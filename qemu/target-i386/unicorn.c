@@ -793,9 +793,12 @@ int x86_reg_read(struct uc_struct *uc, unsigned int *regs, void **vals, int coun
                     case UC_X86_REG_FS_BASE:
                         *(uint64_t *)value = (uint64_t)X86_CPU(uc, mycpu)->env.segs[R_FS].base;
                         break;
+<<<<<<< HEAD
                     case UC_X86_REG_GS_BASE:
                         *(uint64_t *)value = (uint64_t)X86_CPU(uc, mycpu)->env.segs[R_GS].base;
                         break;
+=======
+>>>>>>> x86: setup FS & GS base
                 }
                 break;
 #endif
@@ -917,6 +920,9 @@ int x86_reg_write(struct uc_struct *uc, unsigned int *regs, void *const *vals, i
                         continue;
                     case UC_X86_REG_GS:
                         load_seg_16_helper(&X86_CPU(uc, mycpu)->env, R_GS, *(uint16_t *)value);
+                        continue;
+                    case UC_X86_REG_FS_BASE:
+                        X86_CPU(uc, mycpu)->env.segs[R_FS].base = *(uint32_t *)value;
                         continue;
                 }
                 // fall-thru
@@ -1097,6 +1103,7 @@ int x86_reg_write(struct uc_struct *uc, unsigned int *regs, void *const *vals, i
                     case UC_X86_REG_MXCSR:
                         cpu_set_mxcsr(&X86_CPU(uc, mycpu)->env, *(uint32_t *)value);
                         break;
+<<<<<<< HEAD
                         /*
                     // Don't think base registers are a "thing" on x86
                     case UC_X86_REG_FS_BASE: 
@@ -1106,6 +1113,11 @@ int x86_reg_write(struct uc_struct *uc, unsigned int *regs, void *const *vals, i
                         X86_CPU(uc, mycpu)->env.segs[R_GS].base = *(uint32_t *)value;
                         continue;
                         */
+=======
+                    case UC_X86_REG_FS_BASE:
+                        X86_CPU(uc, mycpu)->env.segs[R_FS].base = *(uint32_t *)value;
+                        continue;
+>>>>>>> x86: setup FS & GS base
                 }
                 break;
 
@@ -1427,9 +1439,12 @@ int x86_reg_write(struct uc_struct *uc, unsigned int *regs, void *const *vals, i
                     case UC_X86_REG_FS_BASE:
                         X86_CPU(uc, mycpu)->env.segs[R_FS].base = *(uint64_t *)value;
                         continue;
+<<<<<<< HEAD
                     case UC_X86_REG_GS_BASE:
                         X86_CPU(uc, mycpu)->env.segs[R_GS].base = *(uint64_t *)value;
                         continue;
+=======
+>>>>>>> x86: setup FS & GS base
                 }
                 break;
 #endif
