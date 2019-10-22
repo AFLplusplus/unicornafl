@@ -1,6 +1,7 @@
 /* Autogen header for Unicorn Engine - DONOT MODIFY */
 #ifndef UNICORN_AUTOGEN_SPARC_H
 #define UNICORN_AUTOGEN_SPARC_H
+#define afl_forkserver_init afl_forkserver_init_sparc
 #define arm_release arm_release_sparc
 #define aarch64_tb_set_jmp_target aarch64_tb_set_jmp_target_sparc
 #define ppc_tb_set_jmp_target ppc_tb_set_jmp_target_sparc

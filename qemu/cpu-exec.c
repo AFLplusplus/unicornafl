@@ -24,6 +24,10 @@
 
 #include "uc_priv.h"
 
+#if defined(UNICORN_AFL)
+#include "../afl-unicorn-cpu-inl.h"
+#endif 
+
 static tcg_target_ulong cpu_tb_exec(CPUState *cpu, uint8_t *tb_ptr);
 static TranslationBlock *tb_find_slow(CPUArchState *env, target_ulong pc,
         target_ulong cs_base, uint64_t flags);
@@ -48,6 +52,39 @@ void cpu_resume_from_signal(CPUState *cpu, void *puc)
 
     cpu->exception_index = -1;
     siglongjmp(cpu->jmp_env, 1);
+}
+
+/* Init the unicorn-afl forkserver */
+
+int afl_forkserver_init(struct uc_struct *uc) 
+{
+    // flush old things for good measure.
+    tb_flush(env);
+
+    // Not sure if we need all of this setup foo.
+    CPUState *cpu = uc->cpu;
+    if (!cpu->created) {
+        cpu->created = true;
+        cpu->halted = 0;
+        if (qemu_init_vcpu(cpu))
+            return -1;
+    }
+    cpu_resume(cpu);
+    
+    if (uc->count_hook != 0) { 
+        uc_hook_del(uc, uc->count_hook);
+        uc->count_hook = 0;
+    }
+
+    uc->quit_request = false;
+    uc->current_cpu = cpu;
+    smp_mb(); 
+    CPUArchState *env = cpu->env_ptr;
+    // Would love to not have the extra step in cpus.c, but it doesn't work otherwise(?)
+    afl_setup(uc);
+    // 0 => we're the child
+    // <0 => no afl
+    return afl_forkserver(env);
 }
 
 /* main execution loop */
@@ -247,6 +284,10 @@ int cpu_exec(struct uc_struct *uc, CPUArchState *env)   // qq
                             next_tb & TB_EXIT_MASK, tb);
                 }
 
+#if defined(UNICORN_AFL)
+                AFL_UNICORN_CPU_SNIPPET2;
+#endif
+
                 /* cpu_interrupt might be called while translating the
                    TB, but before it is linked into a potentially
                    infinite loop and becomes env->current_tb. Avoid
@@ -296,7 +337,13 @@ int cpu_exec(struct uc_struct *uc, CPUArchState *env)   // qq
     // Unicorn: flush JIT cache to because emulation might stop in
     // the middle of translation, thus generate incomplete code.
     // TODO: optimize this for better performance
-    tb_flush(env);
+#if defined (UNICORN_AFL)
+    if (uc->afl_area_ptr) {
+        printf("[d] Found area ptr, not flushing\n");
+    }
+    else 
+#endif
+        tb_flush(env);
 
     /* fail safe : never use current_cpu outside cpu_exec() */
     uc->current_cpu = NULL;
@@ -393,10 +440,18 @@ static TranslationBlock *tb_find_slow(CPUArchState *env, target_ulong pc,
         ptb1 = &tb->phys_hash_next;
     }
 not_found:
+    printf("[d] translating 0x%llx...", pc);
     /* if no translated code available, then translate it now */
     tb = tb_gen_code(cpu, pc, cs_base, (int)flags, 0);   // qq
+    
+#if defined(UNICORN_AFL)
+    /* There seems to be no chaining in unicorn ever? :( */
+    AFL_UNICORN_CPU_SNIPPET1;
+#endif
+    printf(" finished 0x%llx.", pc);
 
 found:
+    printf("[d] got translated block 0x%llx\n", pc);
     /* Move the last found TB to the head of the list */
     if (likely(*ptb1)) {
         *ptb1 = tb->phys_hash_next;

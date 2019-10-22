@@ -642,6 +642,30 @@ uc_err uc_emu_start(uc_engine* uc, uint64_t begin, uint64_t until, uint64_t time
     return uc->invalid_error;
 }
 
+#if defined(UNICORN_AFL)
+UNICORN_EXPORT
+uc_err uc_afl_forkserver_init(uc_engine *uc, size_t exit_count, uint64_t *exits)
+{
+    /*
+    Why we need exits as parameter to forkserver:
+    In the original unicorn-afl, Unicorn needed to flush the tb cache for every iteration.
+    This is super slow.
+    Problem was, that the otiginal forked server doesn't know about possible future exits.
+    The cached blocks, in the next child, therefore whould have no exit set and run forever.
+    Also it's nice to have multiple exits, so let's just do it right.
+    */
+    if (uc->exits) {
+        free(uc->exits);
+    }
+    uc->exits = calloc(sizeof(uint64_t), exit_count);
+    memcpy(uc->exits, exits, sizeof(uint64_t) * exit_count);
+
+    uc->afl_forkserver_init(uc);
+
+    return UC_ERR_OK;
+}
+#endif
+
 
 UNICORN_EXPORT
 uc_err uc_emu_stop(uc_engine *uc)

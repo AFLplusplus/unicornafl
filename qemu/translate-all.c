@@ -436,11 +436,25 @@ static PageDesc *page_find_alloc(struct uc_struct *uc, tb_page_addr_t index, int
 
 #if defined(CONFIG_USER_ONLY)
     /* We can't use g_malloc because it may recurse into a locked mutex. */
+#if defined(UNICORN_AFL)
+    /* This was added by unicorn-afl to bail out semi-gracefully if out of memory. */
+# define ALLOC(P, SIZE)                                 \
+    do {                                                \
+        void* _tmp = mmap(NULL, SIZE, PROT_READ | PROT_WRITE,    \
+                 MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);   \
+        if (_tmp == (void*)-1) { \
+            qemu_log(">>> Out of memory for stack, bailing out. <<<\n"); \
+            exit(1); \
+        } \
+        (P) = _tmp; \
+    } while (0)
+#else /* !UNICORN_AFL */
 # define ALLOC(P, SIZE)                                 \
     do {                                                \
         P = mmap(NULL, SIZE, PROT_READ | PROT_WRITE,    \
                  MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);   \
     } while (0)
+#endif /* UNICORN_AFL */
 #else
 # define ALLOC(P, SIZE) \
     do { P = g_malloc0(SIZE); } while (0)

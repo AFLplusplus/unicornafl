@@ -10975,6 +10975,19 @@ static void disas_a64_insn(CPUARMState *env, DisasContext *s)
     uint32_t insn;
     TCGContext *tcg_ctx = env->uc->tcg_ctx;
 
+#ifdef UNICORN_AFL 
+    // UNICORN-AFL supports (and needs) multiple exits.
+    uint64_t *exits = s->uc->exits;
+    size_t exit_count = s->uc->exit_count;
+    if (exit_count) {
+        for (size_t i; i < exit_count; i++) {
+            if (s->pc == exits[i]) {
+                s->is_jmp = DISAS_WFI;
+                return;
+            }
+        }
+    }
+#endif
     // Unicorn: end address tells us to stop emulation
     if (s->pc == s->uc->addr_end) {
         // imitate WFI instruction to halt emulation
@@ -11108,6 +11121,18 @@ void gen_intermediate_code_internal_a64(ARMCPU *cpu,
 
     tcg_clear_temp_count();
 
+#ifdef UNICORN_AFL 
+    uint64_t *exits = env->uc->exits;
+    size_t exit_count = env->uc->exit_count;
+    if (exit_count) {
+        for (size_t i; i < exit_count; i++) {
+            if (tb->pc == exits[i]) {
+                dc->is_jmp = DISAS_WFI;
+                goto tb_end;
+            }
+        }
+    }
+#endif
     // Unicorn: early check to see if the address of this block is the until address
     if (tb->pc == env->uc->addr_end) {
         // imitate WFI instruction to halt emulation

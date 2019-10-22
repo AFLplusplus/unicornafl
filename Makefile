@@ -88,6 +88,10 @@ AR = llvm-ar
 LDFLAGS := -fsanitize=address ${LDFLAGS}
 endif
 
+ifeq ($(UNICORN_AFL),yes)
+UNICORN_CFLAGS += -DUNICORN_AFL
+endif
+
 ifeq ($(CROSS),)
 CC ?= cc
 AR ?= ar

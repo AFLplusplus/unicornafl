@@ -33,6 +33,12 @@
 
 #include "uc_priv.h"
 
+#if defined(UNICORN_AFL)
+#include "../../afl-unicorn-cpu-translate-inl.h"
+#else
+#define afl_gen_compcov(a,b,c,d,e,f) do {} while (0)
+#endif
+
 #define PREFIX_REPZ   0x01
 #define PREFIX_REPNZ  0x02
 #define PREFIX_LOCK   0x04
@@ -1555,6 +1561,7 @@ static void gen_op(DisasContext *s, int op, TCGMemOp ot, int d)
     case OP_SUBL:
         tcg_gen_mov_tl(tcg_ctx, cpu_cc_srcT, *cpu_T[0]);
         tcg_gen_sub_tl(tcg_ctx, *cpu_T[0], *cpu_T[0], *cpu_T[1]);
+        afl_gen_compcov(tcg_ctx, s->pc, *cpu_T[0], *cpu_T[1], ot, d == OR_EAX);
         gen_op_st_rm_T0_A0(s, ot, d);
         gen_op_update2_cc(tcg_ctx);
         set_cc_op(s, CC_OP_SUBB + ot);
@@ -1582,6 +1589,7 @@ static void gen_op(DisasContext *s, int op, TCGMemOp ot, int d)
         tcg_gen_mov_tl(tcg_ctx, cpu_cc_src, *cpu_T[1]);
         tcg_gen_mov_tl(tcg_ctx, cpu_cc_srcT, *cpu_T[0]);
         tcg_gen_sub_tl(tcg_ctx, cpu_cc_dst, *cpu_T[0], *cpu_T[1]);
+        afl_gen_compcov(tcg_ctx, s->pc, *cpu_T[0], *cpu_T[1], ot, d == OR_EAX);
         set_cc_op(s, CC_OP_SUBB + ot);
         break;
     }
@@ -5010,6 +5018,23 @@ static target_ulong disas_insn(CPUX86State *env, DisasContext *s,
     s->pc = pc_start;
     s->prefix = 0;
 
+#ifdef UNICORN_AFL 
+    // UNICORN-AFL supports (and needs) multiple exits.
+    uint64_t *exits = s->uc->exits;
+    size_t exit_count = s->uc->exit_count;
+    if (exit_count) {
+        for (size_t i; i < exit_count; i++) {
+            if (s->pc == exits[i]) {
+                // imitate the HLT instruction
+                gen_update_cc_op(s);
+                gen_jmp_im(s, pc_start - s->cs_base);
+                gen_helper_hlt(tcg_ctx, cpu_env, tcg_const_i32(tcg_ctx, s->pc - pc_start));
+                s->is_jmp = DISAS_TB_JUMP;
+                return s->pc;
+            }
+        }
+    } 
+#endif
     // end address tells us to stop emulation
     if (s->pc == s->uc->addr_end) {
         // imitate the HLT instruction
@@ -8686,6 +8711,23 @@ static inline void gen_intermediate_code_internal(uint8_t *gen_opc_cc_op,
 
     pc_ptr = pc_start;
 
+#ifdef UNICORN_AFL 
+    // UNICORN-AFL supports (and needs) multiple exits.
+    uint64_t *exits = env->uc->exits;
+    size_t exit_count = env->uc->exit_count;
+    if (exit_count) {
+        for (size_t i; i < exit_count; i++) {
+            if (tb->pc == exits[i]) {
+                // imitate the HLT instruction
+                gen_tb_start(tcg_ctx);
+                gen_jmp_im(dc, tb->pc - tb->cs_base);
+                gen_helper_hlt(tcg_ctx, tcg_ctx->cpu_env, tcg_const_i32(tcg_ctx, 0));
+                dc->is_jmp = DISAS_TB_JUMP;
+                goto done_generating;
+            }
+        }
+    }
+#endif
     // early check to see if the address of this block is the until address
     if (tb->pc == env->uc->addr_end) {
         // imitate the HLT instruction
