@@ -525,6 +525,20 @@ uc_err uc_mem_read(uc_engine *uc, uint64_t address, void *bytes, size_t size);
 UNICORN_EXPORT
 uc_err uc_emu_start(uc_engine *uc, uint64_t begin, uint64_t until, uint64_t timeout, size_t count);
 
+#if defined(UNICORN_AFL)
+/*
+ Start the AFL forkserver
+
+ @uc: handle returned by uc_open()
+ @exit_count: number of exits where fuzzing should stop
+ @exits: address list of exits where fuzzing should stop (len == exit_count)
+
+ @return UC_ERR_OK on success, or other value on failure.
+*/
+UNICORN_EXPORT
+uc_err uc_afl_forkserver_init(uc_engine *uc, size_t exit_count, uint64_t *exits);
+#endif
+
 /*
  Stop emulation (which was started by uc_emu_start() API.
  This is typically called from callback functions registered via tracing APIs.

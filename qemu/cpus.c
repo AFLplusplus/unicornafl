@@ -59,6 +59,8 @@ void run_on_cpu(CPUState *cpu, void (*func)(void *data), void *data)
     func(data);
 }
 
+
+
 int resume_all_vcpus(struct uc_struct *uc)
 {
     CPUState *cpu = uc->cpu;

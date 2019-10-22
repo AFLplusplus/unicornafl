@@ -19205,6 +19205,21 @@ gen_intermediate_code_internal(MIPSCPU *cpu, TranslationBlock *tb,
         max_insns = CF_COUNT_MASK;
     LOG_DISAS("\ntb %p idx %d hflags %04x\n", tb, ctx.mem_idx, ctx.hflags);
 
+#ifdef UNICORN_AFL 
+    // UNICORN-AFL supports (and needs) multiple exits.
+    uint64_t *exits = env->uc->exits;
+    size_t exit_count = env->uc->exit_count;
+    if (exit_count) {
+        for (size_t i; i < exit_count; i++) {
+            if (tb->pc == exits[i]) {
+                gen_tb_start(tcg_ctx);
+                gen_helper_wait(tcg_ctx, tcg_ctx->cpu_env);
+                ctx.bstate = BS_EXCP;
+                goto done_generating;
+            }
+        }
+    }
+#endif
     // Unicorn: early check to see if the address of this block is the until address
     if (tb->pc == env->uc->addr_end) {
         gen_tb_start(tcg_ctx);
@@ -19258,6 +19273,23 @@ gen_intermediate_code_internal(MIPSCPU *cpu, TranslationBlock *tb,
         //if (num_insns + 1 == max_insns && (tb->cflags & CF_LAST_IO))
         //    gen_io_start();
 
+#ifdef UNICORN_AFL 
+        // UNICORN-AFL supports (and needs) multiple exits.
+        uint64_t *exits = ctx.uc->exits;
+        size_t exit_count = ctx.uc->exit_count;
+        if (exit_count) {
+            int stop_emu = 0;
+            for (size_t i; i < exit_count; i++) {
+                if (ctx.pc == exits[i]) {
+                    gen_helper_wait(tcg_ctx, tcg_ctx->cpu_env);
+                    ctx.bstate = BS_EXCP;
+                    stop_emu = 1;
+                    break;
+                }
+            }
+            if (stop_emu) break;
+        }
+#endif
         // Unicorn: end address tells us to stop emulation
         if (ctx.pc == ctx.uc->addr_end) {
             gen_helper_wait(tcg_ctx, tcg_ctx->cpu_env);

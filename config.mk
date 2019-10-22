@@ -28,3 +28,9 @@ UNICORN_STATIC ?= yes
 # a shared library.
 
 UNICORN_SHARED ?= yes
+
+
+################################################################################
+# Changing 'UNICORN_AFLL = yes' to 'UNICORN_AFL = no' disables AFL instrumentation
+
+UNICORN_AFL ?= yes

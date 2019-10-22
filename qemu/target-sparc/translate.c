@@ -5394,7 +5394,20 @@ static inline void gen_intermediate_code_internal(SPARCCPU *cpu,
     dc->singlestep = (cs->singlestep_enabled); // || singlestep);
     gen_opc_end = tcg_ctx->gen_opc_buf + OPC_MAX_SIZE;
 
-
+#ifdef UNICORN_AFL 
+    // UNICORN-AFL supports (and needs) multiple exits.
+    uint64_t *exits = env->uc->exits;
+    size_t exit_count = env->uc->exit_count;
+    if (exit_count) {
+        for (size_t i; i < exit_count; i++) {
+            if (pc_start == exits[i]) {
+                gen_tb_start(tcg_ctx);
+                gen_helper_power_down(tcg_ctx, tcg_ctx->cpu_env);
+                goto done_generating;
+            }
+        }
+    }
+#endif
     // early check to see if the address of this block is the until address
     if (pc_start == env->uc->addr_end) {
         gen_tb_start(tcg_ctx);
@@ -5406,6 +5419,21 @@ static inline void gen_intermediate_code_internal(SPARCCPU *cpu,
     if (max_insns == 0)
         max_insns = CF_COUNT_MASK;
 
+#ifdef UNICORN_AFL 
+    // UNICORN-AFL supports (and needs) multiple exits.
+    exits = env->uc->exits;
+    exit_count = env->uc->exit_count;
+    if (exit_count) {
+        for (size_t i; i < exit_count; i++) {
+            if (tb->pc == exits[i]) {
+                gen_tb_start(tcg_ctx);
+                save_state(dc);
+                gen_helper_power_down(tcg_ctx, tcg_ctx->cpu_env);
+                goto done_generating;
+            }
+        }
+    }
+#endif
     // Unicorn: early check to see if the address of this block is the until address
     if (tb->pc == env->uc->addr_end) {
         gen_tb_start(tcg_ctx);
@@ -5453,6 +5481,24 @@ static inline void gen_intermediate_code_internal(SPARCCPU *cpu,
         }
         //if (num_insns + 1 == max_insns && (tb->cflags & CF_LAST_IO))
         //    gen_io_start();
+
+#ifdef UNICORN_AFL 
+        // UNICORN-AFL supports (and needs) multiple exits.
+        uint64_t *exits = dc->uc->exits;
+        size_t exit_count = dc->uc->exit_count;
+        if (exit_count) {
+            for (size_t i; i < exit_count; i++) {
+                int stop_emu = 0;
+                if (dc->pc == exits[i]) {
+                    save_state(dc);
+                    gen_helper_power_down(tcg_ctx, tcg_ctx->cpu_env);
+                    stop_emu = 1;
+                    break;
+                }
+                if (stop_emu) break;
+            }
+        }
+#endif
         // Unicorn: end address tells us to stop emulation
         if (dc->pc == dc->uc->addr_end) {
             save_state(dc);

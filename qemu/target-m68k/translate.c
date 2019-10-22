@@ -3037,6 +3037,19 @@ static void disas_m68k_insn(CPUM68KState * env, DisasContext *s)
         tcg_gen_debug_insn_start(tcg_ctx, s->pc);
     }
 
+#ifdef UNICORN_AFL 
+    // UNICORN-AFL supports (and needs) multiple exits.
+    uint64_t *exits = s->uc->exits;
+    size_t exit_count = s->uc->exit_count;
+    if (exit_count) {
+        for (size_t i; i < exit_count; i++) {
+            if (s->pc == exits[i]) {
+                gen_exception(s, s->pc, EXCP_HLT);
+                return;
+            }
+        }
+    }
+#endif
     // Unicorn: end address tells us to stop emulation
     if (s->pc == s->uc->addr_end) {
         gen_exception(s, s->pc, EXCP_HLT);
@@ -3097,6 +3110,20 @@ gen_intermediate_code_internal(M68kCPU *cpu, TranslationBlock *tb,
     if (max_insns == 0)
         max_insns = CF_COUNT_MASK;
 
+#ifdef UNICORN_AFL 
+    // UNICORN-AFL supports (and needs) multiple exits.
+    uint64_t *exits = env->uc->exits;
+    size_t exit_count = env->uc->exit_count;
+    if (exit_count) {
+        for (size_t i; i < exit_count; i++) {
+            if (tb->pc == exits[i]) {
+                gen_tb_start(tcg_ctx);
+                gen_exception(dc, dc->pc, EXCP_HLT);
+                goto done_generating;
+            }
+        }
+    }
+#endif
     // Unicorn: early check to see if the address of this block is the until address
     if (tb->pc == env->uc->addr_end) {
         gen_tb_start(tcg_ctx);

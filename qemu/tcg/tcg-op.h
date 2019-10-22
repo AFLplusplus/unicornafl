@@ -27,6 +27,10 @@
 
 int gen_new_label(TCGContext *);
 
+#ifdef UNICORN_AFL
+#include "../../afl-unicorn-tcg-op-inl.h"
+#endif
+
 static inline void gen_uc_tracecode(TCGContext *tcg_ctx, int32_t size, int32_t type, void *uc, uint64_t pc)
 {
     TCGv_i32 tsize = tcg_const_i32(tcg_ctx, size);
