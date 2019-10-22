@@ -5023,7 +5023,7 @@ static target_ulong disas_insn(CPUX86State *env, DisasContext *s,
     uint64_t *exits = s->uc->exits;
     size_t exit_count = s->uc->exit_count;
     if (exit_count) {
-        for (size_t i; i < exit_count; i++) {
+        for (size_t i = 0; i < exit_count; i++) {
             if (s->pc == exits[i]) {
                 // imitate the HLT instruction
                 gen_update_cc_op(s);
@@ -8716,7 +8716,7 @@ static inline void gen_intermediate_code_internal(uint8_t *gen_opc_cc_op,
     uint64_t *exits = env->uc->exits;
     size_t exit_count = env->uc->exit_count;
     if (exit_count) {
-        for (size_t i; i < exit_count; i++) {
+        for (size_t i = 0; i < exit_count; i++) {
             if (tb->pc == exits[i]) {
                 // imitate the HLT instruction
                 gen_tb_start(tcg_ctx);

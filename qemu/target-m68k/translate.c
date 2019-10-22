@@ -3042,7 +3042,7 @@ static void disas_m68k_insn(CPUM68KState * env, DisasContext *s)
     uint64_t *exits = s->uc->exits;
     size_t exit_count = s->uc->exit_count;
     if (exit_count) {
-        for (size_t i; i < exit_count; i++) {
+        for (size_t i = 0; i < exit_count; i++) {
             if (s->pc == exits[i]) {
                 gen_exception(s, s->pc, EXCP_HLT);
                 return;
@@ -3115,7 +3115,7 @@ gen_intermediate_code_internal(M68kCPU *cpu, TranslationBlock *tb,
     uint64_t *exits = env->uc->exits;
     size_t exit_count = env->uc->exit_count;
     if (exit_count) {
-        for (size_t i; i < exit_count; i++) {
+        for (size_t i = 0; i < exit_count; i++) {
             if (tb->pc == exits[i]) {
                 gen_tb_start(tcg_ctx);
                 gen_exception(dc, dc->pc, EXCP_HLT);

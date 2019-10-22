@@ -19210,7 +19210,7 @@ gen_intermediate_code_internal(MIPSCPU *cpu, TranslationBlock *tb,
     uint64_t *exits = env->uc->exits;
     size_t exit_count = env->uc->exit_count;
     if (exit_count) {
-        for (size_t i; i < exit_count; i++) {
+        for (size_t i = 0; i < exit_count; i++) {
             if (tb->pc == exits[i]) {
                 gen_tb_start(tcg_ctx);
                 gen_helper_wait(tcg_ctx, tcg_ctx->cpu_env);
@@ -19279,7 +19279,7 @@ gen_intermediate_code_internal(MIPSCPU *cpu, TranslationBlock *tb,
         size_t exit_count = ctx.uc->exit_count;
         if (exit_count) {
             int stop_emu = 0;
-            for (size_t i; i < exit_count; i++) {
+            for (size_t i = 0; i < exit_count; i++) {
                 if (ctx.pc == exits[i]) {
                     gen_helper_wait(tcg_ctx, tcg_ctx->cpu_env);
                     ctx.bstate = BS_EXCP;
