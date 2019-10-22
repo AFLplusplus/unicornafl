@@ -17,7 +17,7 @@ typedef struct vm_change_state_entry VMChangeStateEntry;
 
 int vm_start(struct uc_struct*);
 
-int afl_forkserver_init(struct uc_struct*);
+void afl_forkserver_init(struct uc_struct*);
 
 void qemu_system_reset_request(struct uc_struct*);
 void qemu_system_shutdown_request(void);

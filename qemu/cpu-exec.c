@@ -56,11 +56,8 @@ void cpu_resume_from_signal(CPUState *cpu, void *puc)
 
 /* Init the unicorn-afl forkserver */
 
-int afl_forkserver_init(struct uc_struct *uc) 
+void afl_forkserver_init(struct uc_struct *uc) 
 {
-    // flush old things for good measure.
-    tb_flush(env);
-
     // Not sure if we need all of this setup foo.
     CPUState *cpu = uc->cpu;
     if (!cpu->created) {
@@ -84,7 +81,7 @@ int afl_forkserver_init(struct uc_struct *uc)
     afl_setup(uc);
     // 0 => we're the child
     // <0 => no afl
-    return afl_forkserver(env);
+    afl_forkserver(env);
 }
 
 /* main execution loop */
@@ -339,7 +336,7 @@ int cpu_exec(struct uc_struct *uc, CPUArchState *env)   // qq
     // TODO: optimize this for better performance
 #if defined (UNICORN_AFL)
     if (uc->afl_area_ptr) {
-        printf("[d] Found area ptr, not flushing\n");
+        //printf("[d] Found area ptr, not flushing\n");
     }
     else 
 #endif
@@ -431,18 +428,18 @@ static TranslationBlock *tb_find_slow(CPUArchState *env, target_ulong pc,
         ptb1 = &tb->phys_hash_next;
     }
 not_found:
-    printf("[d] translating 0x%llx...", pc);
+    //printf("[d] translating 0x%llx...", pc);
     /* if no translated code available, then translate it now */
     tb = tb_gen_code(cpu, pc, cs_base, (int)flags, 0);   // qq
     
 #if defined(UNICORN_AFL)
     /* There seems to be no chaining in unicorn ever? :( */
     AFL_UNICORN_CPU_SNIPPET1;
+    //printf(" finished 0x%llx.", pc);
 #endif
-    printf(" finished 0x%llx.", pc);
 
 found:
-    printf("[d] got translated block 0x%llx\n", pc);
+    //printf("[d] got translated block 0x%llx\n", pc);
     /* Move the last found TB to the head of the list */
     if (likely(*ptb1)) {
         *ptb1 = tb->phys_hash_next;

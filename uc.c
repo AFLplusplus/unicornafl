@@ -652,6 +652,7 @@ uc_err uc_afl_forkserver_init(uc_engine *uc, size_t exit_count, uint64_t *exits)
     }
     uc->exits = calloc(sizeof(uint64_t), exit_count);
     memcpy(uc->exits, exits, sizeof(uint64_t) * exit_count);
+    uc->exit_count = exit_count;
 
     uc->afl_forkserver_init(uc);
 

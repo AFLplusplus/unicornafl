@@ -10980,7 +10980,7 @@ static void disas_a64_insn(CPUARMState *env, DisasContext *s)
     uint64_t *exits = s->uc->exits;
     size_t exit_count = s->uc->exit_count;
     if (exit_count) {
-        for (size_t i; i < exit_count; i++) {
+        for (size_t i = 0; i < exit_count; i++) {
             if (s->pc == exits[i]) {
                 s->is_jmp = DISAS_WFI;
                 return;
@@ -11125,7 +11125,7 @@ void gen_intermediate_code_internal_a64(ARMCPU *cpu,
     uint64_t *exits = env->uc->exits;
     size_t exit_count = env->uc->exit_count;
     if (exit_count) {
-        for (size_t i; i < exit_count; i++) {
+        for (size_t i = 0; i < exit_count; i++) {
             if (tb->pc == exits[i]) {
                 dc->is_jmp = DISAS_WFI;
                 goto tb_end;
