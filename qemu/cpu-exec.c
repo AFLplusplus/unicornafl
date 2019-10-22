@@ -63,8 +63,10 @@ void afl_forkserver_init(struct uc_struct *uc)
     if (!cpu->created) {
         cpu->created = true;
         cpu->halted = 0;
-        if (qemu_init_vcpu(cpu))
-            return -1;
+        if (qemu_init_vcpu(cpu)) {
+            printf("[!] Really bad error initializing vcpu in unicorn :/");
+            exit(1);
+        }
     }
     cpu_resume(cpu);
     
