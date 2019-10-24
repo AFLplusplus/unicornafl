@@ -23,8 +23,8 @@ IS_64BITS = platform.architecture()[0] == '64bit'
 
 # are we building from the repository or from a source distribution?
 ROOT_DIR = os.path.dirname(os.path.realpath(__file__))
-LIBS_DIR = os.path.join(ROOT_DIR, 'unicorn', 'lib')
-HEADERS_DIR = os.path.join(ROOT_DIR, 'unicorn', 'include')
+LIBS_DIR = os.path.join(ROOT_DIR, 'unicornafl', 'lib')
+HEADERS_DIR = os.path.join(ROOT_DIR, 'unicornafl', 'include')
 SRC_DIR = os.path.join(ROOT_DIR, 'src')
 BUILD_DIR = SRC_DIR if os.path.exists(SRC_DIR) else os.path.join(ROOT_DIR, '../..')
 
@@ -59,13 +59,13 @@ else:
     VERSION = '{PKG_MAJOR}.{PKG_MINOR}.{PKG_EXTRA}'.format(**VERSION_DATA)
 
 if SYSTEM == 'darwin':
-    LIBRARY_FILE = "libunicorn.dylib"
+    LIBRARY_FILE = "libunicornafl.dylib"
     STATIC_LIBRARY_FILE = None
 elif SYSTEM in ('win32', 'cygwin'):
-    LIBRARY_FILE = "unicorn.dll"
-    STATIC_LIBRARY_FILE = "unicorn.lib"
+    LIBRARY_FILE = "unicornafl.dll"
+    STATIC_LIBRARY_FILE = "unicornafl.lib"
 else:
-    LIBRARY_FILE = "libunicorn.so"
+    LIBRARY_FILE = "libunicornafl.so"
     STATIC_LIBRARY_FILE = None
 
 def clean_bins():
@@ -125,7 +125,7 @@ def build_libraries():
     os.mkdir(LIBS_DIR)
 
     # copy public headers
-    shutil.copytree(os.path.join(BUILD_DIR, 'include', 'unicorn'), os.path.join(HEADERS_DIR, 'unicorn'))
+    shutil.copytree(os.path.join(BUILD_DIR, 'include', 'unicorn'), os.path.join(HEADERS_DIR, 'unicornafl'))
 
     # check if a prebuilt library exists
     # if so, use it instead of building
@@ -247,9 +247,9 @@ def join_all(src, files):
     return tuple(os.path.join(src, f) for f in files)
 
 setup(
-    provides=['unicorn'],
-    packages=['unicorn'],
-    name='unicorn',
+    provides=['unicornafl'],
+    packages=['unicornafl'],
+    name='unicornafl',
     version=VERSION,
     author='Nguyen Anh Quynh',
     author_email='aquynh@gmail.com',
@@ -266,6 +266,6 @@ setup(
     include_package_data=True,
     is_pure=True,
     package_data={
-        'unicorn': ['lib/*', 'include/unicorn/*']
+        'unicornafl': ['lib/*', 'include/unicornafl/*']
     }
 )

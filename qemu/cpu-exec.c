@@ -54,9 +54,9 @@ void cpu_resume_from_signal(CPUState *cpu, void *puc)
     siglongjmp(cpu->jmp_env, 1);
 }
 
-/* Init the unicorn-afl forkserver */
+/* Init the unicorn-afl forkserver (returns uc_afl_ret) */
 
-void afl_forkserver_init(struct uc_struct *uc) 
+int afl_forkserver_start(struct uc_struct *uc) 
 {
     // Not sure if we need all of this setup foo.
     CPUState *cpu = uc->cpu;
@@ -64,8 +64,8 @@ void afl_forkserver_init(struct uc_struct *uc)
         cpu->created = true;
         cpu->halted = 0;
         if (qemu_init_vcpu(cpu)) {
-            printf("[!] Really bad error initializing vcpu in unicorn :/");
-            exit(1);
+            fprintf(stderr,"[!] Really bad error initializing vcpu in unicorn :/");
+            return UC_AFL_RET_ERROR;
         }
     }
     cpu_resume(cpu);
@@ -81,9 +81,7 @@ void afl_forkserver_init(struct uc_struct *uc)
     CPUArchState *env = cpu->env_ptr;
     // Would love to not have the extra step in cpus.c, but it doesn't work otherwise(?)
     afl_setup(uc);
-    // 0 => we're the child
-    // <0 => no afl
-    afl_forkserver(env);
+    return afl_forkserver(env);
 }
 
 /* main execution loop */

@@ -250,7 +250,7 @@ struct uc_struct {
     bool hook_insert;	// insert new hook at begin of the hook list (append by default)
     
 #ifdef UNICORN_AFL
-    uc_args_uc_t afl_forkserver_init;
+    uc_args_int_uc_t afl_forkserver_start;
     unsigned char *afl_area_ptr;
     int afl_compcov_level;
     unsigned int afl_inst_rms;

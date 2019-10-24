@@ -8,8 +8,26 @@ import inspect
 import os.path
 import sys
 import weakref
+import gc
 
 from . import x86_const, arm64_const, unicorn_const as uc
+
+def monkeypatch():
+    # type: () -> None
+    """
+    If you call monkeypatch() before importing any other unicorn-based lib, it'll "just work".
+    Any normal `import unicorn` will from now on return unicornafl.
+    Good for 3rd Party libs using unicorn.
+    They won't even notice the difference - but they can now use the AFL forkserver.
+    """
+    sys.modules["unicorn"] = sys.modules["unicornafl"]
+
+
+UC_AFL_RET_CHILD = 0 # Fork worked. we are a child
+UC_AFL_RET_NOAFL = 1 # No AFL, no need to fork.
+UC_AFL_RET_AFL_DIED = 2 # We forked before but now AFL is gone (parent)
+UC_AFL_RET_ERROR = 3 # Something went horribly wrong in the parent
+
 
 if not hasattr(sys.modules[__name__], "__file__"):
     __file__ = inspect.getfile(inspect.currentframe())
@@ -18,11 +36,11 @@ _python2 = sys.version_info[0] < 3
 if _python2:
     range = xrange
 
-_lib = { 'darwin': 'libunicorn.dylib',
-         'win32': 'unicorn.dll',
-         'cygwin': 'cygunicorn.dll',
-         'linux': 'libunicorn.so',
-         'linux2': 'libunicorn.so' }
+_lib = { 'darwin': 'libunicornafl.dylib',
+         'win32': 'unicornafl.dll',
+         'cygwin': 'cygunicornafl.dll',
+         'linux': 'libunicornafl.so',
+         'linux2': 'libunicornafl.so' }
 
 
 # Windows DLL in dependency order
@@ -59,7 +77,7 @@ def _load_lib(path):
         if sys.platform in ('win32', 'cygwin'):
             _load_win_support(path)
 
-        lib_file = os.path.join(path, _lib.get(sys.platform, 'libunicorn.so'))
+        lib_file = os.path.join(path, _lib.get(sys.platform, 'libunicornafl.so'))
         #print('Trying to load shared library', lib_file)
         dll = ctypes.cdll.LoadLibrary(lib_file)
         #print('SUCCESS')
@@ -97,6 +115,7 @@ else:
     raise ImportError("ERROR: fail to load the dynamic library.")
 
 __version__ = "%u.%u.%u" % (uc.UC_VERSION_MAJOR, uc.UC_VERSION_MINOR, uc.UC_VERSION_EXTRA)
+__hasafl__ = True
 
 # setup all the function prototype
 def _setup_prototype(lib, fname, restype, *argtypes):
@@ -104,6 +123,7 @@ def _setup_prototype(lib, fname, restype, *argtypes):
     getattr(lib, fname).argtypes = argtypes
 
 ucerr = ctypes.c_int
+ucaflret = ctypes.c_int
 uc_engine = ctypes.c_void_p
 uc_context = ctypes.c_void_p
 uc_hook_h = ctypes.c_size_t
@@ -140,6 +160,8 @@ _setup_prototype(_uc, "uc_context_save", ucerr, uc_engine, uc_context)
 _setup_prototype(_uc, "uc_context_restore", ucerr, uc_engine, uc_context)
 _setup_prototype(_uc, "uc_context_size", ctypes.c_size_t, uc_engine)
 _setup_prototype(_uc, "uc_mem_regions", ucerr, uc_engine, ctypes.POINTER(ctypes.POINTER(_uc_mem_region)), ctypes.POINTER(ctypes.c_uint32))
+_setup_prototype(_uc, "uc_afl_forkserver_start", ucaflret, uc_engine, ctypes.POINTER(ctypes.c_uint64), ctypes.c_size_t)
+
 
 # uc_hook_add is special due to variable number of arguments
 _uc.uc_hook_add = _uc.uc_hook_add
@@ -175,6 +197,28 @@ class UcError(Exception):
 
     def __str__(self):
         return _uc.uc_strerror(self.errno).decode('ascii')
+
+
+# AFL Errors
+class UcAflError(UcError):
+    """
+    Unicode Afl Error class
+    """
+    def __init__(self, afl_ret=UC_AFL_RET_ERROR, message=None):
+        # type: (UcAflError, int, Optional[str]) -> None
+        self.errno = afl_ret # type: int
+        self.message = message # type: str
+
+    def __str__(self):
+        # type: (UcAflError) -> str
+        if self.message:
+            return self.message
+        return {
+            UC_AFL_RET_CHILD: "Fork worked. we are a child (no Error)",
+            UC_AFL_RET_NOAFL: "No AFL, no need to fork (but no real Error)",
+            UC_AFL_RET_AFL_DIED: "We forked before but now AFL is gone (time to quit)",
+            UC_AFL_RET_ERROR: "Something went horribly wrong in the parent!"
+        }[self.errno]
 
 
 # return the core's version
@@ -300,6 +344,8 @@ class Uc(object):
         self._callback_count = 0
         self._cleanup.register(self)
 
+        self.forkserver_started = False
+
     @staticmethod
     def release_handle(uch):
         if uch:
@@ -312,6 +358,10 @@ class Uc(object):
 
     # emulate from @begin, and stop when reaching address @until
     def emu_start(self, begin, until, timeout=0, count=0):
+        """
+        emulate from @begin, and stop when reaching address @until
+        Unless forkserver is started, in which case only the exit points set in afl_start_forksever will work!
+        """
         status = _uc.uc_emu_start(self._uch, begin, until, timeout, count)
         if status != uc.UC_ERR_OK:
             raise UcError(status)
@@ -321,6 +371,46 @@ class Uc(object):
         status = _uc.uc_emu_stop(self._uch)
         if status != uc.UC_ERR_OK:
             raise UcError(status)
+
+    # call this to kick off afl forkserver mode (when running as child of AFL)
+    def afl_forkserver_start(self, exits):
+        # type: (Uc, List[int]) -> bool
+        """
+        This will start the forkserver.
+        It forks internally, leaving the parent running in an endless loop.
+        The child notifies the parent about any new block encountered.
+        The parent then also translates this block for the next AFL iteration.
+        Since the parent won't know about any exits set after this point, there is no use in using
+        emu_start params like until or count.
+        Instead, the exit list of int addresses is passed directly to the parent.
+        Everything beyond this func is done for every. single. child. Make sure to do the important stuff berfore.
+        Will raise UcAflError if something went wrong or AFL died (in which case we want to exit)
+        :param exits: A list of exits at which the Uc execution will stop.
+        :return: True, if AFL was available. You're now in the child. Over and over again.
+        """
+        if not exits:
+            raise UcAflError(message="No exits given. Forkserver needs to know all possible exits in advance.")
+        for addr in exits:
+            if not isinstance(addr, int):
+                raise UcAflError(message="Exit addresses need to be a list of ints where the fuzzer should stop - {} provided instead ({})".format(type(addr), addr))
+        if self.forkserver_started:
+            raise UcAflError(message="Already in a forkserver child. Nesting make")
+        exit_count = len(exits)
+        # Collect all unneeded memory, No need to clone it on fork.
+        gc.collect()
+        self.forkserver_started = True
+        # everything beyond this point is done for every. single. child. For real. Make sure to do the important stuff berfore.
+        status = _uc.uc_afl_forkserver_start(self._uch, (ctypes.c_uint64 * exit_count)(*exits), exit_count)
+        if status == UC_AFL_RET_CHILD:
+            # We're in the child. Let's go fuzz.
+            return True
+        elif status == UC_AFL_RET_NOAFL:
+            self.forkserver_started = False
+            return False
+            # No AFL. We didn't start the forkserver. Let's run on.
+        else:
+            raise UcAflError(status)
+
 
     # return the value of a register
     def reg_read(self, reg_id, opt=None):
