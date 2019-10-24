@@ -89,7 +89,7 @@ static inline void uc_common_init(struct uc_struct* uc)
     uc->afl_area_ptr = 0;
     uc->exit_count = 0;
     uc->exits = NULL;
-    uc->afl_forkserver_init = afl_forkserver_init;
+    uc->afl_forkserver_start = afl_forkserver_start;
 #endif
 }
 

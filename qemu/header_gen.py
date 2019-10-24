@@ -8,7 +8,7 @@ import sys
 
 symbols = (
 
-    'afl_forkserver_init',
+    'afl_forkserver_start',
 
     'arm_release',
     'aarch64_tb_set_jmp_target',

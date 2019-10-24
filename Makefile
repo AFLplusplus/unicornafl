@@ -7,7 +7,7 @@
 include config.mk
 include pkgconfig.mk	# package version
 
-LIBNAME = unicorn
+LIBNAME = unicornafl
 UNAME_S := $(shell uname -s)
 # SMP_MFLAGS is used for controlling the amount of parallelism used
 # in external 'make' invocations. If the user doesn't override it, it
@@ -351,8 +351,8 @@ define generate-pkgcfg
 	echo 'Version: $(PKG_VERSION)' >> $(PKGCFGF)
 	echo 'libdir=$(LIBDIR)' >> $(PKGCFGF)
 	echo 'includedir=$(INCDIR)' >> $(PKGCFGF)
-	echo 'archive=$${libdir}/libunicorn.a' >> $(PKGCFGF)
-	echo 'Libs: -L$${libdir} -lunicorn' >> $(PKGCFGF)
+	echo 'archive=$${libdir}/lib$(LIBNAME).a' >> $(PKGCFGF)
+	echo 'Libs: -L$${libdir} -l$(LIBNAME)' >> $(PKGCFGF)
 	echo 'Cflags: -I$${includedir}' >> $(PKGCFGF)
 endef
 

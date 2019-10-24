@@ -637,7 +637,7 @@ uc_err uc_emu_start(uc_engine* uc, uint64_t begin, uint64_t until, uint64_t time
 
 #if defined(UNICORN_AFL)
 UNICORN_EXPORT
-uc_err uc_afl_forkserver_init(uc_engine *uc, size_t exit_count, uint64_t *exits)
+uc_err uc_afl_forkserver_start(uc_engine *uc, size_t exit_count, uint64_t *exits)
 {
     /*
     Why we need exits as parameter to forkserver:
@@ -654,7 +654,7 @@ uc_err uc_afl_forkserver_init(uc_engine *uc, size_t exit_count, uint64_t *exits)
     memcpy(uc->exits, exits, sizeof(uint64_t) * exit_count);
     uc->exit_count = exit_count;
 
-    uc->afl_forkserver_init(uc);
+    uc->afl_forkserver_start(uc);
 
     return UC_ERR_OK;
 }

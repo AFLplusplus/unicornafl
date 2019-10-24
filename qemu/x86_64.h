@@ -1,7 +1,7 @@
 /* Autogen header for Unicorn Engine - DONOT MODIFY */
 #ifndef UNICORN_AUTOGEN_X86_64_H
 #define UNICORN_AUTOGEN_X86_64_H
-#define afl_forkserver_init afl_forkserver_init_x86_64
+#define afl_forkserver_start afl_forkserver_start_x86_64
 #define arm_release arm_release_x86_64
 #define aarch64_tb_set_jmp_target aarch64_tb_set_jmp_target_x86_64
 #define ppc_tb_set_jmp_target ppc_tb_set_jmp_target_x86_64

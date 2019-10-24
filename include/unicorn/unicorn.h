@@ -155,6 +155,16 @@ typedef enum uc_err {
     UC_ERR_EXCEPTION // Unhandled CPU exception
 } uc_err;
 
+#ifdef UNICORN_AFL
+/* start_forkserver results */
+typedef enum uc_afl_ret {
+  UC_AFL_RET_CHILD = 0, // Fork worked. we are a child
+  UC_AFL_RET_NOAFL, // No AFL, no need to fork.
+  UC_AFL_RET_AFL_DIED, // We forked before but now AFL is gone (parent)
+  UC_AFL_RET_ERROR, // Something went horribly wrong in the parent
+} uc_afl_ret;
+#endif
+
 
 /*
   Callback function for tracing code (UC_HOOK_CODE & UC_HOOK_BLOCK)
@@ -536,7 +546,7 @@ uc_err uc_emu_start(uc_engine *uc, uint64_t begin, uint64_t until, uint64_t time
  @return UC_ERR_OK on success, or other value on failure.
 */
 UNICORN_EXPORT
-uc_err uc_afl_forkserver_init(uc_engine *uc, size_t exit_count, uint64_t *exits);
+uc_err uc_afl_forkserver_start(uc_engine *uc, size_t exit_count, uint64_t *exits);
 #endif
 
 /*
