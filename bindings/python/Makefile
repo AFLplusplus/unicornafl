@@ -7,8 +7,8 @@ gen_const:
 
 install:
 	rm -rf src/ dist/
-	rm -rf prebuilt/win64/unicorn.dll
-	rm -rf prebuilt/win32/unicorn.dll
+	rm -rf prebuilt/win64/unicornafl.dll
+	rm -rf prebuilt/win32/unicornafl.dll
 	if test -n "${DESTDIR}"; then \
 		python setup.py install --root="${DESTDIR}"; \
 	else \
@@ -17,8 +17,8 @@ install:
 
 install3:
 	rm -rf src/ dist/
-	rm -rf prebuilt/win64/unicorn.dll
-	rm -rf prebuilt/win32/unicorn.dll
+	rm -rf prebuilt/win64/unicornafl.dll
+	rm -rf prebuilt/win32/unicornafl.dll
 	if test -n "${DESTDIR}"; then \
 		python3 setup.py install --root="${DESTDIR}"; \
 	else \
@@ -28,29 +28,29 @@ install3:
 # build & upload PyPi package with source code of the core
 sdist:
 	rm -rf src/ dist/
-	rm -rf prebuilt/win64/unicorn.dll
-	rm -rf prebuilt/win32/unicorn.dll
+	rm -rf prebuilt/win64/unicornafl.dll
+	rm -rf prebuilt/win32/unicornafl.dll
 	python setup.py sdist register upload
 
 # build & upload PyPi package with source code of the core
 sdist3:
 	rm -rf src/ dist/
-	rm -rf prebuilt/win64/unicorn.dll
-	rm -rf prebuilt/win32/unicorn.dll
+	rm -rf prebuilt/win64/unicornafl.dll
+	rm -rf prebuilt/win32/unicornafl.dll
 	python3 setup.py sdist register upload
 
 # build & upload PyPi package with precompiled core
 bdist:
 	rm -rf src/ dist/
-	rm -rf prebuilt/win64/unicorn.dll
-	rm -rf prebuilt/win32/unicorn.dll
+	rm -rf prebuilt/win64/unicornafl.dll
+	rm -rf prebuilt/win32/unicornafl.dll
 	python setup.py bdist_wheel register upload
 
 # build & upload PyPi package with precompiled core
 bdist3:
 	rm -rf src/ dist/
-	rm -rf prebuilt/win64/unicorn.dll
-	rm -rf prebuilt/win32/unicorn.dll
+	rm -rf prebuilt/win64/unicornafl.dll
+	rm -rf prebuilt/win32/unicornafl.dll
 	python3 setup.py bdist_wheel register upload
 
 # build & upload PyPi package with prebuilt core
@@ -67,11 +67,11 @@ sdist3_win:
 
 clean:
 	rm -rf src/ dist/ build/ MANIFEST
-	rm -rf prebuilt/win64/unicorn.dll
-	rm -rf prebuilt/win32/unicorn.dll
-	rm -rf unicorn/lib unicorn/include
-	rm -rf unicorn/*.pyc
-	rm -rf unicorn.egg-info
+	rm -rf prebuilt/win64/unicornafl.dll
+	rm -rf prebuilt/win32/unicornafl.dll
+	rm -rf unicornafl/lib unicornafl/include
+	rm -rf unicornafl/*.pyc
+	rm -rf unicornafl.egg-info
 
 
 SAMPLES = sample_arm.py sample_arm64.py sample_mips.py

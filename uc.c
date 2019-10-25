@@ -637,7 +637,7 @@ uc_err uc_emu_start(uc_engine* uc, uint64_t begin, uint64_t until, uint64_t time
 
 #if defined(UNICORN_AFL)
 UNICORN_EXPORT
-uc_err uc_afl_forkserver_start(uc_engine *uc, size_t exit_count, uint64_t *exits)
+uc_afl_ret uc_afl_forkserver_start(uc_engine *uc, uint64_t *exits, size_t exit_count)
 {
     /*
     Why we need exits as parameter to forkserver:
@@ -651,12 +651,14 @@ uc_err uc_afl_forkserver_start(uc_engine *uc, size_t exit_count, uint64_t *exits
         free(uc->exits);
     }
     uc->exits = calloc(sizeof(uint64_t), exit_count);
+    if (!exits) {
+        fprintf(stderr, "[!] Out of mem. Failed to alloc %zu qwords for exits!", exit_count);
+        return UC_AFL_RET_ERROR;
+    }
     memcpy(uc->exits, exits, sizeof(uint64_t) * exit_count);
     uc->exit_count = exit_count;
 
-    uc->afl_forkserver_start(uc);
-
-    return UC_ERR_OK;
+    return uc->afl_forkserver_start(uc);
 }
 #endif
 
