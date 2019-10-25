@@ -252,7 +252,9 @@ UC_X86_REG_FPCW = 246
 UC_X86_REG_FPTAG = 247
 UC_X86_REG_MSR = 248
 UC_X86_REG_MXCSR = 249
-# These two are new in Uncorn AFL
+# Base regs supported in unicorn starting with this commit:
+# https://github.com/unicorn-engine/unicorn/commit/b90427e8d8ac1c98f4817c0bcb5cd2a66c8eaed1
+# These two consts have been added to the python binding for Uncorn AFL.
 UC_X86_REG_GS_BASE = 250
 UC_X86_REG_FS_BASE = 251
 UC_X86_REG_ENDING = 252
