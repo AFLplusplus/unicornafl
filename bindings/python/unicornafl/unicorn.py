@@ -344,7 +344,7 @@ class Uc(object):
         self._callback_count = 0
         self._cleanup.register(self)
 
-        self.forkserver_started = False
+        self.afl_is_forkserver_child = False
 
     @staticmethod
     def release_handle(uch):
@@ -393,22 +393,22 @@ class Uc(object):
         for addr in exits:
             if not isinstance(addr, int):
                 raise UcAflError(message="Exit addresses need to be a list of ints where the fuzzer should stop - {} provided instead ({})".format(type(addr), addr))
-        if self.forkserver_started:
+        if self.afl_is_forkserver_child:
             raise UcAflError(message="Already in a forkserver child. Nesting make")
+        sys.stdout.flush()  # otherwise children will inherit the unflushed buffer
+        gc.collect()  # Collect all unneeded memory, No need to clone it on fork.
         exit_count = len(exits)
-        # Collect all unneeded memory, No need to clone it on fork.
-        gc.collect()
-        self.forkserver_started = True
         # everything beyond this point is done for every. single. child. For real. Make sure to do the important stuff berfore.
         status = _uc.uc_afl_forkserver_start(self._uch, (ctypes.c_uint64 * exit_count)(*exits), exit_count)
         if status == UC_AFL_RET_CHILD:
             # We're in the child. Let's go fuzz.
+            self.afl_is_forkserver_child = True
             return True
-        elif status == UC_AFL_RET_NOAFL:
-            self.forkserver_started = False
+        elif status == UC_AFL_RET_NOAFL or status == UC_AFL_RET_AFL_DIED:
+            # No AFL. We didn't start the forkserver. Let's run on like we did.
             return False
-            # No AFL. We didn't start the forkserver. Let's run on.
         else:
+            # Something else.
             raise UcAflError(status)
 
 
