@@ -56,6 +56,8 @@ void cpu_resume_from_signal(CPUState *cpu, void *puc)
 
 /* Init the unicorn-afl forkserver (returns uc_afl_ret) */
 
+#if defined(UNICORN_AFL)
+
 int afl_forkserver_start(struct uc_struct *uc) 
 {
     // Not sure if we need all of this setup foo.
@@ -83,6 +85,12 @@ int afl_forkserver_start(struct uc_struct *uc)
     afl_setup(uc);
     return afl_forkserver(env);
 }
+#else
+int afl_forkserver_start(struct uc_struct *uc) {
+    fprintf(ferror, "[!] Unicorn built without AFL support. Try rebuilding with UNICORN_AFL=1.\n");
+    return -1;
+}
+#endif 
 
 /* main execution loop */
 
@@ -338,7 +346,7 @@ int cpu_exec(struct uc_struct *uc, CPUArchState *env)   // qq
     if (uc->afl_area_ptr) {
         //printf("[d] Found area ptr, not flushing\n");
     }
-    else 
+    else
 #endif
         tb_flush(env);
 
