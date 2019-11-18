@@ -71,7 +71,6 @@
 /* Set in the child process in forkserver mode: */
 
 static unsigned char afl_fork_child;
-static unsigned int  afl_forksrv_pid;
 
 /* Function declarations. */
 
@@ -130,6 +129,14 @@ static void afl_setup(struct uc_struct* uc) {
     uc->afl_area_ptr = shmat(shm_id, NULL, 0);
 
     if (uc->afl_area_ptr == (void*)-1) exit(1);
+    
+    /* Not sure if this does anything.
+      Also, for persistent mode, we want the map to be emtpy on every fork.
+      As far as I can see, afl clears the map it after each testcase.
+      So there is no reason why it shouldn't be empty on new forked children.
+      In contrast to "normal" instrumentation, we never count branches before forking.
+      */
+    memset(uc->afl_area_ptr, 0, MAP_SIZE); 
 
     /* With AFL_INST_RATIO set to a low value, we want to touch the bitmap
        so that the parent doesn't give up on us. */
@@ -148,71 +155,100 @@ static void afl_setup(struct uc_struct* uc) {
 
 }
 
-/* Fork server logic, invoked once we hit first emulated instruction. */
+
+/* Fork server logic, invoked by calling uc_afl_forkserver_start.
+   Roughly follows https://github.com/vanhauser-thc/AFLplusplus/blob/c83e8e1e6255374b085292ba8673efdca7388d76/llvm_mode/afl-llvm-rt.o.c#L130 
+   */
 
 static inline uc_afl_ret afl_forkserver(CPUArchState* env) {
 
   static unsigned char tmp[4];
+  pid_t   child_pid;
+  int     t_fd[2];  // Channel between child and parent for tcg translation cache
+  uint8_t child_stopped = 0;
 
-  if (!env->uc->afl_area_ptr) return UC_AFL_RET_NOAFL;
+  void (*old_sigchld_handler)(int) = signal(SIGCHLD, SIG_DFL);
 
-  /* Tell AFL that we're alive. If the parent doesn't want
-     to talk, assume that we're not running in forkserver mode. */
+  if (!env->uc->afl_area_ptr) return UC_AFL_RET_NO_AFL;
 
-  if (write(FORKSRV_FD + 1, tmp, 4) != 4) {
-    return UC_AFL_RET_NOAFL;
-  }
+  /* Phone home and tell the parent that we're OK. If parent isn't there,
+     assume we're not running in forkserver mode and just execute program. */
 
-  afl_forksrv_pid = getpid();
+  if (write(FORKSRV_FD + 1, tmp, 4) != 4) return UC_AFL_RET_NO_AFL;
 
   /* All right, let's await orders... */
 
+  /* Establish a channel with child to grab translation commands. We'll
+      read from t_fd[0], child will write to TSL_FD. */
+
+  if (pipe(t_fd) || dup2(t_fd[1], TSL_FD) < 0) {
+    perror("[!] Error creating communication channel. ");
+    return UC_AFL_RET_ERROR;
+  }
+  close(t_fd[1]);
+
   while (1) {
 
-    pid_t child_pid;
-    int   status, t_fd[2];
+    uint32_t was_killed;
+    int      status;
 
-    /* Whoops, AFL dead? */
+    /* Wait for parent by reading from the pipe. Abort if read fails. */
 
-    if (read(FORKSRV_FD, tmp, 4) != 4) {
-      return UC_AFL_RET_AFL_DIED;
-    }
+    if (read(FORKSRV_FD, &was_killed, 4) != 4) return UC_AFL_RET_FINISHED;
 
-    /* Establish a channel with child to grab translation commands. We'll
-       read from t_fd[0], child will write to TSL_FD. */
+    /* If we stopped the child in persistent mode, but there was a race
+    condition and afl-fuzz already issued SIGKILL, write off the old
+    process. */
 
-    if (pipe(t_fd) || dup2(t_fd[1], TSL_FD) < 0) {
-      fprintf(stderr, "[!] The child is not alive!");
-      return UC_AFL_RET_ERROR;
-    }
+    if (child_stopped && was_killed) {
 
-    close(t_fd[1]);
-
-    child_pid = fork();
-    if (child_pid < 0) {
-      fprintf(stderr, "[!] Could not fork!");
-      return UC_AFL_RET_ERROR;
-    }
-
-    if (!child_pid) {
-
-      /* Child process. Close descriptors and run free. */
-
-      afl_fork_child = 1;
-      // TODO: save time//syscalls by not closing these fds?
-      close(FORKSRV_FD);
-      close(FORKSRV_FD + 1);
-      close(t_fd[0]);
-      return UC_AFL_RET_CHILD;
+      child_stopped = 0;
+      if (waitpid(child_pid, &status, 0) < 0) return UC_AFL_RET_FINISHED;
 
     }
 
-    /* Parent. */
+    if (!child_stopped) {
 
-    close(TSL_FD);
+      /* Once woken up, create a clone of our process. */
+
+      child_pid = fork();
+      if (child_pid < 0) {
+        perror("[!] Could not fork! ");
+        return UC_AFL_RET_ERROR;
+      }
+
+      /* In child process: close fds, resume execution. */
+
+      if (!child_pid) {
+
+        signal(SIGCHLD, old_sigchld_handler);
+
+        close(FORKSRV_FD);
+        close(FORKSRV_FD + 1);
+        close(t_fd[0]);
+        return UC_AFL_RET_CHILD;
+
+      }
+
+    } else {
+
+      /* Special handling for persistent mode: if the child is alive but
+         currently stopped, simply restart it with SIGCONT. */
+
+      if (kill(child_pid, SIGCONT) < 0) {
+
+        perror("[!] Child didn't continue. ");
+        return UC_AFL_RET_ERROR;
+
+      }
+      child_stopped = 0;
+
+    }
+
+    /* Keep this open in parent (but never use it) for the next fork. */
 
     if (write(FORKSRV_FD + 1, &child_pid, 4) != 4) {
-      fprintf(stderr, "[!] Error connecting to the child.");
+      fprintf(stderr, "[!] Error talking to the child.");
       return UC_AFL_RET_ERROR;
     }
 
@@ -222,17 +258,21 @@ static inline uc_afl_ret afl_forkserver(CPUArchState* env) {
 
     /* Get and relay exit status to parent. */
 
-    if (waitpid(child_pid, &status, 0) < 0) {
+    if (waitpid(child_pid, &status, WUNTRACED) < 0) {
 
       // Zombie Child could not be collected. Scary!
-      fprintf(stderr, "[!] The child's exit code could not be determined.");
+      perror("[!] The child's exit code could not be determined. ");
       return UC_AFL_RET_ERROR;
 
     }
 
-    if (write(FORKSRV_FD + 1, &status, 4) != 4) {
-      return UC_AFL_RET_AFL_DIED;
-    }
+    /* In persistent mode, the child stops itself with SIGSTOP to indicate
+       a successful run. In this case, we want to wake it up without forking
+       again. */
+
+    if (WIFSTOPPED(status)) child_stopped = 1;
+
+    if (write(FORKSRV_FD + 1, &status, 4) != 4) return UC_AFL_RET_FINISHED;
 
   }
 

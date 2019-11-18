@@ -21,6 +21,7 @@
 #define UC_MODE_SPARC_MASK  (UC_MODE_SPARC32|UC_MODE_SPARC64|UC_MODE_BIG_ENDIAN)
 #define UC_MODE_M68K_MASK   (UC_MODE_BIG_ENDIAN)
 
+
 #define ARR_SIZE(a) (sizeof(a)/sizeof(a[0]))
 
 #define READ_QWORD(x) ((uint64)x)

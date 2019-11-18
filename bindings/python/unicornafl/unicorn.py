@@ -3,6 +3,8 @@
 import ctypes
 import ctypes.util
 import distutils.sysconfig
+from typing import Optional, List, Callable, Any
+
 import pkg_resources
 import inspect
 import os.path
@@ -22,12 +24,10 @@ def monkeypatch():
     """
     sys.modules["unicorn"] = sys.modules["unicornafl"]
 
-
+UC_AFL_RET_ERROR = -1 # Something went horribly wrong in the parent
 UC_AFL_RET_CHILD = 0 # Fork worked. we are a child
-UC_AFL_RET_NOAFL = 1 # No AFL, no need to fork.
-UC_AFL_RET_AFL_DIED = 2 # We forked before but now AFL is gone (parent)
-UC_AFL_RET_ERROR = 3 # Something went horribly wrong in the parent
-
+UC_AFL_RET_NO_AFL = 1 # No AFL, no need to fork.
+UC_AFL_RET_FINISHED = 2 # We forked before but now AFL is gone (parent)
 
 if not hasattr(sys.modules[__name__], "__file__"):
     __file__ = inspect.getfile(inspect.currentframe())
@@ -135,6 +135,16 @@ class _uc_mem_region(ctypes.Structure):
         ("perms", ctypes.c_uint32),
     ]
 
+#typedef bool (*uc_afl_place_input_callback)(uc_engine *uc, char *input, 
+#                                       size_t input_len, uint32_t persistent_round, void *data);
+AFL_PLACE_INPUT_CB = ctypes.CFUNCTYPE(ctypes.c_bool, uc_engine, ctypes.c_char_p,
+                                        ctypes.c_size_t, ctypes.c_uint32, ctypes.c_void_p)
+        
+#typedef bool (*uc_afl_validate_crash_callback)(uc_engine *uc, uc_err unicorn_result, char *input,
+#                                               int input_len, int persistent_round, void *data);
+AFL_VALIDATE_CRASH_CB = ctypes.CFUNCTYPE(ctypes.c_bool, uc_engine, ucerr, ctypes.c_char_p, 
+                                        ctypes.c_size_t, ctypes.c_uint32, ctypes.c_void_p)
+        
 
 _setup_prototype(_uc, "uc_version", ctypes.c_uint, ctypes.POINTER(ctypes.c_int), ctypes.POINTER(ctypes.c_int))
 _setup_prototype(_uc, "uc_arch_supported", ctypes.c_bool, ctypes.c_int)
@@ -161,7 +171,15 @@ _setup_prototype(_uc, "uc_context_restore", ucerr, uc_engine, uc_context)
 _setup_prototype(_uc, "uc_context_size", ctypes.c_size_t, uc_engine)
 _setup_prototype(_uc, "uc_mem_regions", ucerr, uc_engine, ctypes.POINTER(ctypes.POINTER(_uc_mem_region)), ctypes.POINTER(ctypes.c_uint32))
 _setup_prototype(_uc, "uc_afl_forkserver_start", ucaflret, uc_engine, ctypes.POINTER(ctypes.c_uint64), ctypes.c_size_t)
-
+_setup_prototype(_uc, "uc_afl_fuzz", ucaflret, 
+        uc_engine, # unicorn engine
+        ctypes.c_char_p, # input file
+        AFL_PLACE_INPUT_CB, # place input cb
+        ctypes.POINTER(ctypes.c_uint64), # exits
+        ctypes.c_size_t, # exit_count
+        AFL_VALIDATE_CRASH_CB, # validate crash cb
+        ctypes.c_uint32, # persistent_iters
+        ctypes.c_void_p) # data
 
 # uc_hook_add is special due to variable number of arguments
 _uc.uc_hook_add = _uc.uc_hook_add
@@ -189,7 +207,6 @@ UC_HOOK_INSN_OUT_CB = ctypes.CFUNCTYPE(
 )
 UC_HOOK_INSN_SYSCALL_CB = ctypes.CFUNCTYPE(None, uc_engine, ctypes.c_void_p)
 
-
 # access to error code via @errno of UcError
 class UcError(Exception):
     def __init__(self, errno):
@@ -215,8 +232,8 @@ class UcAflError(UcError):
             return self.message
         return {
             UC_AFL_RET_CHILD: "Fork worked. we are a child (no Error)",
-            UC_AFL_RET_NOAFL: "No AFL, no need to fork (but no real Error)",
-            UC_AFL_RET_AFL_DIED: "We forked before but now AFL is gone (time to quit)",
+            UC_AFL_RET_NO_AFL: "No AFL, no need to fork (but no real Error)",
+            UC_AFL_RET_FINISHED: "We forked before but now AFL is gone (time to quit)",
             UC_AFL_RET_ERROR: "Something went horribly wrong in the parent!"
         }[self.errno]
 
@@ -372,6 +389,165 @@ class Uc(object):
         if status != uc.UC_ERR_OK:
             raise UcError(status)
 
+    def afl_fuzz(
+            self,
+            input_file,
+            place_input_callback,
+            exits,
+            validate_crash_callback=None,
+            persistent_iters=1000,
+            data=None
+    ):
+        # type: (str, Callable[[Uc, bytes, int, Any], bool], List[int], Callable[[Uc, list, bytes, str, Any], bool], int, Any) -> bool
+        """
+        The main fuzzer.
+        Starts the forkserver, then beginns a persistent loop.
+        Reads input, calls the place_input callback, emulates, repeats.
+        If unicorn errors out, will call the validate_crash_callback, if set.
+        Will only return in the parent after the whole fuzz thing has been finished and afl died.
+        The child processes never return from here.
+
+        :param input_file: filename/path to the (AFL) inputfile. Usually supplied on the commandline.
+        :param place_input_callback: Callback function that will be called before each test runs.
+                This function needs to write the input from afl to the correct position on the unicorn object.
+                This function is mandatory.
+                It's purpose is to place the input at the right place in unicorn.
+
+                    @uc: (Uc) Unicorn instance
+                    @input: (bytes) The current input we're workin on. Place this somewhere in unicorn's memory now.
+                    @persistent_round: (int) which round we are currently crashing in, if using persistent mode.
+                    @data: (Any) Data pointer passed to uc_afl_fuzz(...).
+
+                    @return: (bool)
+                        If you return is True (or None) all is well. Fuzzing starts.
+                        If you return False, something has gone wrong. the execution loop will exit. 
+                            There should be no reason to do this in a usual usecase.
+        :param exits: address list of exits where fuzzing should stop
+        :param persistent_iters:
+                The amount of loop iterations in persistent mode before restarteing with a new forked child.
+                If your target cannot be fuzzed using persistent mode (global state changes a lot), 
+                set persistent_iters = 1 for the normal fork-server experience.
+                Else, the default is usually around 1000.
+                If your target is super stable (and unicorn is, too - not sure about that one),
+                you may pass persistent_iter = 0 for that an infinite fuzz loop.
+        :param validate_crash_callback: Optional callback (if not needed, pass NULL), that determines 
+                if a non-OK uc_err is an actual error. If false is returned, the test-case will not crash.
+                Callback function called after a non-UC_ERR_OK returncode was returned by Unicorn. 
+                This function is not mandatory.
+                    @uc: Unicorn instance
+                    @unicorn_result: The error state returned by the current testcase
+                    @input: The current input we're workin with.
+                    @persistent_round: which round we are currently crashing in, if using persistent mode.
+                    @data: Data pointer passed to uc_afl_fuzz(...).
+
+                    @Return:
+                    If you return false, the crash is considered invalid and not reported to AFL.
+                    If return is true, the crash is reported. 
+                    -> The child will die and the forkserver will spawn a new child.
+        :param data: Your very own data pointer. This will passed into every callback.
+
+        :return:
+                True, if we fuzzed.
+                False, if AFL was not available but we ran once.
+                raises UcAflException if nothing worked.
+        """
+        self._pre_afl(exits)
+        exit_count = len(exits)
+
+        def _place_input_callback(c_uc, input, input_len, persistent_round, c_data):
+            print("Calling back home. :)", c_uc, input, input_len, persistent_round, c_data)
+            ret = place_input_callback(
+                self,
+                bytes(ctypes.c_ubyte * input_len.from_address(input)),
+                persistent_round.value,
+                data
+            )
+            if ret is False:
+                return False
+            return True
+
+        def _validate_crash_callback(c_uc, uc_err, input, input_len, persistent_round, c_data):
+            print("Calling after crash!", c_uc, input, input_len, persistent_round, c_data)
+            ret = validate_crash_callback(
+                self,
+                uc_err.value,
+                bytes(ctypes.c_ubyte * input_len.from_address(input)),
+                persistent_round.value,
+                data
+            )
+            if validate_crash_callback is False:
+                return False
+            return True
+
+        # This only returns in the parent, child processes all die or loop or other things.
+        status = _uc.uc_afl_fuzz(
+                self._uch, 
+                input_file.encode('utf-8'),
+                AFL_PLACE_INPUT_CB(_place_input_callback),
+                (ctypes.c_uint64 * exit_count)(*exits),
+                exit_count,  # bad languages, like c, need more params.
+                persistent_iters,
+                AFL_VALIDATE_CRASH_CB(_validate_crash_callback),
+                None  # no need to pass the user data through C as the callback keeps it as closure.
+        )
+        if status == UC_AFL_RET_FINISHED:
+            return True
+        elif status == UC_AFL_RET_NO_AFL:
+            return False
+        # Something went wrong.
+        raise UcAflError(status)
+
+    def _pre_afl(self, exits):
+        # type: (Uc, List[int]) -> None
+        """
+        Internal func making sure exits are set and flushing buffers/gc
+        :param exits: exits
+        """
+        if not exits:
+            raise UcAflError(message="No exits given. Forkserver needs to know all possible exits in advance.")
+        for addr in exits:
+            if not isinstance(addr, int):
+                raise UcAflError(message="Exit addresses need to be a list of ints where the fuzzer should stop - {} "
+                                         "provided instead ({})".format(type(addr), addr))
+        if self.afl_is_forkserver_child:
+            raise UcAflError(message="Already in a forkserver child. Nesting not possible.")
+        sys.stdout.flush()  # otherwise children will inherit the unflushed buffer
+        gc.collect()  # Collect all unneeded memory, No need to clone it on fork.
+
+
+    def afl_forkserver_start(self, exits):
+        # type: (Uc, List[int]) -> bool
+        """
+        This will start the forkserver.
+        Call this to kick off afl forkserver mode (when running as child of AFL)
+        If you just want to fuzz, use uc.afl_fuzz instead.
+        It forks internally, leaving the parent running in an endless loop.
+        The child notifies the parent about any new block encountered.
+        The parent then also translates this block for the next AFL iteration.
+        Since the parent won't know about any exits set after this point, there is no use in using
+        emu_start params like until or count.
+        Instead, the exit list of int addresses is passed directly to the parent.
+        Everything beyond this func is done for every. single. child. Make sure to do the important stuff before.
+        Will raise UcAflError if something went wrong or AFL died (in which case we want to exit)
+        :param exits: A list of exits at which the Uc execution will stop.
+        :return: True, if AFL was available. You're now in the child. Over and over again.
+        """
+        self._pre_afl(exits)
+        exit_count = len(exits)
+        # everything beyond this point is done for every. single. child. Make sure to do the important stuff before.
+        status = _uc.uc_afl_forkserver_start(self._uch, (ctypes.c_uint64 * exit_count)(*exits), exit_count)
+        if status == UC_AFL_RET_CHILD:
+            # We're in the child. Let's go fuzz.
+            self.afl_is_forkserver_child = True
+            return True
+        elif status == UC_AFL_RET_NO_AFL or status == UC_AFL_RET_FINISHED:
+            # No AFL. We didn't start the forkserver. Let's run on like we did.
+            return False
+        else:
+            # Something else.
+            raise UcAflError(status)
+
+
     # call this to kick off afl forkserver mode (when running as child of AFL)
     def afl_forkserver_start(self, exits):
         # type: (Uc, List[int]) -> bool
@@ -404,7 +580,7 @@ class Uc(object):
             # We're in the child. Let's go fuzz.
             self.afl_is_forkserver_child = True
             return True
-        elif status == UC_AFL_RET_NOAFL or status == UC_AFL_RET_AFL_DIED:
+        elif status == UC_AFL_RET_NO_AFL or status == UC_AFL_RET_FINISHED:
             # No AFL. We didn't start the forkserver. Let's run on like we did.
             return False
         else:
