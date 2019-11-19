@@ -561,7 +561,7 @@ uc_err uc_emu_start(uc_engine *uc, uint64_t begin, uint64_t until, uint64_t time
   If you return false, something has gone wrong. the execution loop will exit. 
     There should be no reason to do this in a usual usecase.
 */
-typedef bool (*uc_afl_place_input_callback)(uc_engine *uc, char *input, size_t input_len, uint32_t persistent_round, void *data);
+typedef bool (*uc_afl_cb_place_input_t)(uc_engine *uc, char *input, size_t input_len, uint32_t persistent_round, void *data);
 
 /* Callback function called after a non-UC_ERR_OK returncode was returned by Unicorn. 
  This function is not mandatory (pass NULL).
@@ -577,7 +577,7 @@ typedef bool (*uc_afl_place_input_callback)(uc_engine *uc, char *input, size_t i
   If return is true, the crash is reported. 
   -> The child will die and the forkserver will spawn a new child.
 */
-typedef bool (*uc_afl_validate_crash_callback)(uc_engine *uc, uc_err unicorn_result, char *input, int input_len, int persistent_round, void *data);
+typedef bool (*uc_afl_cb_validate_crash_t)(uc_engine *uc, uc_err unicorn_result, char *input, int input_len, int persistent_round, void *data);
 
 
 /*
@@ -594,6 +594,9 @@ typedef bool (*uc_afl_validate_crash_callback)(uc_engine *uc, uc_err unicorn_res
          This function needs to write the input from afl to the correct position on the unicorn object.
  @exits: address list of exits where fuzzing should stop (len == exit_count)
  @exit_count: number of exits where fuzzing should stop
+ @validate_crash_callback: Optional callback (if not needed, pass NULL), that determines 
+         if a non-OK uc_err is an actual error. If false is returned, the test-case will not crash.
+ @always_validate: If false, validate_crash_callback will only be called for crashes.
  @persistent_iters:
   The amount of loop iterations in persistent mode before restarteing with a new forked child.
   If your target cannot be fuzzed using persistent mode (global state changes a lot), 
@@ -601,9 +604,7 @@ typedef bool (*uc_afl_validate_crash_callback)(uc_engine *uc, uc_err unicorn_res
   Else, the default is usually around 1000.
   If your target is super stable (and unicorn is, too - not sure about that one),
    you may pass persistent_iter = 0 for that an infinite fuzz loop.
-  @validate_crash_callback: Optional callback (if not needed, pass NULL), that determines 
-         if a non-OK uc_err is an actual error. If false is returned, the test-case will not crash.
-  @data: Your very own data pointer. This will passed into every callback.
+ @data: Your very own data pointer. This will passed into every callback.
 
  @return uc_afl_ret:
         UC_AFL_RET_ERROR = -1, // Something went horribly wrong in the parent
@@ -617,10 +618,11 @@ UNICORN_EXPORT
 uc_afl_ret uc_afl_fuzz(
     uc_engine *uc, 
     char* input_file, 
-    uc_afl_place_input_callback place_input_callback, 
+    uc_afl_cb_place_input_t place_input_callback, 
     uint64_t *exits, 
     size_t exit_count, 
-    uc_afl_validate_crash_callback validate_crash_callback, 
+    uc_afl_cb_validate_crash_t validate_crash_callback, 
+    bool always_validate,
     uint32_t persistent_iters,
     void *data
 );
@@ -671,10 +673,10 @@ int uc_afl_emu_start(uc_engine *uc);
   (similar to what __afl_persistent loop // __LOOP does)
   uc_afl_fuzz() already makes use of this function under the hood.
 
-  @return -1 on error (mainly if uc_afl_forkserver(...) was not called), else 0.
+  @return UC_AFL_RET_ERROR on error (if uc_afl_forkserver(...) was not called or parent died), else UC_AFL_RET_CHILD.
 */
 UNICORN_EXPORT
-int8_t uc_afl_next(uc_engine *uc);
+uc_afl_ret uc_afl_next(uc_engine *uc);
 
 #endif
 
