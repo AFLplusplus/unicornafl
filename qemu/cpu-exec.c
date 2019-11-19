@@ -298,7 +298,7 @@ int cpu_exec(struct uc_struct *uc, CPUArchState *env)   // qq
                 }
 
 #if defined(UNICORN_AFL)
-                AFL_UNICORN_CPU_SNIPPET2;
+                afl_maybe_log(env->uc, tb->pc); 
 #endif
 
                 /* cpu_interrupt might be called while translating the
@@ -459,7 +459,7 @@ not_found:
     
 #if defined(UNICORN_AFL)
     /* There seems to be no chaining in unicorn ever? :( */
-    AFL_UNICORN_CPU_SNIPPET1;
+    afl_request_tsl(env->uc, pc, cs_base, flags);
     //printf(" finished 0x%llx.", pc);
 #endif
 

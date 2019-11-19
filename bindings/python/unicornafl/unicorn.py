@@ -135,15 +135,26 @@ class _uc_mem_region(ctypes.Structure):
         ("perms", ctypes.c_uint32),
     ]
 
-#typedef bool (*uc_afl_place_input_callback)(uc_engine *uc, char *input, 
+#typedef bool (*uc_afl_cb_place_input_t)(uc_engine *uc, char *input, 
 #                                       size_t input_len, uint32_t persistent_round, void *data);
-AFL_PLACE_INPUT_CB = ctypes.CFUNCTYPE(ctypes.c_bool, uc_engine, ctypes.c_char_p,
+AFL_PLACE_INPUT_CB = ctypes.CFUNCTYPE(ctypes.c_bool, uc_engine, ctypes.POINTER(ctypes.c_char),
                                         ctypes.c_size_t, ctypes.c_uint32, ctypes.c_void_p)
         
-#typedef bool (*uc_afl_validate_crash_callback)(uc_engine *uc, uc_err unicorn_result, char *input,
-#                                               int input_len, int persistent_round, void *data);
-AFL_VALIDATE_CRASH_CB = ctypes.CFUNCTYPE(ctypes.c_bool, uc_engine, ucerr, ctypes.c_char_p, 
+#typedef bool (*uc_afl_cb_validate_crash_t)(uc_engine *uc, uc_err unicorn_result, char *input, 
+#                                       int input_len, int persistent_round, void *data);
+AFL_VALIDATE_CRASH_CB = ctypes.CFUNCTYPE(ctypes.c_bool, uc_engine, ucerr, ctypes.POINTER(ctypes.c_char),
                                         ctypes.c_size_t, ctypes.c_uint32, ctypes.c_void_p)
+
+def from_param(cls, obj):
+    """
+    Allow NULL pointer for crash cb
+    See https://sourceforge.net/p/ctypes/mailman/message/9636230/
+    """
+    if obj is None:
+        return None # return a NULL pointer
+    return ctypes._CFuncPtr.from_param(obj)
+
+AFL_VALIDATE_CRASH_CB.from_param = classmethod(from_param)
         
 
 _setup_prototype(_uc, "uc_version", ctypes.c_uint, ctypes.POINTER(ctypes.c_int), ctypes.POINTER(ctypes.c_int))
@@ -178,6 +189,7 @@ _setup_prototype(_uc, "uc_afl_fuzz", ucaflret,
         ctypes.POINTER(ctypes.c_uint64), # exits
         ctypes.c_size_t, # exit_count
         AFL_VALIDATE_CRASH_CB, # validate crash cb
+        ctypes.c_bool, # always_validate,
         ctypes.c_uint32, # persistent_iters
         ctypes.c_void_p) # data
 
@@ -390,15 +402,16 @@ class Uc(object):
             raise UcError(status)
 
     def afl_fuzz(
-            self,
-            input_file,
-            place_input_callback,
-            exits,
-            validate_crash_callback=None,
-            persistent_iters=1000,
-            data=None
+            self,                   # type: Uc
+            input_file,             # type: str
+            place_input_callback,   # type: Callable[[Uc, bytes, int, Any], Optional[bool]]
+            exits,                  # type: List[int]
+            validate_crash_callback=None,  # type: Optional[Callable[[Uc, UcError, bytes, int, Any], Optional[bool]]]
+            always_validate=False,  # type: bool
+            persistent_iters=1000,  # type: int
+            data=None               # type: Any
     ):
-        # type: (str, Callable[[Uc, bytes, int, Any], bool], List[int], Callable[[Uc, list, bytes, str, Any], bool], int, Any) -> bool
+        # type: (...) -> bool
         """
         The main fuzzer.
         Starts the forkserver, then beginns a persistent loop.
@@ -442,8 +455,10 @@ class Uc(object):
 
                     @Return:
                     If you return false, the crash is considered invalid and not reported to AFL.
-                    If return is true, the crash is reported. 
-                    -> The child will die and the forkserver will spawn a new child.
+                        -> Next loop iteration begins.
+                    If return is true, the crash is reported // the program crashes.
+                        -> The child will die and the forkserver will spawn a new child.
+        :param always_validate: If false, validate_crash_callback will only be called for crashes.
         :param data: Your very own data pointer. This will passed into every callback.
 
         :return:
@@ -454,28 +469,28 @@ class Uc(object):
         self._pre_afl(exits)
         exit_count = len(exits)
 
-        def _place_input_callback(c_uc, input, input_len, persistent_round, c_data):
-            print("Calling back home. :)", c_uc, input, input_len, persistent_round, c_data)
+        def place_input_wrapper(c_uc, input, input_len, persistent_round, c_data):
+            # print("Calling back home. :)", c_uc, input, input_len, persistent_round, c_data)
             ret = place_input_callback(
                 self,
-                bytes(ctypes.c_ubyte * input_len.from_address(input)),
-                persistent_round.value,
+                input[:input_len],
+                persistent_round,
                 data
             )
             if ret is False:
                 return False
             return True
 
-        def _validate_crash_callback(c_uc, uc_err, input, input_len, persistent_round, c_data):
-            print("Calling after crash!", c_uc, input, input_len, persistent_round, c_data)
+        def validate_crash_wrapper(c_uc, uc_err, input, input_len, persistent_round, c_data):
+            # print("Calling after crash!", c_uc, input, input_len, persistent_round, c_data)
             ret = validate_crash_callback(
                 self,
-                uc_err.value,
-                bytes(ctypes.c_ubyte * input_len.from_address(input)),
-                persistent_round.value,
+                UcError(uc_err.value),
+                input[:input_len],
+                persistent_round,
                 data
             )
-            if validate_crash_callback is False:
+            if ret is False or uc_err.value == uc.UC_ERR_OK:
                 return False
             return True
 
@@ -483,11 +498,12 @@ class Uc(object):
         status = _uc.uc_afl_fuzz(
                 self._uch, 
                 input_file.encode('utf-8'),
-                AFL_PLACE_INPUT_CB(_place_input_callback),
+                AFL_PLACE_INPUT_CB(place_input_wrapper),
                 (ctypes.c_uint64 * exit_count)(*exits),
                 exit_count,  # bad languages, like c, need more params.
+                AFL_VALIDATE_CRASH_CB(validate_crash_wrapper) if validate_crash_callback else None,
+                always_validate,
                 persistent_iters,
-                AFL_VALIDATE_CRASH_CB(_validate_crash_callback),
                 None  # no need to pass the user data through C as the callback keeps it as closure.
         )
         if status == UC_AFL_RET_FINISHED:
@@ -513,7 +529,6 @@ class Uc(object):
             raise UcAflError(message="Already in a forkserver child. Nesting not possible.")
         sys.stdout.flush()  # otherwise children will inherit the unflushed buffer
         gc.collect()  # Collect all unneeded memory, No need to clone it on fork.
-
 
     def afl_forkserver_start(self, exits):
         # type: (Uc, List[int]) -> bool
@@ -546,47 +561,6 @@ class Uc(object):
         else:
             # Something else.
             raise UcAflError(status)
-
-
-    # call this to kick off afl forkserver mode (when running as child of AFL)
-    def afl_forkserver_start(self, exits):
-        # type: (Uc, List[int]) -> bool
-        """
-        This will start the forkserver.
-        It forks internally, leaving the parent running in an endless loop.
-        The child notifies the parent about any new block encountered.
-        The parent then also translates this block for the next AFL iteration.
-        Since the parent won't know about any exits set after this point, there is no use in using
-        emu_start params like until or count.
-        Instead, the exit list of int addresses is passed directly to the parent.
-        Everything beyond this func is done for every. single. child. Make sure to do the important stuff berfore.
-        Will raise UcAflError if something went wrong or AFL died (in which case we want to exit)
-        :param exits: A list of exits at which the Uc execution will stop.
-        :return: True, if AFL was available. You're now in the child. Over and over again.
-        """
-        if not exits:
-            raise UcAflError(message="No exits given. Forkserver needs to know all possible exits in advance.")
-        for addr in exits:
-            if not isinstance(addr, int):
-                raise UcAflError(message="Exit addresses need to be a list of ints where the fuzzer should stop - {} provided instead ({})".format(type(addr), addr))
-        if self.afl_is_forkserver_child:
-            raise UcAflError(message="Already in a forkserver child. Nesting make")
-        sys.stdout.flush()  # otherwise children will inherit the unflushed buffer
-        gc.collect()  # Collect all unneeded memory, No need to clone it on fork.
-        exit_count = len(exits)
-        # everything beyond this point is done for every. single. child. For real. Make sure to do the important stuff berfore.
-        status = _uc.uc_afl_forkserver_start(self._uch, (ctypes.c_uint64 * exit_count)(*exits), exit_count)
-        if status == UC_AFL_RET_CHILD:
-            # We're in the child. Let's go fuzz.
-            self.afl_is_forkserver_child = True
-            return True
-        elif status == UC_AFL_RET_NO_AFL or status == UC_AFL_RET_FINISHED:
-            # No AFL. We didn't start the forkserver. Let's run on like we did.
-            return False
-        else:
-            # Something else.
-            raise UcAflError(status)
-
 
     # return the value of a register
     def reg_read(self, reg_id, opt=None):

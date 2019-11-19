@@ -90,6 +90,7 @@ static inline void uc_common_init(struct uc_struct* uc)
     uc->exit_count = 0;
     uc->exits = NULL;
     uc->afl_forkserver_start = afl_forkserver_start;
+    uc->afl_child_request_next = NULL;  // This callback is only set if inside child.
 #endif
 }
 

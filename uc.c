@@ -666,23 +666,36 @@ uc_afl_ret uc_afl_forkserver_start(uc_engine *uc, uint64_t *exits, size_t exit_c
     The cached blocks, in the next child, therefore whould have no exit set and run forever.
     Also it's nice to have multiple exits, so let's just do it right.
     */
+
+    if (!uc) {
+        fprintf(stderr, "[!] Unicorn Engine passed to uc_afl_fuzz is NULL!\n");
+        return UC_AFL_RET_ERROR;
+    }
+    if (!exits || !exit_count) {
+        fprintf(stderr, "[!] No exits provided. Testcases could never stop!\n");
+        return UC_AFL_RET_ERROR;
+    }
     if (unlikely(uc->afl_area_ptr)) {
         fprintf(stderr, "[!] forkserver_start(...) called twice. Already fuzzing!\n");
         return UC_AFL_RET_ERROR;
     }
+
+    /* Copy exits to unicorn env buffer */
     uc->exits = g_realloc(uc->exits, exit_count * sizeof(exits[0]));
     if (uc->exits == NULL) {
         perror("[!] malloc failed when starting forkserver.");
         return UC_AFL_RET_ERROR;
     }
-    memcpy(&uc->exits, exits, sizeof(uint64_t) * exit_count);
+    memcpy(uc->exits, exits, sizeof(uint64_t) * exit_count);
     uc->exit_count = exit_count;
 
+    /* Fork() :) */
     return uc->afl_forkserver_start(uc);
+
 }
 
 /* returns the filesize in bytes, -1 or error. */
-static size_t uc_afl_mmap_file (char *filename, char **buf) {
+static size_t uc_afl_mmap_file(char *filename, char **buf_ptr) {
 
     int ret = -1;
 
@@ -693,9 +706,9 @@ static size_t uc_afl_mmap_file (char *filename, char **buf) {
 
     off_t in_len = st.st_size;
 
-    buf = mmap(0, in_len, PROT_READ | PROT_WRITE, MAP_PRIVATE, fd, 0);
+    *buf_ptr = mmap(0, in_len, PROT_READ | PROT_WRITE, MAP_PRIVATE, fd, 0);
 
-    if (buf != MAP_FAILED) ret = in_len;
+    if (*buf_ptr != MAP_FAILED) ret = in_len;
 
 exit:
     close(fd);
@@ -733,42 +746,63 @@ int uc_afl_emu_start(uc_engine *uc) {
 
 /* similar to __afl_persistent loop */
 UNICORN_EXPORT
-int8_t uc_afl_next(uc_engine *uc)
+uc_afl_ret uc_afl_next(uc_engine *uc)
 {
 
     if (unlikely(!uc->afl_area_ptr)) {
         fprintf(stderr, "[!] uc_afl_next(...) called before forkserver_start(...).");
-        return -1;
+        return UC_AFL_RET_ERROR;
     }
 
-    raise(SIGSTOP);
+    // Tell the parent we need a new testcase, then stop until testcase is available.
+    if (uc->afl_child_request_next) {
 
-    return 0;
+        if (uc->afl_child_request_next() == UC_AFL_RET_ERROR) return UC_AFL_RET_ERROR;
+        raise(SIGSTOP);
+
+        return UC_AFL_RET_CHILD;
+
+    }     
+
+    return UC_AFL_RET_NO_AFL;
 
 }
-
-// /* Returns false if we're supposed to exit */
-// UNICORN_EXPORT
-// typedef bool (*uc_afl_place_input_callback)(uc_engine *uc, char *input, int input_len, int persistent_round, void *data);
-
-// /* Returns false if not a crash */
-// UNICORN_EXPORT
-// typedef bool (*uc_afl_validate_crash_callback)(uc_engine *uc, uc_err unicorn_result, char *input, int input_len, int persistent_round, void *data);
-
 
 UNICORN_EXPORT
 uc_afl_ret uc_afl_fuzz(
         uc_engine *uc, 
         char* input_file, 
-        uc_afl_place_input_callback place_input_callback, 
+        uc_afl_cb_place_input_t place_input_callback, 
         uint64_t *exits, 
         size_t exit_count, 
-        uc_afl_validate_crash_callback validate_crash_callback, 
+        uc_afl_cb_validate_crash_t validate_crash_callback, 
+        bool always_validate,
         uint32_t persistent_iters,
         void *data
 ){
 
-    char **in_buf = NULL;
+    if (!uc) {
+        fprintf(stderr, "[!] Unicorn Engine passed to uc_afl_fuzz is NULL!\n");
+        return UC_AFL_RET_ERROR;
+    }
+    if (!input_file || input_file[0] == 0) {
+        fprintf(stderr, "[!] No input file provided to uc_afl_fuzz.\n");
+        return UC_AFL_RET_ERROR;
+    }
+    if (!place_input_callback) {
+        fprintf(stderr, "[!] no place_input_callback set.\n");
+        return UC_AFL_RET_ERROR;
+    }
+    if (always_validate && !validate_crash_callback) {
+        fprintf(stderr, "[!] always_validate set but validate_crash_callback is missing.\n");
+        return UC_AFL_RET_ERROR;
+    }
+    if (!exits || !exit_count) {
+        fprintf(stderr, "[!] No exits provided. Testcases could never stop!\n");
+        return UC_AFL_RET_ERROR;
+    }
+
+    char *in_buf = NULL;
 
     uc_afl_ret afl_ret = uc_afl_forkserver_start(uc, exits, exit_count);
     switch(afl_ret) {
@@ -798,19 +832,21 @@ uc_afl_ret uc_afl_fuzz(
         // The main fuzz loop starts here :)
         if (first_round) {
             first_round = false;
+        } else {
             uc_afl_next(uc);
         }
-        size_t in_len = uc_afl_mmap_file(input_file, in_buf);
-        if (unlikely(place_input_callback(uc, *in_buf, in_len, i, data) == false)) {
+
+        size_t in_len = uc_afl_mmap_file(input_file, &in_buf);
+        if (unlikely(place_input_callback(uc, in_buf, in_len, i, data) == false)) {
             // Apparently, we're supposed to quit.
             break;
         }
         uc_err uc_emu_ret = uc_afl_emu_start(uc);
 
-        if (unlikely((uc_emu_ret != UC_ERR_OK))) {
+        if (unlikely((uc_emu_ret != UC_ERR_OK) || (always_validate && validate_crash_callback))) {
             
             if (validate_crash_callback != NULL && validate_crash_callback(
-                    uc, uc_emu_ret, *in_buf, in_len, i, data) != true) {
+                    uc, uc_emu_ret, in_buf, in_len, i, data) != true) {
                 // The callback thinks this is not a valid crash. Ignore.
                 continue;
             }
@@ -824,7 +860,7 @@ uc_afl_ret uc_afl_fuzz(
     // UC_AFL_RET_CHILD -> We looped through all iters. 
     // We are still in the child, nothing good will come after this.
     // Exit and let the next generation run.
-    if (likely(UC_AFL_RET_CHILD)) {
+    if (likely(afl_ret == UC_AFL_RET_CHILD)) {
         exit(0);
     }
 
