@@ -519,12 +519,11 @@ class Uc(object):
         Internal func making sure exits are set and flushing buffers/gc
         :param exits: exits
         """
-        if not exits:
-            raise UcAflError(message="No exits given. Forkserver needs to know all possible exits in advance.")
-        for addr in exits:
-            if not isinstance(addr, int):
-                raise UcAflError(message="Exit addresses need to be a list of ints where the fuzzer should stop - {} "
-                                         "provided instead ({})".format(type(addr), addr))
+        try:
+            exits = [int(exit) for exit in exits]
+        except Exception as ex:
+            raise UcAflError(message="Exit addresses need to be a list of addresses where the fuzzer should stop - {} "
+                                         "provided instead ({})".format(ex, exits))
         if self.afl_is_forkserver_child:
             raise UcAflError(message="Already in a forkserver child. Nesting not possible.")
         sys.stdout.flush()  # otherwise children will inherit the unflushed buffer
