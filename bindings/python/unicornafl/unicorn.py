@@ -530,7 +530,7 @@ class Uc(object):
         gc.collect()  # Collect all unneeded memory, No need to clone it on fork.
 
     def afl_forkserver_start(self, exits):
-        # type: (Uc, List[int]) -> bool
+        # type: (Uc, List[int]) -> int
         """
         This will start the forkserver.
         Call this to kick off afl forkserver mode (when running as child of AFL)
@@ -544,21 +544,31 @@ class Uc(object):
         Everything beyond this func is done for every. single. child. Make sure to do the important stuff before.
         Will raise UcAflError if something went wrong or AFL died (in which case we want to exit)
         :param exits: A list of exits at which the Uc execution will stop.
-        :return: True, if AFL was available. You're now in the child. Over and over again.
+        :return: UC_AFL_RET_CHILD: 
+                   You're now in the child. Over and over again.
+                 UC_AFL_RET_NO_AFL:
+                   No AFL to communicate with. Running on as sole process. :)
+                   It's porbably best to just continue to emulate from here on.
+                 UC_AFL_RET_FINISHED:
+                   Successful fuzz run ended. Probably not much else to do.
+        -> Prints to sterr and raises UcAflError on error.
+        (See stderr of your child in AFL with `AFL_DEBUG_CHILD_OUTPUT=1` env)
         """
         self._pre_afl(exits)
         exit_count = len(exits)
-        # everything beyond this point is done for every. single. child. Make sure to do the important stuff before.
+        self.afl_is_forkserver_child = True # Set this before we fork for speed :)
+        # everything beyond this point is done for every. single. child. Make sure to do the important stuff before. 
         status = _uc.uc_afl_forkserver_start(self._uch, (ctypes.c_uint64 * exit_count)(*exits), exit_count)
         if status == UC_AFL_RET_CHILD:
             # We're in the child. Let's go fuzz.
-            self.afl_is_forkserver_child = True
-            return True
-        elif status == UC_AFL_RET_NO_AFL or status == UC_AFL_RET_FINISHED:
-            # No AFL. We didn't start the forkserver. Let's run on like we did.
-            return False
+            return UC_AFL_RET_CHILD
+        
+        # No AFL or we finished fuzzing. Either way we're in the parent.
+        self.afl_is_forkserver_child = False
+        if status == UC_AFL_RET_NO_AFL or status == UC_AFL_RET_FINISHED:
+            return status
         else:
-            # Something else.
+            # Error creating forkserver :(
             raise UcAflError(status)
 
     # return the value of a register
