@@ -671,8 +671,8 @@ uc_afl_ret uc_afl_forkserver_start(uc_engine *uc, uint64_t *exits, size_t exit_c
         fprintf(stderr, "[!] Unicorn Engine passed to uc_afl_fuzz is NULL!\n");
         return UC_AFL_RET_ERROR;
     }
-    if (!exits || !exit_count) {
-        fprintf(stderr, "[!] No exits provided. Testcases could never stop!\n");
+    if (!exit_count) {
+        fprintf(stderr, "[!] Nullptr provided for exits.\n");
         return UC_AFL_RET_ERROR;
     }
     if (unlikely(uc->afl_area_ptr)) {
@@ -797,8 +797,8 @@ uc_afl_ret uc_afl_fuzz(
         fprintf(stderr, "[!] always_validate set but validate_crash_callback is missing.\n");
         return UC_AFL_RET_ERROR;
     }
-    if (!exits || !exit_count) {
-        fprintf(stderr, "[!] No exits provided. Testcases could never stop!\n");
+    if (!exit_count) {
+        fprintf(stderr, "[!] Nullptr provided for exits.\n");
         return UC_AFL_RET_ERROR;
     }
 

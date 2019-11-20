@@ -41,6 +41,8 @@
 
 #define TSL_FD (FORKSRV_FD - 1)
 
+#define FF16 (0xFFFFFFFFFFFFFFFF)
+
 /* Function declarations. */
 
 static void        afl_setup(struct uc_struct*);
@@ -60,8 +62,16 @@ struct afl_tsl {
   target_ulong pc;
   target_ulong cs_base;
   uint64_t     flags;
-  bool         child_finished;
 
+};
+
+/* Instead of adding a field, reuse this special one.
+  this should have less overhead. */
+
+static const struct afl_tsl AFL_NEXT_TESTCASE_REQUEST = {
+  .pc = (target_ulong) FF16,
+  .cs_base = (target_ulong) FF16,
+  .flags = FF16,
 };
 
 /*************************
@@ -135,7 +145,7 @@ static inline uc_afl_ret afl_forkserver(CPUArchState* env) {
   static unsigned char tmp[4];
   pid_t   child_pid;
   int     t_fd[2];  // Channel between child and parent for tcg translation cache
-  uint8_t child_alive = 0;
+  bool child_alive = false;
 
   if (!env->uc->afl_area_ptr) return UC_AFL_RET_NO_AFL;
 
@@ -161,7 +171,7 @@ static inline uc_afl_ret afl_forkserver(CPUArchState* env) {
 
     if (child_alive && was_killed) {
 
-      child_alive = 0;
+      child_alive = false;
       if (waitpid(child_pid, &status, 0) < 0) {
         perror("[!] Error waiting for child! ");
         return UC_AFL_RET_ERROR;
@@ -219,7 +229,7 @@ static inline uc_afl_ret afl_forkserver(CPUArchState* env) {
         return UC_AFL_RET_ERROR;
 
       }
-      child_alive = 0;
+      child_alive = false;
 
     }
 
@@ -229,13 +239,15 @@ static inline uc_afl_ret afl_forkserver(CPUArchState* env) {
       return UC_AFL_RET_FINISHED;
     }
 
-    /* Collect translation requests until child is finished or 0xdead */
+    /* Collect translation requests until child is finished (true) 
+       or 0xdead (false) */
 
-    afl_wait_tsl(env, t_fd[0]);
+    child_alive = afl_wait_tsl(env, t_fd[0]);
 
-    /* Get and relay exit status to parent. */
+    /* Get and relay exit status to parent. 
+       No need to wait for WUNTRACED if child is not alive. */
 
-    if (waitpid(child_pid, &status, WUNTRACED) < 0) {
+    if (waitpid(child_pid, &status, child_alive ? WUNTRACED: 0) < 0) {
 
       // Zombie Child could not be collected. Scary!
       perror("[!] The child's exit code could not be determined. ");
@@ -243,11 +255,12 @@ static inline uc_afl_ret afl_forkserver(CPUArchState* env) {
 
     }
 
+
     /* In persistent mode, the child stops itself with SIGSTOP to indicate
        a successful run. In this case, we want to wake it up without forking
        again. */
 
-    if (WIFSTOPPED(status)) child_alive = 1;
+    child_alive = child_alive && WIFSTOPPED(status);
 
     /* Relay wait status to AFL pipe, then loop back. */
 
@@ -293,7 +306,7 @@ static inline void afl_maybe_log(struct uc_struct* uc, unsigned long cur_loc) {
    we tell the parent to mirror the operation, so that the next fork() has a
    cached copy. */
 
-static void afl_request_tsl(struct uc_struct* uc, target_ulong pc, target_ulong cb, uint64_t flags) {
+static inline void afl_request_tsl(struct uc_struct* uc, target_ulong pc, target_ulong cb, uint64_t flags) {
 
   /* Dual use: if this func is NULL, we're not a child process */
 
@@ -313,12 +326,8 @@ static void afl_request_tsl(struct uc_struct* uc, target_ulong pc, target_ulong 
 /* This code is invoked whenever the child decides that it is done with one fuzz-case. */
 
 static uc_afl_ret afl_request_next(void) {
-  
-  struct afl_tsl t = {
-    .child_finished = true
-  };
 
-  if (write(TSL_FD, &t, sizeof(struct afl_tsl)) != sizeof(struct afl_tsl)) return UC_AFL_RET_ERROR;
+  if (write(TSL_FD, &AFL_NEXT_TESTCASE_REQUEST, sizeof(struct afl_tsl)) != sizeof(struct afl_tsl)) return UC_AFL_RET_ERROR;
 
   return UC_AFL_RET_CHILD;
 
@@ -339,7 +348,10 @@ static bool afl_wait_tsl(CPUArchState* env, int fd) {
 
     if (read(fd, &t, sizeof(struct afl_tsl)) != sizeof(struct afl_tsl)) return false; // child is dead.
 
-    if (t.child_finished) return true; // child is still alive!
+    /* We chose FF16 (MAX_INT64) for each member of our afl_next_testcase_request struct. */
+
+    if (t.pc == AFL_NEXT_TESTCASE_REQUEST.pc && t.cs_base == AFL_NEXT_TESTCASE_REQUEST.cs_base 
+        && t.flags == AFL_NEXT_TESTCASE_REQUEST.flags) return true; // child is still alive!
 
     tb_find_slow(env, t.pc, t.cs_base, t.flags);
 
