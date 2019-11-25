@@ -124,7 +124,8 @@ public interface ArmConst {
    public static final int UC_ARM_REG_MSP = 115;
    public static final int UC_ARM_REG_PSP = 116;
    public static final int UC_ARM_REG_CONTROL = 117;
-   public static final int UC_ARM_REG_ENDING = 118;
+   public static final int UC_ARM_REG_XPSR = 118;
+   public static final int UC_ARM_REG_ENDING = 119;
 
 // alias registers
    public static final int UC_ARM_REG_R13 = 12;
