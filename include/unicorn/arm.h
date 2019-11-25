@@ -137,6 +137,8 @@ typedef enum uc_arm_reg {
     UC_ARM_REG_MSP,
     UC_ARM_REG_PSP,
     UC_ARM_REG_CONTROL,
+    // XPSR patch, see https://github.com/ucsb-seclab/hal-fuzz/blob/master/unicorn_mode/patches/halfuzz-expose-XPSR.diff
+    UC_ARM_REG_XPSR,
     UC_ARM_REG_ENDING,		// <-- mark the end of the list or registers
 
     //> alias registers
