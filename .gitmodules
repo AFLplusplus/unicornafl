@@ -1,0 +1,3 @@
+[submodule "bindings/unicorn-rs"]
+	path = bindings/rust
+	url = https://github.com/domenukk/unicorn-rs.git
