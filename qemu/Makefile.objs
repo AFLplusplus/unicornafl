@@ -6,7 +6,7 @@ util-obj-y = util/ qobject/ qapi/ qapi-types.o qapi-visit.o
 # block-obj-y is code used by both qemu system emulation and qemu-img
 
 block-obj-y =
-block-obj-y += ../uc.o ../list.o glib_compat.o
+block-obj-y += ../uc.o ../afl.o ../list.o glib_compat.o
 
 #######################################################################
 # Target independent part of system emulation. The long term path is to

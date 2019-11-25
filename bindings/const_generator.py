@@ -13,7 +13,7 @@ template = {
             'header': "# For Unicorn Engine. AUTO-GENERATED FILE, DO NOT EDIT [%s_const.py]\n",
             'footer': "",
             'line_format': 'UC_%s = %s\n',
-            'out_file': './python/unicorn/%s_const.py',
+            'out_file': './python/unicornafl/%s_const.py',
             # prefixes for constant filenames of all archs - case sensitive
             'arm.h': 'arm',
             'arm64.h': 'arm64',

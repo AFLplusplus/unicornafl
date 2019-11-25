@@ -56,8 +56,8 @@ install() {
   # Mac OSX needs to find the right directory for pkgconfig
   if [ "$UNAME" = Darwin ]; then
     # we are going to install into /usr/local, so remove old installs under /usr
-    rm -rf /usr/lib/libunicorn*
-    rm -rf /usr/include/unicorn
+    rm -rf /usr/lib/libunicornafl*
+    rm -rf /usr/include/unicornafl
     # install into /usr/local
     PREFIX=${PREFIX:-/usr/local}
     ${MAKE} install
