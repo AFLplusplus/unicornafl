@@ -24,11 +24,6 @@ def monkeypatch():
     """
     sys.modules["unicorn"] = sys.modules["unicornafl"]
 
-UC_AFL_RET_ERROR = -1 # Something went horribly wrong in the parent
-UC_AFL_RET_CHILD = 0 # Fork worked. we are a child
-UC_AFL_RET_NO_AFL = 1 # No AFL, no need to fork.
-UC_AFL_RET_FINISHED = 2 # We forked before but now AFL is gone (parent)
-
 if not hasattr(sys.modules[__name__], "__file__"):
     __file__ = inspect.getfile(inspect.currentframe())
 

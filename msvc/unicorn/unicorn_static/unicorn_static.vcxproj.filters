@@ -187,6 +187,7 @@
       <Filter>qemu\util</Filter>
     </ClCompile>
     <ClCompile Include="..\..\..\uc.c" />
+    <ClCompile Include="..\..\..\afl.c" />
     <ClCompile Include="..\qapi-visit.c">
       <Filter>qemu</Filter>
     </ClCompile>

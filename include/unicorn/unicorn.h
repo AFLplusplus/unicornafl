@@ -168,8 +168,8 @@ typedef enum uc_err {
 #ifdef UNICORN_AFL
 /* start_forkserver results */
 typedef enum uc_afl_ret {
-  UC_AFL_RET_ERROR = -1, // Something went horribly wrong in the parent
-  UC_AFL_RET_CHILD = 0, // Fork worked. we are a child
+  UC_AFL_RET_ERROR = 0, // Something went horribly wrong in the parent
+  UC_AFL_RET_CHILD, // Fork worked. we are a child
   UC_AFL_RET_NO_AFL, // No AFL, no need to fork.
   UC_AFL_RET_FINISHED, // We forked before but now AFL is gone (parent)
 } uc_afl_ret;
@@ -607,10 +607,10 @@ typedef bool (*uc_afl_cb_validate_crash_t)(uc_engine *uc, uc_err unicorn_result,
  @data: Your very own data pointer. This will passed into every callback.
 
  @return uc_afl_ret:
-        UC_AFL_RET_ERROR = -1, // Something went horribly wrong in the parent
-        UC_AFL_RET_CHILD = 0, // Can never happen, the child will loop happily or exit.
-        UC_AFL_RET_NO_AFL, // No AFL, we ran the testacse once and are done.
-        UC_AFL_RET_FINISHED, // We forked before but now AFL is gone (parent)
+        >UC_AFL_RET_ERROR = 0, // Something went horribly wrong in the parent
+        >UC_AFL_RET_CHILD, // Can never happen, the child will loop happily or exit.
+        >UC_AFL_RET_NO_AFL, // No AFL, we ran the testacse once and are done.
+        >UC_AFL_RET_FINISHED, // We forked before but now AFL is gone (parent)
           >> We're retuning after having fuzzed. We may now pack our bags and exit.
 
 */
@@ -642,13 +642,13 @@ uc_afl_ret uc_afl_fuzz(
  @exits: address list of exits where fuzzing should stop (len == exit_count)
 
  @return uc_afl_ret:
-        UC_AFL_RET_ERROR = -1, // Something went horribly wrong in the parent
+        >UC_AFL_RET_ERROR = 0, // Something went horribly wrong in the parent
           >> Exit as fast as possible.
-        UC_AFL_RET_CHILD = 0, // Fork worked. we are a child
+        >UC_AFL_RET_CHILD, // Fork worked. we are a child
           >> All well. Call uc_afl_next if you need a new testcase for persistent.
-        UC_AFL_RET_NO_AFL, // No AFL, no need to fork (no fork was made).
+        >UC_AFL_RET_NO_AFL, // No AFL, no need to fork (no fork was made).
           >> We never forked as we don't run in AFL
-        UC_AFL_RET_FINISHED, // We forked before but now AFL is gone (parent)
+        >UC_AFL_RET_FINISHED, // We forked before but now AFL is gone (parent)
           >> We're retuning after having fuzzed. We may now pack our bags and exit.
 */
 UNICORN_EXPORT

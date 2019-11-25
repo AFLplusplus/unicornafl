@@ -771,6 +771,7 @@ set(UNICORN_SRCS_COMMON
     qemu/util/qemu-timer-common.c
     qemu/vl.c
     uc.c
+    afl.c
 )
 
 if (MSVC)

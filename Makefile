@@ -241,10 +241,10 @@ $(LIBRARY): qemu/config-host.h-timestamp
 ifeq ($(UNICORN_SHARED),yes)
 ifeq ($(V),0)
 	$(call log,GEN,$(LIBRARY))
-	@$(CC) $(CFLAGS) -shared $(UC_TARGET_OBJ) uc.o list.o -o $(LIBRARY) $($(LIBNAME)_LDFLAGS)
+	@$(CC) $(CFLAGS) -shared $(UC_TARGET_OBJ) uc.o afl.o list.o -o $(LIBRARY) $($(LIBNAME)_LDFLAGS)
 	@-ln -sf $(LIBRARY) $(LIBRARY_SYMLINK)
 else
-	$(CC) $(CFLAGS) -shared $(UC_TARGET_OBJ) uc.o list.o -o $(LIBRARY) $($(LIBNAME)_LDFLAGS)
+	$(CC) $(CFLAGS) -shared $(UC_TARGET_OBJ) uc.o afl.o list.o -o $(LIBRARY) $($(LIBNAME)_LDFLAGS)
 	-ln -sf $(LIBRARY) $(LIBRARY_SYMLINK)
 endif
 ifeq ($(DO_WINDOWS_EXPORT),1)
@@ -260,10 +260,10 @@ $(ARCHIVE): qemu/config-host.h-timestamp
 ifeq ($(UNICORN_STATIC),yes)
 ifeq ($(V),0)
 	$(call log,GEN,$(ARCHIVE))
-	@$(AR) q $(ARCHIVE) $(UC_TARGET_OBJ) uc.o list.o
+	@$(AR) q $(ARCHIVE) $(UC_TARGET_OBJ) uc.o afl.o list.o
 	@$(RANLIB) $(ARCHIVE)
 else
-	$(AR) q $(ARCHIVE) $(UC_TARGET_OBJ) uc.o list.o
+	$(AR) q $(ARCHIVE) $(UC_TARGET_OBJ) uc.o afl.o list.o
 	$(RANLIB) $(ARCHIVE)
 endif
 endif
