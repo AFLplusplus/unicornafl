@@ -45,8 +45,45 @@ maps = {
     }
 }
 
+def rust_emit_subprefix(subprefix):
+    c_struct = """}}
+
+#[repr(C)]
+#[derive(PartialEq, Debug, Clone, Copy)]
+pub enum {} {{
+"""
+    print(subprefix)
+    if subprefix == "uc_x86_insn":
+        return c_struct.format("InsnX86")
+    elif subprefix == "uc_err":
+        return c_struct.format("Error")
+    elif subprefix == "uc_afl_ret":
+        return c_struct.format("AflRet")
+    elif subprefix == "uc_mem_type":
+        return c_struct.format("MemType")
+    elif subprefix == "uc_hook_type":
+        return c_struct.format("HookType")
+    elif subprefix == "uc_arch":
+        return c_struct.format("Arch")
+    elif subprefix == "uc_mode":
+        return c_struct.format("Mode")
+    elif subprefix == "uc_query_type":
+        return c_struct.format("Query")
+    elif subprefix == "uc_prot":
+        return """}}
+
+bitflags! {{
+#[repr(C)]
+pub struct Protection : u32 {{
+"""
+    return ""
+
+# This state is needed as the rust bindings start new structs for sub-files.
+last_prefix = None
+last_const = None
 def rust_const_name_func(prefix, const):
-    print(prefix, const)
+    global last_prefix
+    global last_const 
     if not prefix:
         return const
     #elif prefix.lower() in maps and const in maps[prefix.lower()]:
@@ -58,6 +95,9 @@ def rust_const_name_func(prefix, const):
             return "R" + reg_name
         else:
             return reg_name
+    last_prefix = prefix
+    last_const = const
+    return ret
 
 template = {
     'python': {
@@ -110,10 +150,11 @@ template = {
         },
     'rust': {
 
-            'header': "#![allow(non_camel_case_types)]\n// For Unicorn Engine. AUTO-GENERATED FILE, DO NOT EDIT\n\n#[repr(C)]\n#[derive(PartialEq, Debug, Clone, Copy)]\npub enum Register%s {\n\n",
+            'header': "#![allow(non_camel_case_types)]\n// For Unicorn Engine. AUTO-GENERATED FILE, DO NOT EDIT\nuse bitflags::bitflags;\n\n#[repr(C)]\n#[derive(PartialEq, Debug, Clone, Copy)]\npub enum Register%s {\n\n",
             'footer': "\n\n}",
             'line_format': '    %s = %s\n',
             'const_name_func': rust_const_name_func,
+            'emit_subprefix': rust_emit_subprefix,
             'out_file': './rust/src/%s_const.rs',
             # prefixes for constant filenames of all archs - case sensitive
             'arm.h': 'arm',
@@ -184,6 +225,7 @@ def gen(lang):
     templ = template[lang]
     for target in include:
         prefix = templ[target]
+        subprefix = ""
         outfile = open(templ['out_file'] %(prefix), 'wb')   # open as binary prevents windows newlines
         outfile.write((templ['header'] % (prefix)).encode("utf-8"))
         if target == 'unicorn.h':
@@ -203,6 +245,12 @@ def gen(lang):
 
             if line == '' or line.startswith('//'):
                 continue
+
+            if line.startswith("typedef enum"):
+                subprefix = line.split()[2] # typedef enum uc_x86_reg {
+                print(templ.keys())
+                if "emit_subprefix" in templ.keys():
+                    outfile.write(templ["emit_subprefix"](subprefix).encode("utf-8"))
 
             tmp = line.strip().split(',')
             for t in tmp:
