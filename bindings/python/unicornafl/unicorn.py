@@ -228,7 +228,7 @@ class UcAflError(UcError):
     """
     Unicode Afl Error class
     """
-    def __init__(self, afl_ret=unicorn_const.UC_AFL_RET_ERROR, message=None):
+    def __init__(self, afl_ret=uc.UC_AFL_RET_ERROR, message=None):
         # type: (UcAflError, int, Optional[str]) -> None
         self.errno = afl_ret # type: int
         self.message = message # type: str
@@ -238,10 +238,10 @@ class UcAflError(UcError):
         if self.message:
             return self.message
         return {
-            unicorn_const.UC_AFL_RET_CHILD: "Fork worked. we are a child (no Error)",
-            unicorn_const.UC_AFL_RET_NO_AFL: "No AFL, no need to fork (but no real Error)",
-            unicorn_const.UC_AFL_RET_FINISHED: "We forked before but now AFL is gone (time to quit)",
-            unicorn_const.UC_AFL_RET_ERROR: "Something went horribly wrong in the parent!"
+            uc.UC_AFL_RET_CHILD: "Fork worked. we are a child (no Error)",
+            uc.UC_AFL_RET_NO_AFL: "No AFL, no need to fork (but no real Error)",
+            uc.UC_AFL_RET_FINISHED: "We forked before but now AFL is gone (time to quit)",
+            uc.UC_AFL_RET_ERROR: "Something went horribly wrong in the parent!"
         }[self.errno]
 
 
@@ -501,9 +501,9 @@ class Uc(object):
                 persistent_iters,
                 None  # no need to pass the user data through C as the callback keeps it as closure.
         )
-        if status == unicorn_const.UC_AFL_RET_FINISHED:
+        if status == uc.UC_AFL_RET_FINISHED:
             return True
-        elif status == unicorn_const.UC_AFL_RET_NO_AFL:
+        elif status == uc.UC_AFL_RET_NO_AFL:
             return False
         # Something went wrong.
         raise UcAflError(status)
@@ -554,13 +554,13 @@ class Uc(object):
         self.afl_is_forkserver_child = True # Set this before we fork for speed :)
         # everything beyond this point is done for every. single. child. Make sure to do the important stuff before. 
         status = _uc.uc_afl_forkserver_start(self._uch, (ctypes.c_uint64 * exit_count)(*exits), exit_count)
-        if status == unicorn_const.UC_AFL_RET_CHILD:
+        if status == uc.UC_AFL_RET_CHILD:
             # We're in the child. Let's go fuzz.
-            return unicorn_const.UC_AFL_RET_CHILD
+            return uc.UC_AFL_RET_CHILD
         
         # No AFL or we finished fuzzing. Either way we're in the parent.
         self.afl_is_forkserver_child = False
-        if status == unicorn_const.UC_AFL_RET_NO_AFL or status == unicorn_const.UC_AFL_RET_FINISHED:
+        if status == uc.UC_AFL_RET_NO_AFL or status == uc.UC_AFL_RET_FINISHED:
             return status
         else:
             # Error creating forkserver :(
