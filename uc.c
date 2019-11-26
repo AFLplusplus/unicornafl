@@ -4,7 +4,7 @@
 #if defined(UNICORN_HAS_OSXKERNEL)
 #include <libkern/libkern.h>
 #else
-#include <stddef.h>
+#include <stddef.h
 #include <stdio.h>
 #include <stdlib.h>
 #include <stdint.h>
