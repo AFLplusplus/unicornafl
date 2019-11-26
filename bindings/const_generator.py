@@ -8,19 +8,16 @@ INCL_DIR = os.path.join('..', 'include', 'unicorn')
 
 include = [ 'arm.h', 'arm64.h', 'mips.h', 'x86.h', 'sparc.h', 'm68k.h', 'unicorn.h' ]
 
-def rust_emit_subprefix(subprefix):
-    c_struct = """}}
-
+def rust_emit_subprefix(prefix, subprefix):
+    c_struct = """
 #[repr(C)]
 #[derive(PartialEq, Debug, Clone, Copy)]
 pub enum {} {{
 """
-    i32_struct = """}}
-
+    i32_struct = """
 #[repr(i32)]
 #[derive(PartialEq, Debug, Clone, Copy)]
-pub enum {} {{
-"""
+pub enum {} {{"""
     if subprefix == "uc_x86_insn":
         return c_struct.format("InsnX86")
     elif subprefix == "uc_err":
@@ -38,53 +35,66 @@ pub enum {} {{
     elif subprefix == "uc_query_type":
         return c_struct.format("Query")
     elif subprefix == "uc_prot":
-        return """}
-
+        return """
 bitflags! {
 #[repr(C)]
-pub struct Protection : u32 {
-"""
+pub struct Protection : u32 {"""
     return ""
 
 # This state is needed as the rust bindings start new structs for sub-files.
-def rust_const_name_func(prefix, subprefix, const):
-    if not prefix:  # unicorn_const.rs
+def rust_line_format_func(prefix, subprefix, const, val, format):
+    if prefix == "unicorn":  # unicorn_const.rs
         if const == "MODE_ARM":
-            return "// use LITTLE_ENDIAN.\n    // " + const
+            return format % ("// use LITTLE_ENDIAN.\n    // " + const, val)
         reg_name = const.split("_",1)[1] # X86_REG_RAX -> RAX
         if ord(reg_name[0]) >= ord("0") and ord(reg_name[0]) <= ord("9"):
             # Special case for MIPS REG_0 - REG_31
-            return "MODE_" + reg_name
+            return format % ("MODE_" + reg_name, val)
         else:
             if subprefix == "uc_prot":
-                return "const " + reg_name
+                return "{}const {} = {};\n".format(" "*8, reg_name, val)
             if reg_name in ["MAJOR", "MINOR", "EXTRA", "SCALE"]:
-                return "pub const " + const + ": u64"
-            return reg_name
+                return "pub const {}: u64 = {};\n".format(const, val)
+            if reg_name in ["V9", "SPARC64", "MIPS64", "SPARC32", "QPX", "PPC64", "PPC32", "MIPS32", "V8", "MCLASS", "MICRO"]:
+                return format % ("// " + reg_name, val)
+            return format % (reg_name, val)
     else:
         reg_name = const.split("_",2)[2] # X86_REG_RAX -> RAX
         if ord(reg_name[0]) >= ord("0") and ord(reg_name[0]) <= ord("9"):
             # Special case for MIPS REG_0 - REG_31 -> multiple enum entries with same name not allowed in rust
-            return "// R" + reg_name
+            return format % ("// R" + reg_name, val)
         if len(reg_name) == 3 and (reg_name.startswith("LO") or reg_name.startswith("HI")):
-            return "// " + reg_name
+            return format % ("// " + reg_name, val)
         if reg_name in ["R9", "R10", "R11", "R12", "R13", "R14", "R15", "X16", "X17", "X29", "X30", "I6", "O6", "S8"]:
-            return "// " + reg_name
+            return format % ("// " + reg_name, val)
         else:
-            return reg_name
+            return format % (reg_name, val)
     return ""
 
 def rust_header_func(prefix, header):
     if prefix == "unicorn":
-        return "#![allow(non_camel_case_types)]\n// For Unicorn Engine. AUTO-GENERATED FILE, DO NOT EDIT\nuse bitflags::bitflags;\n\n{\n"
+        return "#![allow(non_camel_case_types)]\n// For Unicorn Engine. AUTO-GENERATED FILE, DO NOT EDIT\nuse bitflags::bitflags;\n\n"
     if prefix in ["mips", "arm", "arm64", "x86", "sparc", "m68k"]:
         prefix = prefix.upper()
     return header % (prefix,)
 
-def rust_footer_func(prefix, footer):
-    if prefix == None:
-        return "    }\n" + footer
-    return footer
+skipped_mem_hook_ctr = False
+def rust_emit_subprefix_end_func(prefix, subprefix):
+    if prefix == "unicorn":
+        if subprefix == "uc_hook_type":
+            # some defines follow. Hack it away.
+            global skipped_mem_hook_ctr
+            if not skipped_mem_hook_ctr:
+                skipped_mem_hook_ctr = True
+                return ""
+            else:
+                skipped_mem_hook_ctr = False # in case we come back here at some point
+                return "}\n"  
+        if subprefix == "uc_prot":
+            return "    }\n}\n"
+        else:
+            return "}\n"
+    return "}"
 
 template = {
     'python': {
@@ -138,12 +148,12 @@ template = {
     'rust': {
             'header': "#![allow(non_camel_case_types)]\n// For Unicorn Engine. AUTO-GENERATED FILE, DO NOT EDIT\n\n#[repr(C)]\n#[derive(PartialEq, Debug, Clone, Copy)]\npub enum Register%s {\n\n",
             'header_func': rust_header_func,
-            'footer': "\n}",
-            'footer_func': rust_footer_func,
+            'footer': "",
             'line_format': '    %s = %s,\n',
-            'const_name_func': rust_const_name_func,
-            'emit_subprefix': rust_emit_subprefix,
-            'out_file': './rust/src/%s_const.rs',
+            'line_format_func': rust_line_format_func,
+            'emit_subprefix_func': rust_emit_subprefix,
+            'emit_subprefix_end_func': rust_emit_subprefix_end_func,
+            'out_file': './rust/libunicorn-sys/src/%s_const.rs',
             # prefixes for constant filenames of all archs - case sensitive
             'arm.h': 'arm',
             'arm64.h': 'arm64',
@@ -223,6 +233,7 @@ def gen(lang):
             prefix = ''
         with open(os.path.join(INCL_DIR, target)) as f:
             lines = f.readlines()
+        func_prefix = prefix if prefix else "unicorn"
 
         previous = {}
         count = 0
@@ -239,8 +250,8 @@ def gen(lang):
 
             if line.startswith("typedef enum"):
                 subprefix = line.split()[2] # typedef enum uc_x86_reg {
-                if "emit_subprefix" in templ.keys():
-                    outfile.write(templ["emit_subprefix"](subprefix).encode("utf-8"))
+                if "emit_subprefix_func" in templ.keys():
+                    outfile.write(templ["emit_subprefix_func"](func_prefix, subprefix).encode("utf-8"))
 
             tmp = line.strip().split(',')
             for t in tmp:
@@ -284,13 +295,22 @@ def gen(lang):
                     if (count == 1):
                         outfile.write(("\n").encode("utf-8"))
                     # If the template has a const_name_func that alters the var name, do it now.
-                    if 'const_name_func' in templ.keys():
-                        lhs_strip = templ['const_name_func'](prefix, subprefix, lhs_strip)
-                    outfile.write((templ['line_format'] % (lhs_strip, rhs)).encode("utf-8"))
+                    if 'line_format_func' in templ.keys():
+                        outfile.write(templ['line_format_func'](func_prefix, 
+                                                                subprefix, 
+                                                                lhs_strip, 
+                                                                rhs, 
+                                                                templ['line_format']
+                        ).encode("utf-8"))
+                    else:
+                        outfile.write((templ['line_format'] % (lhs_strip, rhs)).encode("utf-8"))
                     previous[lhs] = str(rhs)
 
-        if 'footer_func' in templ:
-            outfile.write(templ['footer_func'](prefix, templ['footer']).encode("utf-8"))
+            if line.startswith("}") and line.strip().endswith(";") and 'emit_subprefix_end_func' in templ.keys() and subprefix:
+                outfile.write(templ['emit_subprefix_end_func'](func_prefix, subprefix).encode("utf-8"))
+
+        if 'footer_func' in templ.keys():
+            outfile.write(templ['footer_func'](func_prefix, templ['footer']).encode("utf-8"))
         else:
             outfile.write((templ['footer']).encode("utf-8"))
         outfile.close()
