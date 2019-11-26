@@ -8,6 +8,57 @@ INCL_DIR = os.path.join('..', 'include', 'unicorn')
 
 include = [ 'arm.h', 'arm64.h', 'mips.h', 'x86.h', 'sparc.h', 'm68k.h', 'unicorn.h' ]
 
+maps = {
+    'mips': { 
+        "MIPS_REG_0": "ZERO",
+        "MIPS_REG_1": "AT",
+        "MIPS_REG_2": "V0", 
+        "MIPS_REG_3": "V1",
+        "MIPS_REG_4": "A0",
+        "MIPS_REG_5": "A1",
+        "MIPS_REG_6": "A2",
+        "MIPS_REG_7": "A3",
+        "MIPS_REG_8": "T0",
+        "MIPS_REG_9": "T1",
+        "MIPS_REG_10": "T2",
+        "MIPS_REG_11": "T3",
+        "MIPS_REG_12": "T4",
+        "MIPS_REG_13": "T5",
+        "MIPS_REG_14": "T6",
+        "MIPS_REG_15": "T7",
+        "MIPS_REG_16": "S0",
+        "MIPS_REG_17": "S1",
+        "MIPS_REG_18": "S2",
+        "MIPS_REG_19": "S3",
+        "MIPS_REG_20": "S4",
+        "MIPS_REG_21": "S5",
+        "MIPS_REG_22": "S6",
+        "MIPS_REG_23": "S7",
+        "MIPS_REG_24": "T8",
+        "MIPS_REG_25": "T9",
+        "MIPS_REG_26": "K0",
+        "MIPS_REG_27": "K1",
+        "MIPS_REG_28": "GP",
+        "MIPS_REG_29": "SP",
+        "MIPS_REG_30": "FP",
+        "MIPS_REG_31": "RA"
+    }
+}
+
+def rust_const_name_func(prefix, const):
+    print(prefix, const)
+    if not prefix:
+        return const
+    #elif prefix.lower() in maps and const in maps[prefix.lower()]:
+    #    return maps[prefix][const] # MIPS_REG_31 -> RA
+    else:
+        reg_name = const.split("_",2)[2] # X86_REG_RAX -> RAX
+        if ord(reg_name[0]) >= ord("0") and ord(reg_name[0]) <= ord("9"):
+            # Special case for MIPS REG_0 - REG_31
+            return "R" + reg_name
+        else:
+            return reg_name
+
 template = {
     'python': {
             'header': "# For Unicorn Engine. AUTO-GENERATED FILE, DO NOT EDIT [%s_const.py]\n",
@@ -57,7 +108,25 @@ template = {
             'comment_open': '//',
             'comment_close': '',
         },
-    'java': {
+    'rust': {
+
+            'header': "#![allow(non_camel_case_types)]\n// For Unicorn Engine. AUTO-GENERATED FILE, DO NOT EDIT\n\n#[repr(C)]\n#[derive(PartialEq, Debug, Clone, Copy)]\npub enum Register%s {\n\n",
+            'footer': "\n\n}",
+            'line_format': '    %s = %s\n',
+            'const_name_func': rust_const_name_func,
+            'out_file': './rust/src/%s_const.rs',
+            # prefixes for constant filenames of all archs - case sensitive
+            'arm.h': 'arm',
+            'arm64.h': 'arm64',
+            'mips.h': 'mips',
+            'x86.h': 'x86',
+            'sparc.h': 'sparc',
+            'm68k.h': 'm68k',
+            'unicorn.h': 'unicorn',
+            'comment_open': '    //',
+            'comment_close': '',
+        },
+        'java': {
             'header': "// For Unicorn Engine. AUTO-GENERATED FILE, DO NOT EDIT\n\npackage unicorn;\n\npublic interface %sConst {\n",
             'footer': "\n}\n",
             'line_format': '   public static final int UC_%s = %s;\n',
@@ -178,7 +247,11 @@ def gen(lang):
                     count = int(rhs) + 1
                     if (count == 1):
                         outfile.write(("\n").encode("utf-8"))
-
+                    # If the template has a const_name_func that alters the var name, do it now.
+                    try:
+                        lhs_strip = templ['const_name_func'](prefix, lhs_strip)
+                    except Exception as ex:
+                        print(ex, lhs_strip)
                     outfile.write((templ['line_format'] % (lhs_strip, rhs)).encode("utf-8"))
                     previous[lhs] = str(rhs)
 
