@@ -46,6 +46,8 @@ def rust_line_format_func(prefix, subprefix, const, val, format):
     if prefix == "unicorn":  # unicorn_const.rs
         if const == "MODE_ARM":
             return format % ("// use LITTLE_ENDIAN.\n    // " + const, val)
+        if subprefix == "uc_afl_ret":
+            return format % (const.split("_",2)[2], val) # AFL_RET_NO_AFL -> NO_AFL
         reg_name = const.split("_",1)[1] # X86_REG_RAX -> RAX
         if ord(reg_name[0]) >= ord("0") and ord(reg_name[0]) <= ord("9"):
             # Special case for MIPS REG_0 - REG_31
@@ -114,7 +116,7 @@ template = {
             'comment_close': '',
         },
     'ruby': {
-            'header': "# For Unicorn Engine. AUTO-GENERATED FILE, DO NOT EDIT\n{\n[%s_const.rb]\n\nmodule UnicornEngine\n",
+            'header': "# For Unicorn Engine. AUTO-GENERATED FILE, DO NOT EDIT [%s_const.rb]\n\nmodule UnicornEngine\n",
             'footer': "end",
             'line_format': '\tUC_%s = %s\n',
             'out_file': './ruby/unicorn_gem/lib/unicorn_engine/%s_const.rb',
