@@ -8,70 +8,87 @@ INCL_DIR = os.path.join('..', 'include', 'unicorn')
 
 include = [ 'arm.h', 'arm64.h', 'mips.h', 'x86.h', 'sparc.h', 'm68k.h', 'unicorn.h' ]
 
+rust_subprefix_enum_struct_names = {
+    "uc_x86_insn": "InsnX86",
+    "uc_err": "Error",
+    "uc_afl_ret": "AflRet",
+    "uc_mem_type": "MemType",
+    "uc_hook_type": "HookType",
+    "uc_arch": "Arch",
+    "uc_mode": "Mode",
+    "uc_query_type": "Query",
+    "uc_prot": "Protection"
+}
+
 def rust_emit_subprefix(prefix, subprefix):
-    c_struct = """
+
+    if subprefix in [
+                    "uc_x86_insn", 
+                    "uc_err",
+                    "uc_afl_ret",
+                    "uc_mem_type",
+                    "uc_arch",
+                    "uc_mode",
+                    "uc_query_type"
+                    ]:
+        return """
 #[repr(C)]
 #[derive(PartialEq, Debug, Clone, Copy)]
 pub enum {} {{
-"""
-    i32_struct = """
+""".format(rust_subprefix_enum_struct_names[subprefix])
+
+    elif subprefix == "uc_hook_type":
+        return """
 #[repr(i32)]
 #[derive(PartialEq, Debug, Clone, Copy)]
-pub enum {} {{"""
-    if subprefix == "uc_x86_insn":
-        return c_struct.format("InsnX86")
-    elif subprefix == "uc_err":
-        return c_struct.format("Error")
-    elif subprefix == "uc_afl_ret":
-        return c_struct.format("AflRet")
-    elif subprefix == "uc_mem_type":
-        return c_struct.format("MemType")
-    elif subprefix == "uc_hook_type":
-        return i32_struct.format("HookType")
-    elif subprefix == "uc_arch":
-        return c_struct.format("Arch")
-    elif subprefix == "uc_mode":
-        return c_struct.format("Mode")
-    elif subprefix == "uc_query_type":
-        return c_struct.format("Query")
+pub enum HookType {"""
+
     elif subprefix == "uc_prot":
         return """
 bitflags! {
 #[repr(C)]
 pub struct Protection : u32 {"""
+
     return ""
 
+
+
+rust_line_format_taken_vals = {}
+rust_line_format_duplicates = {}
 # This state is needed as the rust bindings start new structs for sub-files.
 def rust_line_format_func(prefix, subprefix, const, val, format):
-    if prefix == "unicorn":  # unicorn_const.rs
-        if const == "MODE_ARM":
-            return format % ("// use LITTLE_ENDIAN.\n    // " + const, val)
-        if subprefix == "uc_afl_ret":
-            return format % (const.split("_",2)[2], val) # AFL_RET_NO_AFL -> NO_AFL
-        reg_name = const.split("_",1)[1] # X86_REG_RAX -> RAX
-        if ord(reg_name[0]) >= ord("0") and ord(reg_name[0]) <= ord("9"):
-            # Special case for MIPS REG_0 - REG_31
-            return format % ("MODE_" + reg_name, val)
-        else:
-            if subprefix == "uc_prot":
-                return "{}const {} = {};\n".format(" "*8, reg_name, val)
-            if reg_name in ["MAJOR", "MINOR", "EXTRA", "SCALE"]:
-                return "pub const {}: u64 = {};\n".format(const, val)
-            if reg_name in ["V9", "SPARC64", "MIPS64", "SPARC32", "QPX", "PPC64", "PPC32", "MIPS32", "V8", "MCLASS", "MICRO"]:
-                return format % ("// " + reg_name, val)
-            return format % (reg_name, val)
+    global rust_line_format_taken_vals
+    global rust_line_format_duplicates
+    
+    if prefix != "unicorn":  # unicorn_const.rs
+        reg_name = const.split("_",2)[2] 
+    elif const == "MODE_ARM":
+        return format % ("// use LITTLE_ENDIAN.\n    // " + const, val)
+    elif subprefix == "uc_afl_ret":
+        return format % (const.split("_",2)[2], val) # AFL_RET_NO_AFL -> NO_AFL
     else:
-        reg_name = const.split("_",2)[2] # X86_REG_RAX -> RAX
-        if ord(reg_name[0]) >= ord("0") and ord(reg_name[0]) <= ord("9"):
-            # Special case for MIPS REG_0 - REG_31 -> multiple enum entries with same name not allowed in rust
-            return format % ("// R" + reg_name, val)
-        if len(reg_name) == 3 and (reg_name.startswith("LO") or reg_name.startswith("HI")):
-            return format % ("// " + reg_name, val)
-        if reg_name in ["R9", "R10", "R11", "R12", "R13", "R14", "R15", "X16", "X17", "X29", "X30", "I6", "O6", "S8"]:
-            return format % ("// " + reg_name, val)
+        reg_name = const.split("_",1)[1] # X86_REG_RAX -> RAX
+
+    if ord(reg_name[0]) >= ord("0") and ord(reg_name[0]) <= ord("9"):
+        if subprefix == "uc_mode":
+            # 16,32,64 bit modes
+            reg_name = "MODE_{}".format(reg_name)
         else:
-            return format % (reg_name, val)
-    return ""
+            # Special case for MIPS REG_0 - REG_31
+            reg_name = "R{}".format(reg_name)
+    if subprefix == "uc_prot":
+        return "{}const {} = {};\n".format(" "*8, reg_name, val)
+    if reg_name in ["MAJOR", "MINOR", "EXTRA", "SCALE"]:
+        return "pub const {}: u64 = {};\n".format(const, val)
+
+    if val in rust_line_format_taken_vals.keys():
+        # Special handling: Rust does not directly support multiple enum values with the same content
+        rust_line_format_duplicates[reg_name] = rust_line_format_taken_vals[val]
+        return format % ("// (assoc) {}".format(reg_name), val)
+    #if reg_name in ["V9", "SPARC64", "MIPS64", "SPARC32", "QPX", "PPC64", "PPC32", "MIPS32", "V8", "MCLASS", "MICRO"]:
+    rust_line_format_taken_vals[val] = reg_name
+    return format % (reg_name, val)
+
 
 def rust_header_func(prefix, header):
     if prefix == "unicorn":
@@ -79,6 +96,26 @@ def rust_header_func(prefix, header):
     if prefix in ["mips", "arm", "arm64", "x86", "sparc", "m68k"]:
         prefix = prefix.upper()
     return header % (prefix,)
+
+
+def rust_get_associated_consts(prefix, subprefix):
+    # Enums in rust do not allow multiple enum values with the same int value.
+    # Instead, we add them as associated const (alias) in the next step (impl).
+    global rust_line_format_taken_vals
+    global rust_line_format_duplicates
+    if prefix in ["mips", "arm", "arm64", "x86", "sparc", "m68k"]:
+        struct = "Register{}".format(prefix.upper())
+    else:
+        struct = rust_subprefix_enum_struct_names[subprefix]
+    rust_line_format_taken_vals = {}
+    if len(rust_line_format_duplicates) == 0:
+        return ""
+    ret = "\nimpl {} {{\n".format(struct)
+    for dst, src in rust_line_format_duplicates.items():
+        ret += "    pub const {dst}: {struct} = {struct}::{src};\n".format(dst=dst, struct=struct, src=src)
+    rust_line_format_duplicates = {}
+    return ret + "}\n"
+
 
 skipped_mem_hook_ctr = False
 def rust_emit_subprefix_end_func(prefix, subprefix):
@@ -91,12 +128,12 @@ def rust_emit_subprefix_end_func(prefix, subprefix):
                 return ""
             else:
                 skipped_mem_hook_ctr = False # in case we come back here at some point
-                return "}\n"  
+                return "}\n" + rust_get_associated_consts(prefix, subprefix)
         if subprefix == "uc_prot":
-            return "    }\n}\n"
+            return "    }\n}\n" + rust_get_associated_consts(prefix, subprefix)
         else:
-            return "}\n"
-    return "}"
+            return "}\n" + rust_get_associated_consts(prefix, subprefix)
+    return "}"  + rust_get_associated_consts(prefix, subprefix)
 
 template = {
     'python': {
