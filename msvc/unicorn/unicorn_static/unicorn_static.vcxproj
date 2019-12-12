@@ -58,6 +58,7 @@
     <ClCompile Include="..\..\..\qemu\util\qemu-timer-common.c" />
     <ClCompile Include="..\..\..\qemu\vl.c" />
     <ClCompile Include="..\..\..\uc.c" />
+    <ClCompile Include="..\..\..\afl.c" />
     <ClCompile Include="..\qapi-types.c" />
     <ClCompile Include="..\qapi-visit.c" />
   </ItemGroup>

@@ -7,6 +7,7 @@
 #include <stddef.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <stdint.h>
 #endif
 
 #include <time.h>   // nanosleep
@@ -348,6 +349,13 @@ uc_err uc_close(uc_engine *uc)
 
     free(uc->mapped_blocks);
 
+#if defined(UNICORN_AFL)
+    if (uc->exits) {
+        free(uc->exits);
+        uc->exits = NULL;
+    }
+#endif
+
     // finally, free uc itself.
     memset(uc, 0, sizeof(*uc));
     free(uc);
@@ -634,7 +642,6 @@ uc_err uc_emu_start(uc_engine* uc, uint64_t begin, uint64_t until, uint64_t time
 
     return uc->invalid_error;
 }
-
 
 UNICORN_EXPORT
 uc_err uc_emu_stop(uc_engine *uc)
@@ -1028,6 +1035,17 @@ uc_err uc_mem_unmap(struct uc_struct *uc, uint64_t address, size_t size)
 
     return UC_ERR_OK;
 }
+
+
+// // Clone the important uc parts instead of a real fork
+// bool uc_afl_softfork(struct uc_struct* uc, /* out */ struct afl_softfork_state **state) {
+
+// }
+
+// bool uc_afl_softfork_reset(struct uc_struct* uc) {
+
+// }
+
 
 // find the memory region of this address
 MemoryRegion *memory_mapping(struct uc_struct* uc, uint64_t address)

@@ -1,6 +1,7 @@
 /* Autogen header for Unicorn Engine - DONOT MODIFY */
 #ifndef UNICORN_AUTOGEN_MIPS_H
 #define UNICORN_AUTOGEN_MIPS_H
+#define afl_forkserver_start afl_forkserver_start_mips
 #define arm_release arm_release_mips
 #define aarch64_tb_set_jmp_target aarch64_tb_set_jmp_target_mips
 #define ppc_tb_set_jmp_target ppc_tb_set_jmp_target_mips

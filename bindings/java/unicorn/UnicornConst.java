@@ -68,6 +68,11 @@ public interface UnicornConst {
    public static final int UC_ERR_HOOK_EXIST = 19;
    public static final int UC_ERR_RESOURCE = 20;
    public static final int UC_ERR_EXCEPTION = 21;
+
+   public static final int UC_AFL_RET_ERROR = 0;
+   public static final int UC_AFL_RET_CHILD = 1;
+   public static final int UC_AFL_RET_NO_AFL = 2;
+   public static final int UC_AFL_RET_FINISHED = 3;
    public static final int UC_MEM_READ = 16;
    public static final int UC_MEM_WRITE = 17;
    public static final int UC_MEM_FETCH = 18;

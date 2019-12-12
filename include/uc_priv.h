@@ -21,6 +21,7 @@
 #define UC_MODE_SPARC_MASK  (UC_MODE_SPARC32|UC_MODE_SPARC64|UC_MODE_BIG_ENDIAN)
 #define UC_MODE_M68K_MASK   (UC_MODE_BIG_ENDIAN)
 
+
 #define ARR_SIZE(a) (sizeof(a)/sizeof(a[0]))
 
 #define READ_QWORD(x) ((uint64)x)
@@ -81,6 +82,9 @@ typedef uint64_t (*uc_mem_redirect_t)(uint64_t address);
 
 // validate if Unicorn supports hooking a given instruction
 typedef bool(*uc_insn_hook_validate)(uint32_t insn_enum);
+
+// we use this as shortcut deep inside uc_afl for uc_afl_next()
+typedef uc_afl_ret(*uc_afl_ret_void_t)(void);
 
 struct hook {
     int type;            // UC_HOOK_*
@@ -247,6 +251,16 @@ struct uc_struct {
     uint32_t target_page_align;
     uint64_t next_pc;   // save next PC for some special cases
     bool hook_insert;	// insert new hook at begin of the hook list (append by default)
+    
+#ifdef UNICORN_AFL
+    uc_args_int_uc_t afl_forkserver_start; // function to start afl forkserver
+    uc_afl_ret_void_t afl_child_request_next; // function from child to ask for new testcase (if in child)
+    unsigned char *afl_area_ptr; // map, shared with afl, to report coverage feedback etc. during runs
+    int afl_compcov_level; // how much compcove we want
+    unsigned int afl_inst_rms; 
+    size_t exit_count; // number of exits set in afl_fuzz or afl_forkserver
+    uint64_t *exits; // pointer to the actual exits
+#endif
 };
 
 // Metadata stub for the variable-size cpu context used with uc_context_*()

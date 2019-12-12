@@ -84,6 +84,14 @@ static inline void uc_common_init(struct uc_struct* uc)
 
     if (!uc->release)
         uc->release = release_common;
+
+#ifdef UNICORN_AFL
+    uc->afl_area_ptr = 0;
+    uc->exit_count = 0;
+    uc->exits = NULL;
+    uc->afl_forkserver_start = afl_forkserver_start;
+    uc->afl_child_request_next = NULL;  // This callback is only set if inside child.
+#endif
 }
 
 #endif

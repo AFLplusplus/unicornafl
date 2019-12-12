@@ -7,7 +7,7 @@
 include config.mk
 include pkgconfig.mk	# package version
 
-LIBNAME = unicorn
+LIBNAME = unicornafl
 UNAME_S := $(shell uname -s)
 # SMP_MFLAGS is used for controlling the amount of parallelism used
 # in external 'make' invocations. If the user doesn't override it, it
@@ -86,6 +86,10 @@ CC = clang -fsanitize=address -fno-omit-frame-pointer
 CXX = clang++ -fsanitize=address -fno-omit-frame-pointer
 AR = llvm-ar
 LDFLAGS := -fsanitize=address ${LDFLAGS}
+endif
+
+ifeq ($(UNICORN_AFL),yes)
+UNICORN_CFLAGS += -DUNICORN_AFL
 endif
 
 ifeq ($(CROSS),)
@@ -237,10 +241,10 @@ $(LIBRARY): qemu/config-host.h-timestamp
 ifeq ($(UNICORN_SHARED),yes)
 ifeq ($(V),0)
 	$(call log,GEN,$(LIBRARY))
-	@$(CC) $(CFLAGS) -shared $(UC_TARGET_OBJ) uc.o list.o -o $(LIBRARY) $($(LIBNAME)_LDFLAGS)
+	@$(CC) $(CFLAGS) -shared $(UC_TARGET_OBJ) uc.o afl.o list.o -o $(LIBRARY) $($(LIBNAME)_LDFLAGS)
 	@-ln -sf $(LIBRARY) $(LIBRARY_SYMLINK)
 else
-	$(CC) $(CFLAGS) -shared $(UC_TARGET_OBJ) uc.o list.o -o $(LIBRARY) $($(LIBNAME)_LDFLAGS)
+	$(CC) $(CFLAGS) -shared $(UC_TARGET_OBJ) uc.o afl.o list.o -o $(LIBRARY) $($(LIBNAME)_LDFLAGS)
 	-ln -sf $(LIBRARY) $(LIBRARY_SYMLINK)
 endif
 ifeq ($(DO_WINDOWS_EXPORT),1)
@@ -256,10 +260,10 @@ $(ARCHIVE): qemu/config-host.h-timestamp
 ifeq ($(UNICORN_STATIC),yes)
 ifeq ($(V),0)
 	$(call log,GEN,$(ARCHIVE))
-	@$(AR) q $(ARCHIVE) $(UC_TARGET_OBJ) uc.o list.o
+	@$(AR) q $(ARCHIVE) $(UC_TARGET_OBJ) uc.o afl.o list.o
 	@$(RANLIB) $(ARCHIVE)
 else
-	$(AR) q $(ARCHIVE) $(UC_TARGET_OBJ) uc.o list.o
+	$(AR) q $(ARCHIVE) $(UC_TARGET_OBJ) uc.o afl.o list.o
 	$(RANLIB) $(ARCHIVE)
 endif
 endif
@@ -347,8 +351,8 @@ define generate-pkgcfg
 	echo 'Version: $(PKG_VERSION)' >> $(PKGCFGF)
 	echo 'libdir=$(LIBDIR)' >> $(PKGCFGF)
 	echo 'includedir=$(INCDIR)' >> $(PKGCFGF)
-	echo 'archive=$${libdir}/libunicorn.a' >> $(PKGCFGF)
-	echo 'Libs: -L$${libdir} -lunicorn' >> $(PKGCFGF)
+	echo 'archive=$${libdir}/lib$(LIBNAME).a' >> $(PKGCFGF)
+	echo 'Libs: -L$${libdir} -l$(LIBNAME)' >> $(PKGCFGF)
 	echo 'Cflags: -I$${includedir}' >> $(PKGCFGF)
 endef
 
