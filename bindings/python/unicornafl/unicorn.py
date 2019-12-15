@@ -428,8 +428,7 @@ class Uc(object):
 
                     @return: (bool)
                         If you return is True (or None) all is well. Fuzzing starts.
-                        If you return False, something has gone wrong. the execution loop will exit. 
-                            There should be no reason to do this in a usual usecase.
+                        If you return False, the input is rejected; we will continue with the next input.
         :param exits: address list of exits where fuzzing should stop
         :param persistent_iters:
                 The amount of loop iterations in persistent mode before restarteing with a new forked child.

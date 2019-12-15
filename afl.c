@@ -199,8 +199,8 @@ uc_afl_ret uc_afl_fuzz(
 
         size_t in_len = uc_afl_mmap_file(input_file, &in_buf);
         if (unlikely(place_input_callback(uc, in_buf, in_len, i, data) == false)) {
-            // Apparently, we're supposed to quit.
-            break;
+            // Apparently the input was not to our liking. Let's continue.
+            continue;
         }
         uc_err uc_emu_ret = uc_afl_emu_start(uc);
 
