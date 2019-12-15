@@ -884,7 +884,7 @@ Description: Unicorn emulator engine\n\
 Version: ${UNICORN_VERSION_MAJOR}.${UNICORN_VERSION_MINOR}.${UNICORN_VERSION_PATCH}\n\
 libdir=${CMAKE_INSTALL_FULL_LIBDIR}\n\
 includedir=${CMAKE_INSTALL_FULL_INCLUDEDIR}\n\
-Libs: -L\$\{libdir\} -lunicorn\n\
+Libs: -L\$\{libdir\} -lunicornafl\n\
 Cflags: -I\$\{includedir\}\n"
     )
     install(FILES ${CMAKE_BINARY_DIR}/unicorn.pc DESTINATION ${CMAKE_INSTALL_LIBDIR}/pkgconfig)

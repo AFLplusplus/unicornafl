@@ -1,6 +1,6 @@
 CFLAGS += -Wall -Werror -I../../include
 CFLAGS += -D__USE_MINGW_ANSI_STDIO=1
-LDLIBS += -L../../ -lm -lunicorn
+LDLIBS += -L../../ -lm -lunicornafl
 
 UNAME_S := $(shell uname -s)
 LDLIBS += -pthread
