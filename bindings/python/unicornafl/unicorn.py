@@ -403,7 +403,7 @@ class Uc(object):
             exits,                  # type: List[int]
             validate_crash_callback=None,  # type: Optional[Callable[[Uc, UcError, bytes, int, Any], Optional[bool]]]
             always_validate=False,  # type: bool
-            persistent_iters=1000,  # type: int
+            persistent_iters=1,     # type: int
             data=None               # type: Any
     ):
         # type: (...) -> bool
