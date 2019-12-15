@@ -13,7 +13,7 @@ OBJCOPY = gobjcopy
 ASFLAGS = -arch i386
 endif
 
-LDLIBS += -lcmocka -lunicorn
+LDLIBS += -lcmocka -lunicornafl
 
 EXECUTE_VARS = LD_LIBRARY_PATH=../../cmocka/src:../../ DYLD_LIBRARY_PATH=../../
 

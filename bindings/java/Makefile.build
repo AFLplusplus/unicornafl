@@ -24,7 +24,7 @@ endif
 CC=gcc
 CFLAGS=-fPIC
 LDFLAGS=-shared -fPIC
-LIBS=-lunicorn
+LIBS=-lunicornafl
 LIBDIR=-L../../
 INCS=-I$(JAVA_INC) -I$(JAVA_PLATFORM_INC) -I$(UNICORN_INC)
 

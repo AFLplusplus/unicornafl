@@ -317,8 +317,8 @@ bindings: qemu/config-host.h-timestamp
 	$(MAKE) -C bindings samples
 
 dist:
-	git archive --format=tar.gz --prefix=unicorn-$(DIST_VERSION)/ $(TAG) > unicorn-$(DIST_VERSION).tgz
-	git archive --format=zip --prefix=unicorn-$(DIST_VERSION)/ $(TAG) > unicorn-$(DIST_VERSION).zip
+	git archive --format=tar.gz --prefix=unicornafl-$(DIST_VERSION)/ $(TAG) > unicornafl-$(DIST_VERSION).tgz
+	git archive --format=zip --prefix=unicornafl-$(DIST_VERSION)/ $(TAG) > unicornafl-$(DIST_VERSION).zip
 
 
 # run "make header" whenever qemu/header_gen.py is modified
@@ -346,8 +346,8 @@ clean:
 
 
 define generate-pkgcfg
-	echo 'Name: unicorn' > $(PKGCFGF)
-	echo 'Description: Unicorn emulator engine' >> $(PKGCFGF)
+	echo 'Name: unicornafl' > $(PKGCFGF)
+	echo 'Description: Unicorn emulator engine with AFL++ additions' >> $(PKGCFGF)
 	echo 'Version: $(PKG_VERSION)' >> $(PKGCFGF)
 	echo 'libdir=$(LIBDIR)' >> $(PKGCFGF)
 	echo 'includedir=$(INCDIR)' >> $(PKGCFGF)

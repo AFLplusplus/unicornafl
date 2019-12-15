@@ -5,7 +5,7 @@ ifeq ($(UNAME_S), Linux)
 LDFLAGS += -lrt -pthread
 endif
 
-LDFLAGS += -lunicorn
+LDFLAGS += -lunicornafl
 
 
 ALL_TESTS_SOURCES = $(wildcard fuzz*.c)
