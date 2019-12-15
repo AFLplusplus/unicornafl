@@ -559,8 +559,7 @@ uc_err uc_emu_start(uc_engine *uc, uint64_t begin, uint64_t until, uint64_t time
 
  @return:
   If you return is true, all is well. Fuzzing starts.
-  If you return false, something has gone wrong. the execution loop will exit. 
-    There should be no reason to do this in a usual usecase.
+  If you return false, the input is rejected; we will continue with the next input.
 */
 typedef bool (*uc_afl_cb_place_input_t)(uc_engine *uc, char *input, size_t input_len, uint32_t persistent_round, void *data);
 
