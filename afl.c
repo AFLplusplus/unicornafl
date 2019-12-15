@@ -188,7 +188,8 @@ uc_afl_ret uc_afl_fuzz(
     bool first_round = true;
 
     // 0 means never stop child in persistence mode.
-    for (uint32_t i = 0; persistent_iters == 0 || i < persistent_iters; i++) {
+    uint32_t i;
+    for (i = 0; persistent_iters == 0 || i < persistent_iters; i++) {
 
         // The main fuzz loop starts here :)
         if (first_round) {
