@@ -5399,7 +5399,8 @@ static inline void gen_intermediate_code_internal(SPARCCPU *cpu,
     uint64_t *exits = env->uc->exits;
     size_t exit_count = env->uc->exit_count;
     if (exit_count) {
-        for (size_t i = 0; i < exit_count; i++) {
+        size_t i;
+        for (i = 0; i < exit_count; i++) {
             if (pc_start == exits[i]) {
                 gen_tb_start(tcg_ctx);
                 gen_helper_power_down(tcg_ctx, tcg_ctx->cpu_env);
@@ -5424,7 +5425,8 @@ static inline void gen_intermediate_code_internal(SPARCCPU *cpu,
     exits = env->uc->exits;
     exit_count = env->uc->exit_count;
     if (exit_count) {
-        for (size_t i = 0; i < exit_count; i++) {
+        size_t i;
+        for (i = 0; i < exit_count; i++) {
             if (tb->pc == exits[i]) {
                 gen_tb_start(tcg_ctx);
                 save_state(dc);
@@ -5487,7 +5489,8 @@ static inline void gen_intermediate_code_internal(SPARCCPU *cpu,
         uint64_t *exits = dc->uc->exits;
         size_t exit_count = dc->uc->exit_count;
         if (exit_count) {
-            for (size_t i = 0; i < exit_count; i++) {
+            size_t i;
+            for (i = 0; i < exit_count; i++) {
                 int stop_emu = 0;
                 if (dc->pc == exits[i]) {
                     save_state(dc);
