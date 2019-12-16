@@ -4,8 +4,8 @@
 # AARCH64 Python sample ported by zhangwm <rustydaar@gmail.com>
 
 from __future__ import print_function
-from unicorn import *
-from unicorn.arm64_const import *
+from unicornafl import *
+from unicornafl.arm64_const import *
 
 
 # code to be emulated

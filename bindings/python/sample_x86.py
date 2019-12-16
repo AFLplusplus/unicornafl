@@ -2,8 +2,8 @@
 # Sample code for X86 of Unicorn. Nguyen Anh Quynh <aquynh@gmail.com>
 
 from __future__ import print_function
-from unicorn import *
-from unicorn.x86_const import *
+from unicornafl import *
+from unicornafl.x86_const import *
 
 
 X86_CODE32 = b"\x41\x4a\x66\x0f\xef\xc1" # INC ecx; DEC edx; PXOR xmm0, xmm1

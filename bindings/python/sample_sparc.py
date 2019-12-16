@@ -3,8 +3,8 @@
 # Python sample ported by Loi Anh Tuan <loianhtuan@gmail.com>
 
 from __future__ import print_function
-from unicorn import *
-from unicorn.sparc_const import *
+from unicornafl import *
+from unicornafl.sparc_const import *
 
 
 # code to be emulated
