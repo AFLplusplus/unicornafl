@@ -260,7 +260,7 @@ setup(
         'Programming Language :: Python :: 2',
         'Programming Language :: Python :: 3',
     ],
-    install_requires=['ctypes', 'typing'],
+    install_requires=['typing'],
     cmdclass=cmdclass,
     zip_safe=True,
     include_package_data=True,
