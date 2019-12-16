@@ -54,7 +54,7 @@ if 'PKG_MAJOR' not in VERSION_DATA or \
     raise Exception("Malformed pkgconfig.mk")
 
 if 'PKG_TAG' in VERSION_DATA:
-    VERSION = '{PKG_MAJOR}.{PKG_MINOR}.{PKG_EXTRA}.{PKG_TAG}'.format(**VERSION_DATA)
+    VERSION = '{PKG_MAJOR}.{PKG_MINOR}.{PKG_EXTRA}{PKG_TAG}'.format(**VERSION_DATA)
 else:
     VERSION = '{PKG_MAJOR}.{PKG_MINOR}.{PKG_EXTRA}'.format(**VERSION_DATA)
 
@@ -192,8 +192,8 @@ class custom_sdist(sdist):
 
 class custom_build(build):
     def run(self):
-        if 'LIBUNICORN_PATH' in os.environ:
-            log.info("Skipping building C extensions since LIBUNICORN_PATH is set")
+        if 'LIBUNICORNAFL_PATH' in os.environ:
+            log.info("Skipping building C extensions since LIBUNICORNAFL_PATH is set")
         else:
             log.info("Building C extensions")
             build_libraries()
@@ -260,7 +260,7 @@ setup(
         'Programming Language :: Python :: 2',
         'Programming Language :: Python :: 3',
     ],
-    requires=['ctypes'],
+    install_requires=['ctypes', 'typing'],
     cmdclass=cmdclass,
     zip_safe=True,
     include_package_data=True,

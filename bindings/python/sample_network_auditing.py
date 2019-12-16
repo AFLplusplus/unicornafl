@@ -3,8 +3,8 @@
 # Nguyen Tan Cong <shenlongbk@gmail.com>
 
 from __future__ import print_function
-from unicorn import *
-from unicorn.x86_const import *
+from unicornafl import *
+from unicornafl.x86_const import *
 import struct
 import uuid
 

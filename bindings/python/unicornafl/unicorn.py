@@ -91,7 +91,7 @@ _uc = None
 # - python's lib directory
 # - last-gasp attempt at some hardcoded paths on darwin and linux
 
-_path_list = [os.getenv('LIBUNICORN_PATH', None),
+_path_list = [os.getenv('LIBUNICORNAFL_PATH', None),
               pkg_resources.resource_filename(__name__, 'lib'),
               os.path.join(os.path.split(__file__)[0], 'lib'),
               '',

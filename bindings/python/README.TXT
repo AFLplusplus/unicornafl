@@ -1,4 +1,4 @@
-This documentation explains how to install the python binding for Unicorn
+This documentation explains how to install the python binding for Unicornafl
 from source.
 
 1. Installing on Linux:
@@ -9,7 +9,7 @@ from source.
 	and install it to your system.
 
     If you want to prevent the build of the native library during the python installation,
-    set the environment variable LIBUNICORN_PATH. You may also set this to a directory
+    set the environment variable LIBUNICORNAFL_PATH. You may also set this to a directory
     containing libunicorn.so if you wish to use a verison of the native library other than
     the globally installed one.
 
