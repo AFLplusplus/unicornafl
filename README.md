@@ -1,3 +1,45 @@
+Unicorn Engine for AFLplusplus
+==============================
+
+This fork of [Unicorn Engine](http://www.unicorn-engine.org/) enables the fuzzing of arbitrary binary code under [AFLplusplus](https://github.com/vanhauser-thc/AFLplusplus).
+
+The API design and implementation differs from the old afl-unicorn and are by @domenukk.
+
+Those API permits a more fine-grained control in the harness and enabled persistent mode.
+
+CompareCoverage and NeverZero counter are ported from AFL++ QEMU by @andreafioraldi.
+
+API
+---
+
+The new exposed API is:
+
+```c
+uc_afl_ret uc_afl_forkserver_start(uc_engine *uc, uint64_t *exits, size_t exit_count)
+```
+
+```c
+int uc_afl_emu_start(uc_engine *uc)
+```
+
+```c
+uc_afl_ret uc_afl_next(uc_engine *uc)
+```
+
+```c
+uc_afl_ret uc_afl_fuzz(
+        uc_engine *uc, 
+        char* input_file, 
+        uc_afl_cb_place_input_t place_input_callback, 
+        uint64_t *exits, 
+        size_t exit_count, 
+        uc_afl_cb_validate_crash_t validate_crash_callback, 
+        bool always_validate,
+        uint32_t persistent_iters,
+        void *data
+)
+```
+
 Unicorn Engine
 ==============
 
