@@ -10427,7 +10427,8 @@ static void disas_thumb_insn(CPUARMState *env, DisasContext *s) // qq
     uint64_t *exits = s->uc->exits;
     size_t exit_count = s->uc->exit_count;
     if (exit_count) {
-        for (size_t i = 0; i < exit_count; i++) {
+        size_t i;
+        for (i = 0; i < exit_count; i++) {
             if (s->pc == exits[i]) {
                 s->is_jmp = DISAS_WFI;
                 return;
@@ -11291,7 +11292,8 @@ static inline void gen_intermediate_code_internal(ARMCPU *cpu,
     uint64_t *exits = env->uc->exits;
     size_t exit_count = env->uc->exit_count;
     if (exit_count) {
-        for (size_t i = 0; i < exit_count; i++) {
+        size_t i;
+        for (i = 0; i < exit_count; i++) {
             if (tb->pc == exits[i]) {
                 gen_tb_start(tcg_ctx);
                 dc->is_jmp = DISAS_WFI;
@@ -11447,7 +11449,8 @@ static inline void gen_intermediate_code_internal(ARMCPU *cpu,
             uint64_t *exits = dc->uc->exits;
             size_t exit_count = dc->uc->exit_count;
             if (exit_count) {
-                for (size_t i = 0; i < exit_count; i++) {
+                size_t i;
+                for (i = 0; i < exit_count; i++) {
                     if (dc->pc == exits[i]) {
                         dc->is_jmp = DISAS_WFI;
                     }
