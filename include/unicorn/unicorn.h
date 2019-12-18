@@ -7,6 +7,8 @@
 #ifndef UNICORN_ENGINE_H
 #define UNICORN_ENGINE_H
 
+#define UNICORN_AFL
+
 #ifdef __cplusplus
 extern "C" {
 #endif

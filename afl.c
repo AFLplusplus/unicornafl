@@ -56,9 +56,9 @@ uc_afl_ret uc_afl_forkserver_start(uc_engine *uc, uint64_t *exits, size_t exit_c
 }
 
 /* returns the filesize in bytes, -1 or error. */
-static size_t uc_afl_mmap_file(char *filename, char **buf_ptr) {
+static off_t uc_afl_mmap_file(char *filename, char **buf_ptr) {
 
-    int ret = -1;
+    off_t ret = -1;
 
     int fd = open(filename, O_RDONLY);
 
@@ -198,11 +198,22 @@ uc_afl_ret uc_afl_fuzz(
             uc_afl_next(uc);
         }
 
+        // map input, call place input callback, unmap input
         size_t in_len = uc_afl_mmap_file(input_file, &in_buf);
-        if (unlikely(place_input_callback(uc, in_buf, in_len, i, data) == false)) {
-            // Apparently the input was not to our liking. Let's continue.
+        if (unlikely(in_len < 0)) {
+            fprintf("[!] Unable to mmap file: %s", input_file);
+            perror("mmap");
+            fflush(stderr);
+            return UC_AFL_RET_ERROR;
+        }
+        bool input_accepted = place_input_callback(uc, in_buf, in_len, i, data);
+        munmap(in_buf, in_len);
+
+        if (unlikely(!input_accepted)) {
+            // Apparently the input was not to the users' liking. Let's continue.
             continue;
         }
+        
         uc_err uc_emu_ret = uc_afl_emu_start(uc);
 
         if (unlikely((uc_emu_ret != UC_ERR_OK) || (always_validate && validate_crash_callback))) {
