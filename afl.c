@@ -198,7 +198,7 @@ uc_afl_ret uc_afl_fuzz(
             uc_afl_next(uc);
         }
 
-        // map input, call place input callback, unmap input
+        // map input, call place input callback, emulate, unmap input
         size_t in_len = uc_afl_mmap_file(input_file, &in_buf);
         if (unlikely(in_len < 0)) {
             fprintf("[!] Unable to mmap file: %s", input_file);
@@ -207,11 +207,10 @@ uc_afl_ret uc_afl_fuzz(
             return UC_AFL_RET_ERROR;
         }
         bool input_accepted = place_input_callback(uc, in_buf, in_len, i, data);
-        munmap(in_buf, in_len);
 
         if (unlikely(!input_accepted)) {
             // Apparently the input was not to the users' liking. Let's continue.
-            continue;
+            goto next_iter;
         }
         
         uc_err uc_emu_ret = uc_afl_emu_start(uc);
@@ -221,7 +220,7 @@ uc_afl_ret uc_afl_fuzz(
             if (validate_crash_callback != NULL && validate_crash_callback(
                     uc, uc_emu_ret, in_buf, in_len, i, data) != true) {
                 // The callback thinks this is not a valid crash. Ignore.
-                continue;
+                goto next_iter;
             }
 
             fprintf(stderr, "[!] UC returned Error: '%s' - let's abort().\n", uc_strerror(uc_emu_ret));
@@ -229,6 +228,8 @@ uc_afl_ret uc_afl_fuzz(
             abort();
 
         }
+next_iter:
+        munmap(in_buf, in_len);
     }
     // UC_AFL_RET_CHILD -> We looped through all iters. 
     // We are still in the child, nothing good will come after this.

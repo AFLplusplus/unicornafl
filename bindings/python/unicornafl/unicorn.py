@@ -477,14 +477,15 @@ class Uc(object):
 
         def validate_crash_wrapper(c_uc, uc_err, input, input_len, persistent_round, c_data):
             # print("Calling after crash!", c_uc, input, input_len, persistent_round, c_data)
+            # assert type(uc_err) == int
             ret = validate_crash_callback(
                 self,
-                UcError(uc_err.value),
+                UcError(uc_err),
                 input[:input_len],
                 persistent_round,
                 data
             )
-            if ret is False or uc_err.value == uc.UC_ERR_OK:
+            if ret is False or uc_err == uc.UC_ERR_OK:
                 return False
             return True
 
