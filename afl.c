@@ -199,9 +199,9 @@ uc_afl_ret uc_afl_fuzz(
         }
 
         // map input, call place input callback, emulate, unmap input
-        size_t in_len = uc_afl_mmap_file(input_file, &in_buf);
+        off_t in_len = uc_afl_mmap_file(input_file, &in_buf);
         if (unlikely(in_len < 0)) {
-            fprintf("[!] Unable to mmap file: %s", input_file);
+            fprintf(stderr, "[!] Unable to mmap file: %s", input_file);
             perror("mmap");
             fflush(stderr);
             return UC_AFL_RET_ERROR;
