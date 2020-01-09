@@ -7859,7 +7859,7 @@ static void disas_arm_insn(DisasContext *s, unsigned int insn)  // qq
             tcg_gen_movi_i32(tcg_ctx, tmp, val);
             store_reg(s, 14, tmp);
             /* Sign-extend the 24-bit offset */
-            offset = (((int32_t)insn) << 8) >> 8;
+            offset = ((int32_t)(insn << 8)) >> 8;
             /* offset * 4 + bit24 * 2 + (thumb bit) */
             val += (offset << 2) | ((insn >> 23) & 2) | 1;
             /* pipeline offset */
@@ -9911,7 +9911,7 @@ static int disas_thumb2_insn(CPUARMState *env, DisasContext *s, uint16_t insn_hw
             if (insn & 0x5000) {
                 /* Unconditional branch.  */
                 /* signextend(hw1[10:0]) -> offset[:12].  */
-                offset = ((int32_t)insn << 5) >> 9 & ~(int32_t)0xfff;
+                offset = ((int32_t)(insn << 5)) >> 9 & ~(int32_t)0xfff;
                 /* hw1[10:0] -> offset[11:1].  */
                 offset |= (insn & 0x7ff) << 1;
                 /* (~hw2[13, 11] ^ offset[24]) -> offset[23,22]
