@@ -49,7 +49,7 @@
 #define _W(pipe) ((pipe)[1])
 
 /* Channel from child (_W) to parent (_R) for tcg translation cache */
-static int p_tsl[2]; 
+static int p_tsl[2] = {0}; 
 
 /* Function declarations. */
 
