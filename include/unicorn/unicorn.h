@@ -7,7 +7,10 @@
 #ifndef UNICORN_ENGINE_H
 #define UNICORN_ENGINE_H
 
+#ifndef UNICORN_AFL
+/* Always enable AFL additions */
 #define UNICORN_AFL
+#endif
 
 #ifdef __cplusplus
 extern "C" {
