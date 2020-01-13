@@ -71,11 +71,13 @@ module Common =
     let UC_ERR_HOOK_EXIST = 19
     let UC_ERR_RESOURCE = 20
     let UC_ERR_EXCEPTION = 21
+    let UC_ERR_TIMEOUT = 22
 
     let UC_AFL_RET_ERROR = 0
     let UC_AFL_RET_CHILD = 1
     let UC_AFL_RET_NO_AFL = 2
     let UC_AFL_RET_FINISHED = 3
+
     let UC_MEM_READ = 16
     let UC_MEM_WRITE = 17
     let UC_MEM_FETCH = 18

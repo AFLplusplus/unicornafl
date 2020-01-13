@@ -130,7 +130,7 @@ static int32 roundAndPackInt32( flag zSign, uint64_t absZ STATUS_PARAM)
     absZ = ( absZ + roundIncrement )>>7;
     absZ &= ~ ( ( ( roundBits ^ 0x40 ) == 0 ) & roundNearestEven );
     z = (int32_t)absZ;
-    if ( zSign ) z = - z;
+    if ( zSign && (z != 0x80000000)) z = - z;
     if ( ( absZ>>32 ) || ( z && ( ( z < 0 ) ^ zSign ) ) ) {
         float_raise( float_flag_invalid STATUS_VAR);
         return zSign ? (int32_t) 0x80000000 : 0x7FFFFFFF;
@@ -668,7 +668,7 @@ static void
 {
     int8 shiftCount;
 
-    shiftCount = countLeadingZeros64( aSig );
+    shiftCount = countLeadingZeros64( aSig ) & 0x3f;
     *zSigPtr = aSig<<shiftCount;
     *zExpPtr = 1 - shiftCount;
 
@@ -1220,7 +1220,7 @@ float64 int32_to_float64(int32_t a STATUS_PARAM)
 
     if ( a == 0 ) return float64_zero;
     zSign = ( a < 0 );
-    absA = zSign ? - a : a;
+    absA = (zSign & (a != 0x80000000)) ? - a : a;
     shiftCount = countLeadingZeros32( absA ) + 21;
     zSig = absA;
     return packFloat64( zSign, 0x432 - shiftCount, zSig<<shiftCount );
@@ -4606,7 +4606,7 @@ int32 floatx80_to_int32( floatx80 a STATUS_PARAM )
 
     if (floatx80_invalid_encoding(a)) {
         float_raise(float_flag_invalid STATUS_VAR);
-        return 1 << 31;
+        return (int32)(1U << 31);
     }
     aSig = extractFloatx80Frac( a );
     aExp = extractFloatx80Exp( a );
@@ -4638,7 +4638,7 @@ int32 floatx80_to_int32_round_to_zero( floatx80 a STATUS_PARAM )
 
     if (floatx80_invalid_encoding(a)) {
         float_raise(float_flag_invalid STATUS_VAR);
-        return 1 << 31;
+        return (int32)(1U << 31);
     }
     aSig = extractFloatx80Frac( a );
     aExp = extractFloatx80Exp( a );

@@ -56,9 +56,9 @@ uc_afl_ret uc_afl_forkserver_start(uc_engine *uc, uint64_t *exits, size_t exit_c
 }
 
 /* returns the filesize in bytes, -1 or error. */
-static size_t uc_afl_mmap_file(char *filename, char **buf_ptr) {
+static off_t uc_afl_mmap_file(char *filename, char **buf_ptr) {
 
-    int ret = -1;
+    off_t ret = -1;
 
     int fd = open(filename, O_RDONLY);
 
@@ -198,11 +198,21 @@ uc_afl_ret uc_afl_fuzz(
             uc_afl_next(uc);
         }
 
-        size_t in_len = uc_afl_mmap_file(input_file, &in_buf);
-        if (unlikely(place_input_callback(uc, in_buf, in_len, i, data) == false)) {
-            // Apparently the input was not to our liking. Let's continue.
-            continue;
+        // map input, call place input callback, emulate, unmap input
+        off_t in_len = uc_afl_mmap_file(input_file, &in_buf);
+        if (unlikely(in_len < 0)) {
+            fprintf(stderr, "[!] Unable to mmap file: %s", input_file);
+            perror("mmap");
+            fflush(stderr);
+            return UC_AFL_RET_ERROR;
         }
+        bool input_accepted = place_input_callback(uc, in_buf, in_len, i, data);
+
+        if (unlikely(!input_accepted)) {
+            // Apparently the input was not to the users' liking. Let's continue.
+            goto next_iter;
+        }
+        
         uc_err uc_emu_ret = uc_afl_emu_start(uc);
 
         if (unlikely((uc_emu_ret != UC_ERR_OK) || (always_validate && validate_crash_callback))) {
@@ -210,7 +220,7 @@ uc_afl_ret uc_afl_fuzz(
             if (validate_crash_callback != NULL && validate_crash_callback(
                     uc, uc_emu_ret, in_buf, in_len, i, data) != true) {
                 // The callback thinks this is not a valid crash. Ignore.
-                continue;
+                goto next_iter;
             }
 
             fprintf(stderr, "[!] UC returned Error: '%s' - let's abort().\n", uc_strerror(uc_emu_ret));
@@ -218,6 +228,8 @@ uc_afl_ret uc_afl_fuzz(
             abort();
 
         }
+next_iter:
+        munmap(in_buf, in_len);
     }
     // UC_AFL_RET_CHILD -> We looped through all iters. 
     // We are still in the child, nothing good will come after this.

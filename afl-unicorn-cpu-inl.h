@@ -39,9 +39,17 @@
 /* We use one additional file descriptor to relay "needs translation"
    or "child done" messages between the child and the fork server. */
 
-#define TSL_FD (FORKSRV_FD - 1)
-
 #define FF16 (0xFFFFFFFFFFFFFFFF)
+
+/**
+ * The correct fds for reading and writing pipes
+ */
+
+#define _R(pipe) ((pipe)[0])
+#define _W(pipe) ((pipe)[1])
+
+/* Channel from child (_W) to parent (_R) for tcg translation cache */
+static int p_tsl[2] = {0}; 
 
 /* Function declarations. */
 
@@ -144,7 +152,6 @@ static inline uc_afl_ret afl_forkserver(CPUArchState* env) {
 
   static unsigned char tmp[4];
   pid_t   child_pid;
-  int     t_fd[2];  // Channel between child and parent for tcg translation cache
   bool child_alive = false;
 
   if (!env->uc->afl_area_ptr) return UC_AFL_RET_NO_AFL;
@@ -182,13 +189,16 @@ static inline uc_afl_ret afl_forkserver(CPUArchState* env) {
     if (!child_alive) {
 
       /* Child dead. Establish new a channel with child to grab translation commands.
-        We'll read from t_fd[0], child will write to TSL_FD. */
+        We'll read from _R(p_tsl), child will write to _W(p_tsl). */
 
-      if (pipe(t_fd) || dup2(t_fd[1], TSL_FD) < 0) {
+      /* close the read fd of previous round. */
+
+      if _R(p_tsl) close(_R(p_tsl));
+
+      if (pipe(p_tsl)) {
         perror("[!] Error creating pipe to child. ");
         return UC_AFL_RET_ERROR;
       }
-      close(t_fd[1]);
 
       /* Create a clone of our process. */
 
@@ -206,15 +216,15 @@ static inline uc_afl_ret afl_forkserver(CPUArchState* env) {
 
         close(FORKSRV_FD);
         close(FORKSRV_FD + 1);
-        close(t_fd[0]);
+        close(_R(p_tsl));
         env->uc->afl_child_request_next = afl_request_next;
         return UC_AFL_RET_CHILD;
 
       } else {
 
-        /* If we don't close this in parent, we don't get notified on t_fd once child is gone. */
+        /* If we don't close this in parent, we don't get notified on p_tsl once child is gone. */
 
-        close(TSL_FD);
+        close(_W(p_tsl));
 
       }
 
@@ -229,7 +239,6 @@ static inline uc_afl_ret afl_forkserver(CPUArchState* env) {
         return UC_AFL_RET_ERROR;
 
       }
-      child_alive = false;
 
     }
 
@@ -242,7 +251,7 @@ static inline uc_afl_ret afl_forkserver(CPUArchState* env) {
     /* Collect translation requests until child is finished (true) 
        or 0xdead (false) */
 
-    child_alive = afl_wait_tsl(env, t_fd[0]);
+    child_alive = afl_wait_tsl(env, _R(p_tsl));
 
     /* Get and relay exit status to parent. 
        No need to wait for WUNTRACED if child is not alive. */
@@ -308,9 +317,9 @@ static inline void afl_maybe_log(struct uc_struct* uc, unsigned long cur_loc) {
 
 static inline void afl_request_tsl(struct uc_struct* uc, target_ulong pc, target_ulong cb, uint64_t flags) {
 
-  /* Dual use: if this func is NULL, we're not a child process */
+  /* Dual use: if this func is not set, we're not a child process */
 
-  if (!uc->afl_child_request_next) return;
+  if (uc->afl_child_request_next == NULL) return;
 
   struct afl_tsl t = {0};
 
@@ -318,7 +327,7 @@ static inline void afl_request_tsl(struct uc_struct* uc, target_ulong pc, target
   t.cs_base = cb;
   t.flags = flags;
 
-  if (write(TSL_FD, &t, sizeof(struct afl_tsl)) != sizeof(struct afl_tsl))
+  if (write(_W(p_tsl), &t, sizeof(struct afl_tsl)) != sizeof(struct afl_tsl))
     return;
 
 }
@@ -327,7 +336,7 @@ static inline void afl_request_tsl(struct uc_struct* uc, target_ulong pc, target
 
 static uc_afl_ret afl_request_next(void) {
 
-  if (write(TSL_FD, &AFL_NEXT_TESTCASE_REQUEST, sizeof(struct afl_tsl)) != sizeof(struct afl_tsl)) return UC_AFL_RET_ERROR;
+  if (write(_W(p_tsl), &AFL_NEXT_TESTCASE_REQUEST, sizeof(struct afl_tsl)) != sizeof(struct afl_tsl)) return UC_AFL_RET_ERROR;
 
   return UC_AFL_RET_CHILD;
 
@@ -356,8 +365,6 @@ static bool afl_wait_tsl(CPUArchState* env, int fd) {
     tb_find_slow(env, t.pc, t.cs_base, t.flags);
 
   }
-
-  close(fd);
 
 }
 

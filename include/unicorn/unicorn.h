@@ -7,6 +7,11 @@
 #ifndef UNICORN_ENGINE_H
 #define UNICORN_ENGINE_H
 
+#ifndef UNICORN_AFL
+/* Always enable AFL additions */
+#define UNICORN_AFL
+#endif
+
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -162,7 +167,8 @@ typedef enum uc_err {
     UC_ERR_FETCH_UNALIGNED,  // Unaligned fetch
     UC_ERR_HOOK_EXIST,  // hook for this event already existed
     UC_ERR_RESOURCE,    // Insufficient resource: uc_emu_start()
-    UC_ERR_EXCEPTION // Unhandled CPU exception
+    UC_ERR_EXCEPTION, // Unhandled CPU exception
+    UC_ERR_TIMEOUT // Emulation timed out
 } uc_err;
 
 #ifdef UNICORN_AFL
