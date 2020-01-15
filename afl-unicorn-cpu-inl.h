@@ -50,7 +50,7 @@
 
 /* Channel from child (_W) to parent (_R) for tcg translation cache */
 static int p_tsl[2] = {0}; 
-static __thread unsigned long prev_loc = 0;
+//static __thread unsigned long prev_loc = 0;
 
 
 /* Function declarations. */
@@ -300,11 +300,11 @@ static inline void afl_maybe_log(struct uc_struct* uc, unsigned long cur_loc) {
 
   if (cur_loc >= uc->afl_inst_rms) return;
 
-  register uintptr_t afl_idx = cur_loc ^ prev_loc;
+  register uintptr_t afl_idx = cur_loc ^ uc->afl_prev_loc;
 
   INC_AFL_AREA(afl_idx);
 
-  prev_loc = cur_loc >> 1;
+  uc->afl_prev_loc = cur_loc >> 1;
 
 }
 
