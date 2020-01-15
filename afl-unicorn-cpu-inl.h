@@ -50,6 +50,8 @@
 
 /* Channel from child (_W) to parent (_R) for tcg translation cache */
 static int p_tsl[2] = {0}; 
+static __thread unsigned long prev_loc = 0;
+
 
 /* Function declarations. */
 
@@ -61,7 +63,7 @@ static bool afl_wait_tsl(CPUArchState*, int);
 static void afl_request_tsl(struct uc_struct* uc, target_ulong, target_ulong, uint64_t);
 static uc_afl_ret afl_request_next(void);
 
-static TranslationBlock* tb_find_slow(CPUArchState*, target_ulong, target_ulong, uint64_t);
+// static TranslationBlock* tb_find_slow(CPUArchState*, target_ulong, target_ulong, uint64_t);
 
 /* Data structure passed around by the translate handlers: */
 
@@ -115,16 +117,14 @@ static void afl_setup(struct uc_struct* uc) {
 
     shm_id = atoi(id_str);
     uc->afl_area_ptr = shmat(shm_id, NULL, 0);
+    uc->afl_prev_loc = 0;
 
     if (uc->afl_area_ptr == (void*)-1) exit(1);
     
-    /* Not sure if this does anything.
-      Also, for persistent mode, we want the map to be emtpy on every fork.
-      As far as I can see, afl clears the map it after each testcase.
-      So there is no reason why it shouldn't be empty on new forked children.
-      In contrast to "normal" instrumentation, we never count branches before forking.
+    /*For persistent mode, we want the map to be emtpy on every fork.
+      This has to be done by the initial caller, now.
       */
-    memset(uc->afl_area_ptr, 0, MAP_SIZE); 
+    //memset(uc->afl_area_ptr, 0, MAP_SIZE); 
 
     /* With AFL_INST_RATIO set to a low value, we want to touch the bitmap
        so that the parent doesn't give up on us. */
@@ -284,9 +284,7 @@ static inline uc_afl_ret afl_forkserver(CPUArchState* env) {
 
 static inline void afl_maybe_log(struct uc_struct* uc, unsigned long cur_loc) {
 
-  static __thread unsigned long prev_loc;
-
-  u8* afl_area_ptr = uc->afl_area_ptr;
+  uint8_t* afl_area_ptr = uc->afl_area_ptr;
 
   if (!afl_area_ptr) return;
 

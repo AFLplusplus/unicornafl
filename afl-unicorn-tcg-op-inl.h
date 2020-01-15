@@ -31,7 +31,7 @@
  */
 
 static inline void gen_afl_compcov_log_16(TCGContext *tcg_ctx, uint64_t cur_loc,
-                                          TCGv_i64 arg1, TCGv_i64 arg2) {
+                                          TCGv_i32 arg1, TCGv_i32 arg2) {
 
   TCGv_ptr tuc = tcg_const_ptr(tcg_ctx, tcg_ctx->uc);
   TCGv_i64 tcur_loc = tcg_const_i64(tcg_ctx, cur_loc);
@@ -40,7 +40,7 @@ static inline void gen_afl_compcov_log_16(TCGContext *tcg_ctx, uint64_t cur_loc,
 }
 
 static inline void gen_afl_compcov_log_32(TCGContext *tcg_ctx, uint64_t cur_loc,
-                                          TCGv_i64 arg1, TCGv_i64 arg2) {
+                                          TCGv_i32 arg1, TCGv_i32 arg2) {
 
   TCGv_ptr tuc = tcg_const_ptr(tcg_ctx, tcg_ctx->uc);
   TCGv_i64 tcur_loc = tcg_const_i64(tcg_ctx, cur_loc);

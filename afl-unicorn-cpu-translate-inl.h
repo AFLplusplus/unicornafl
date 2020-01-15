@@ -32,8 +32,8 @@
 
 #include "config.h"
 
-static void afl_gen_compcov(TCGContext *s, uint64_t cur_loc, TCGv_i64 arg1,
-                            TCGv_i64 arg2, TCGMemOp ot, int is_imm) {
+static void afl_gen_compcov(TCGContext *s, uint64_t cur_loc, TCGv arg1,
+                            TCGv arg2, TCGMemOp ot, int is_imm) {
 
   if (!s->uc->afl_compcov_level || !s->uc->afl_area_ptr) return;
 
@@ -46,9 +46,9 @@ static void afl_gen_compcov(TCGContext *s, uint64_t cur_loc, TCGv_i64 arg1,
 
   switch (ot) {
 
-    case MO_64: gen_afl_compcov_log_64(s, cur_loc, arg1, arg2); break;
-    case MO_32: gen_afl_compcov_log_32(s, cur_loc, arg1, arg2); break;
-    case MO_16: gen_afl_compcov_log_16(s, cur_loc, arg1, arg2); break;
+    case MO_64: gen_afl_compcov_log_64(s, cur_loc, (TCGv_i64)arg1, (TCGv_i64)arg2); break;
+    case MO_32: gen_afl_compcov_log_32(s, cur_loc, (TCGv_i32)arg1, (TCGv_i32)arg2); break;
+    case MO_16: gen_afl_compcov_log_16(s, cur_loc, (TCGv_i32)arg1, (TCGv_i32)arg2); break;
     default: return;
 
   }

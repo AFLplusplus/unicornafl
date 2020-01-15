@@ -8222,7 +8222,7 @@ static void disas_arm_insn(DisasContext *s, unsigned int insn)  // qq
             } else {
                 if (set_cc) {
                     gen_sub_CC(s, tmp, tmp, tmp2);
-                    afl_gen_compcov(tcg_ctx, s->pc, tmp, tmp2, MO_32, insn & (1 << 25));
+                    afl_gen_compcov(tcg_ctx, s->pc, (TCGv)tmp, (TCGv)tmp2, MO_32, insn & (1 << 25));
                 } else {
                     tcg_gen_sub_i32(tcg_ctx, tmp, tmp, tmp2);
                 }
@@ -8232,7 +8232,7 @@ static void disas_arm_insn(DisasContext *s, unsigned int insn)  // qq
         case 0x03:
             if (set_cc) {
                 gen_sub_CC(s, tmp, tmp2, tmp);
-                afl_gen_compcov(tcg_ctx, s->pc, tmp, tmp2, MO_32, insn & (1 << 25));
+                afl_gen_compcov(tcg_ctx, s->pc, (TCGv)tmp, (TCGv)tmp2, MO_32, insn & (1 << 25));
             } else {
                 tcg_gen_sub_i32(tcg_ctx, tmp, tmp2, tmp);
             }
@@ -8287,7 +8287,7 @@ static void disas_arm_insn(DisasContext *s, unsigned int insn)  // qq
         case 0x0a:
             if (set_cc) {
                 gen_sub_CC(s, tmp, tmp, tmp2);
-                afl_gen_compcov(tcg_ctx, s->pc, tmp, tmp2, MO_32, insn & (1 << 25));
+                afl_gen_compcov(tcg_ctx, s->pc, (TCGv)tmp, (TCGv)tmp2, MO_32, insn & (1 << 25));
             }
             tcg_temp_free_i32(tcg_ctx, tmp);
             break;
@@ -9208,14 +9208,14 @@ gen_thumb2_data_op(DisasContext *s, int op, int conds, uint32_t shifter_out,
     case 13: /* sub */
         if (conds) {
             gen_sub_CC(s, t0, t0, t1);
-            afl_gen_compcov(tcg_ctx, s->pc, t0, t1, MO_32, has_imm);
+            afl_gen_compcov(tcg_ctx, s->pc, (TCGv)t0, (TCGv)t1, MO_32, has_imm);
         } else
             tcg_gen_sub_i32(tcg_ctx, t0, t0, t1);
         break;
     case 14: /* rsb */
         if (conds) {
             gen_sub_CC(s, t0, t1, t0);
-            afl_gen_compcov(tcg_ctx, s->pc, t0, t1, MO_32, has_imm);
+            afl_gen_compcov(tcg_ctx, s->pc, (TCGv)t0, (TCGv)t1, MO_32, has_imm);
         } else
             tcg_gen_sub_i32(tcg_ctx, t0, t1, t0);
         break;
@@ -10500,7 +10500,7 @@ static void disas_thumb_insn(CPUARMState *env, DisasContext *s) // qq
                     tcg_gen_sub_i32(tcg_ctx, tmp, tmp, tmp2);
                 else {
                     gen_sub_CC(s, tmp, tmp, tmp2);
-                    afl_gen_compcov(tcg_ctx, s->pc, tmp, tmp2, MO_32, insn & (1 << 10));
+                    afl_gen_compcov(tcg_ctx, s->pc, (TCGv)tmp, (TCGv)tmp2, MO_32, insn & (1 << 10));
                 }
             } else {
                 if (s->condexec_mask)
@@ -10538,7 +10538,7 @@ static void disas_thumb_insn(CPUARMState *env, DisasContext *s) // qq
             switch (op) {
             case 1: /* cmp */
                 gen_sub_CC(s, tmp, tmp, tmp2);
-                afl_gen_compcov(tcg_ctx, s->pc, tmp, tmp2, MO_32, 1);
+                afl_gen_compcov(tcg_ctx, s->pc, (TCGv)tmp, (TCGv)tmp2, MO_32, 1);
                 tcg_temp_free_i32(tcg_ctx, tmp);
                 tcg_temp_free_i32(tcg_ctx, tmp2);
                 break;
@@ -10555,7 +10555,7 @@ static void disas_thumb_insn(CPUARMState *env, DisasContext *s) // qq
                     tcg_gen_sub_i32(tcg_ctx, tmp, tmp, tmp2);
                 else {
                     gen_sub_CC(s, tmp, tmp, tmp2);
-                    afl_gen_compcov(tcg_ctx, s->pc, tmp, tmp2, MO_32, 1);
+                    afl_gen_compcov(tcg_ctx, s->pc, (TCGv)tmp, (TCGv)tmp2, MO_32, 1);
                 }
                 tcg_temp_free_i32(tcg_ctx, tmp2);
                 store_reg(s, rd, tmp);
@@ -10594,7 +10594,7 @@ static void disas_thumb_insn(CPUARMState *env, DisasContext *s) // qq
                 tmp = load_reg(s, rd);
                 tmp2 = load_reg(s, rm);
                 gen_sub_CC(s, tmp, tmp, tmp2);
-                afl_gen_compcov(tcg_ctx, s->pc, tmp, tmp2, MO_32, 0);
+                afl_gen_compcov(tcg_ctx, s->pc, (TCGv)tmp, (TCGv)tmp2, MO_32, 0);
                 tcg_temp_free_i32(tcg_ctx, tmp2);
                 tcg_temp_free_i32(tcg_ctx, tmp);
                 break;
@@ -10713,7 +10713,7 @@ static void disas_thumb_insn(CPUARMState *env, DisasContext *s) // qq
             break;
         case 0xa: /* cmp */
             gen_sub_CC(s, tmp, tmp, tmp2);
-            afl_gen_compcov(tcg_ctx, s->pc, tmp, tmp2, MO_32, 0);
+            afl_gen_compcov(tcg_ctx, s->pc, (TCGv)tmp, (TCGv)tmp2, MO_32, 0);
             rd = 16;
             break;
         case 0xb: /* cmn */
