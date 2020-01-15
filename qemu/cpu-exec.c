@@ -24,15 +24,15 @@
 
 #include "uc_priv.h"
 
-#if defined(UNICORN_AFL)
-#include "../afl-unicorn-cpu-inl.h"
-#endif 
-
 static tcg_target_ulong cpu_tb_exec(CPUState *cpu, uint8_t *tb_ptr);
 static TranslationBlock *tb_find_slow(CPUArchState *env, target_ulong pc,
         target_ulong cs_base, uint64_t flags);
 static TranslationBlock *tb_find_fast(CPUArchState *env);
 static void cpu_handle_debug_exception(CPUArchState *env);
+
+#if defined(UNICORN_AFL)
+#include "../afl-unicorn-cpu-inl.h"
+#endif 
 
 void cpu_loop_exit(CPUState *cpu)
 {

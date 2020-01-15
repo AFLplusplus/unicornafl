@@ -33,8 +33,8 @@
 #include "uc_priv.h"
 #include "afl-unicorn-common.h"
 
-void HELPER(afl_compcov_log_16)(void* uc_ptr, uint64_t cur_loc, uint64_t arg1,
-                                uint64_t arg2) {
+void HELPER(afl_compcov_log_16)(void* uc_ptr, uint64_t cur_loc, uint32_t arg1,
+                                uint32_t arg2) {
 
   u8* afl_area_ptr = ((struct uc_struct*)uc_ptr)->afl_area_ptr;
 
@@ -42,8 +42,8 @@ void HELPER(afl_compcov_log_16)(void* uc_ptr, uint64_t cur_loc, uint64_t arg1,
 
 }
 
-void HELPER(afl_compcov_log_32)(void* uc_ptr, uint64_t cur_loc, uint64_t arg1,
-                                uint64_t arg2) {
+void HELPER(afl_compcov_log_32)(void* uc_ptr, uint64_t cur_loc, uint32_t arg1,
+                                uint32_t arg2) {
 
   u8* afl_area_ptr = ((struct uc_struct*)uc_ptr)->afl_area_ptr;
 

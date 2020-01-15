@@ -256,7 +256,8 @@ struct uc_struct {
 #ifdef UNICORN_AFL
     uc_args_int_uc_t afl_forkserver_start; // function to start afl forkserver
     uc_afl_ret_void_t afl_child_request_next; // function from child to ask for new testcase (if in child)
-    unsigned char *afl_area_ptr; // map, shared with afl, to report coverage feedback etc. during runs
+    uint8_t *afl_area_ptr; // map, shared with afl, to report coverage feedback etc. during runs
+    uint64_t afl_prev_loc; // previous location
     int afl_compcov_level; // how much compcove we want
     unsigned int afl_inst_rms; 
     size_t exit_count; // number of exits set in afl_fuzz or afl_forkserver

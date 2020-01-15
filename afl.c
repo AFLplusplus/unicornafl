@@ -11,10 +11,11 @@
 
 #include <string.h>
 
-#include "uc_priv.h"
-
 #include <sys/mman.h> 
 #include <sys/stat.h>
+
+#include "config.h"
+#include "uc_priv.h"
 
 UNICORN_EXPORT
 uc_afl_ret uc_afl_forkserver_start(uc_engine *uc, uint64_t *exits, size_t exit_count)
@@ -121,12 +122,24 @@ uc_afl_ret uc_afl_next(uc_engine *uc)
         if (uc->afl_child_request_next() == UC_AFL_RET_ERROR) return UC_AFL_RET_ERROR;
         raise(SIGSTOP);
 
+        // Write a byte to the map so that afl knows we exist. It will have been cleared at this point.
+        uc->afl_area_ptr[0] = 1;
+        // Start with a clean slate
+        uc->afl_prev_loc = 0;
+
         return UC_AFL_RET_CHILD;
 
     }     
 
     return UC_AFL_RET_NO_AFL;
 
+}
+
+/*For persistent mode, the afl_area map has to be reset by us for each new loop iteration.*/
+static inline void uc_afl_persistent_start(uc_engine *uc) {
+    memset(uc->afl_area_ptr, 0, MAP_SIZE);
+    uc->afl_area_ptr[0] = 1;
+    uc->afl_prev_loc = 0;
 }
 
 UNICORN_EXPORT
@@ -194,6 +207,9 @@ uc_afl_ret uc_afl_fuzz(
         // The main fuzz loop starts here :)
         if (first_round) {
             first_round = false;
+            if (persistent_iters != 1 && uc->afl_area_ptr) {
+                uc_afl_persistent_start(uc);
+            }
         } else {
             uc_afl_next(uc);
         }

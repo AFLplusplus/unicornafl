@@ -1533,7 +1533,7 @@ DISAS_INSN(tas)
     TCGContext *tcg_ctx = s->uc->tcg_ctx;
     TCGv dest;
     TCGv src1;
-    TCGv addr;
+    TCGv addr = 0; // fixes gcc uninitialized warning(?)
 
     dest = tcg_temp_new(tcg_ctx);
     SRC_EA(env, src1, OS_BYTE, 1, &addr);
@@ -1869,7 +1869,7 @@ DISAS_INSN(eor)
     TCGv src;
     TCGv reg;
     TCGv dest;
-    TCGv addr;
+    TCGv addr = 0; // HINT: workaround for maybe-unitialized warning by gcc(?)
 
     SRC_EA(env, src, OS_LONG, 0, &addr);
     reg = DREG(insn, 9);
