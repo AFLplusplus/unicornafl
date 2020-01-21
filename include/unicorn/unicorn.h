@@ -588,7 +588,7 @@ typedef bool (*uc_afl_cb_validate_crash_t)(uc_engine *uc, uc_err unicorn_result,
 /*
  The main fuzzer.
  Starts uc_afl_forkserver(), then beginns a persistent loop.
- Reads input, calls the place_input callback, emulates, uc_afl_next(), repeats.
+ Reads input, calls the place_input callback, emulates, uc_afl_next(...), repeats.
  If unicorn errors out, will call the validate_crash_callback, if set.
  Will only retrun in the parent after the whole fuzz thing has been finished and afl died.
  The child processes never return from here.
@@ -678,10 +678,13 @@ int uc_afl_emu_start(uc_engine *uc);
   (similar to what __afl_persistent loop // __LOOP does)
   uc_afl_fuzz() already makes use of this function under the hood.
 
+  @uc: handle returned by uc_open()
+  @crash_found: true, if the previous round found a crash (will be reported to afl before the next testcase), false otherwise
+
   @return UC_AFL_RET_ERROR on error (if uc_afl_forkserver(...) was not called or parent died), else UC_AFL_RET_CHILD.
 */
 UNICORN_EXPORT
-uc_afl_ret uc_afl_next(uc_engine *uc);
+uc_afl_ret uc_afl_next(uc_engine *uc, bool crash_found);
 
 #endif
 
