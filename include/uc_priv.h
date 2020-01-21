@@ -83,8 +83,8 @@ typedef uint64_t (*uc_mem_redirect_t)(uint64_t address);
 // validate if Unicorn supports hooking a given instruction
 typedef bool(*uc_insn_hook_validate)(uint32_t insn_enum);
 
-// we use this as shortcut deep inside uc_afl for uc_afl_next()
-typedef uc_afl_ret(*uc_afl_ret_void_t)(void);
+// we use this as shortcut deep inside uc_afl for the arch specific uc_afl_next(uc, bool)
+typedef uc_afl_ret(*uc_afl_ret_uc_bool_t)(struct uc_struct*, bool);
 
 struct hook {
     int type;            // UC_HOOK_*
@@ -255,7 +255,9 @@ struct uc_struct {
     
 #ifdef UNICORN_AFL
     uc_args_int_uc_t afl_forkserver_start; // function to start afl forkserver
-    uc_afl_ret_void_t afl_child_request_next; // function from child to ask for new testcase (if in child)
+    uc_afl_ret_uc_bool_t afl_child_request_next; // function from child to ask for new testcase (if in child)
+    int afl_child_pipe[2]; // pipe used to send information from child process to forkserver
+    int afl_parent_pipe[2]; // pipe used to send information from parent to child in forkserver
     uint8_t *afl_area_ptr; // map, shared with afl, to report coverage feedback etc. during runs
     uint64_t afl_prev_loc; // previous location
     int afl_compcov_level; // how much compcove we want
