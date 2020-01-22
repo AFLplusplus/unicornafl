@@ -28,6 +28,13 @@
 
 #include "exec/gen-icount.h"
 
+#if defined(UNICORN_AFL)
+#undef ARCH_HAS_COMPCOV
+#include "../../afl-unicorn-cpu-translate-inl.h"
+#endif
+
+
+
 //#define DEBUG_DISPATCH 1
 
 /* Fake floating point.  */
@@ -1533,7 +1540,7 @@ DISAS_INSN(tas)
     TCGContext *tcg_ctx = s->uc->tcg_ctx;
     TCGv dest;
     TCGv src1;
-    TCGv addr;
+    TCGv addr = 0; // fixes gcc uninitialized warning(?)
 
     dest = tcg_temp_new(tcg_ctx);
     SRC_EA(env, src1, OS_BYTE, 1, &addr);
@@ -1869,7 +1876,7 @@ DISAS_INSN(eor)
     TCGv src;
     TCGv reg;
     TCGv dest;
-    TCGv addr;
+    TCGv addr = 0; // HINT: workaround for maybe-unitialized warning by gcc(?)
 
     SRC_EA(env, src, OS_LONG, 0, &addr);
     reg = DREG(insn, 9);
@@ -3144,6 +3151,11 @@ gen_intermediate_code_internal(M68kCPU *cpu, TranslationBlock *tb,
     } else {
         env->uc->size_arg = -1;
     }
+
+#if defined(UNICORN_AFL)
+    /* Generate instrumentation for AFL. */
+    afl_gen_maybe_log(env->uc->tcg_ctx, tb->pc);
+#endif
 
     gen_tb_start(tcg_ctx);
     do {

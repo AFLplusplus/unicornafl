@@ -15,8 +15,9 @@ DEF_HELPER_FLAGS_2(sar_i64, TCG_CALL_NO_RWG_SE, s64, s64, s64)
 DEF_HELPER_FLAGS_2(mulsh_i64, TCG_CALL_NO_RWG_SE, s64, s64, s64)
 DEF_HELPER_FLAGS_2(muluh_i64, TCG_CALL_NO_RWG_SE, i64, i64, i64)
 
-#ifdef UNICORN_AFL
-DEF_HELPER_FLAGS_4(afl_compcov_log_16, 0, void, ptr, i64, i64, i64)
-DEF_HELPER_FLAGS_4(afl_compcov_log_32, 0, void, ptr, i64, i64, i64)
+#if defined(UNICORN_AFL)
+DEF_HELPER_FLAGS_2(afl_maybe_log, 0, void, ptr, i64)
+DEF_HELPER_FLAGS_4(afl_compcov_log_16, 0, void, ptr, i64, i32, i32)
+DEF_HELPER_FLAGS_4(afl_compcov_log_32, 0, void, ptr, i64, i32, i32)
 DEF_HELPER_FLAGS_4(afl_compcov_log_64, 0, void, ptr, i64, i64, i64)
 #endif

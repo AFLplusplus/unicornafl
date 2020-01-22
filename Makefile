@@ -92,6 +92,10 @@ ifeq ($(UNICORN_AFL),yes)
 UNICORN_CFLAGS += -DUNICORN_AFL
 endif
 
+ifeq ($(AFL_DEBUG),yes)
+UNICORN_CFLAGS += -DAFL_DEBUG
+endif
+
 ifeq ($(CROSS),)
 CC ?= cc
 AR ?= ar
