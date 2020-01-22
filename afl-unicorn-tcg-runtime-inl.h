@@ -33,6 +33,27 @@
 #include "uc_priv.h"
 #include "afl-unicorn-common.h"
 
+/* This is the main instrumentation function, patched in at translate.
+   cur_loc has already been shifted in afl-unicorn-translate-inl.h at this point. 
+   Also this helper will only be emitted if running instrumented. */
+
+void HELPER(afl_maybe_log)(void* uc_ptr, uint64_t cur_loc) {
+
+  struct uc_struct* uc = (struct uc_struct*) uc_ptr;
+  u8* afl_area_ptr = uc->afl_area_ptr; // Don't remove, it's used by INC_AFL_AREA implicitly;
+
+  register uintptr_t afl_idx = cur_loc ^ uc->afl_prev_loc;
+
+  INC_AFL_AREA(afl_idx);
+
+#if defined(AFL_DEBUG)
+  printf("[d] At loc 0x%lx: prev: 0x%lx, afl_idx: %lu, map[afl_idx]: %d\n", cur_loc, uc->afl_prev_loc, afl_idx, afl_area_ptr[afl_idx]);
+#endif
+
+  uc->afl_prev_loc = cur_loc >> 1;
+
+}
+
 void HELPER(afl_compcov_log_16)(void* uc_ptr, uint64_t cur_loc, uint32_t arg1,
                                 uint32_t arg2) {
 

@@ -54,7 +54,6 @@
 
 static void        afl_setup(struct uc_struct*);
 static inline uc_afl_ret afl_forkserver(CPUArchState*);
-static inline void afl_maybe_log(struct uc_struct*, unsigned long);
 static int afl_find_wifsignaled_id(void);
 
 static enum afl_child_ret afl_handle_child_requests(CPUArchState*);
@@ -148,7 +147,7 @@ static void afl_setup(struct uc_struct* uc) {
 
 static int afl_find_wifsignaled_id(void) {
 
-  int ret; // A faux status code that AFL will accept as signaled/crashed. 1 on linux.
+  int ret = 0; // A faux status code that AFL will accept as signaled/crashed. 1 on linux.
   while (!(WIFSIGNALED(ret))) ret++;
 
 #if defined(AFL_DEBUG)
@@ -334,39 +333,6 @@ static inline uc_afl_ret afl_forkserver(CPUArchState* env) {
     if (write(FORKSRV_FD + 1, &status, 4) != 4) return UC_AFL_RET_FINISHED;
 
   }
-
-}
-
-
-/* The equivalent of the tuple logging routine from afl-as.h. */
-
-static inline void afl_maybe_log(struct uc_struct* uc, unsigned long cur_loc) {
-
-  uint8_t* afl_area_ptr = uc->afl_area_ptr;
-
-  if (!afl_area_ptr) return;
-
-  /* Looks like QEMU always maps to fixed locations, so ASAN is not a
-     concern. Phew. But instruction addresses may be aligned. Let's mangle
-     the value to get something quasi-uniform. */
-
-  cur_loc = (cur_loc >> 4) ^ (cur_loc << 8);
-  cur_loc &= MAP_SIZE - 1;
-
-  /* Implement probabilistic instrumentation by looking at scrambled block
-     address. This keeps the instrumented locations stable across runs. */
-
-  if (cur_loc >= uc->afl_inst_rms) return;
-
-  register uintptr_t afl_idx = cur_loc ^ uc->afl_prev_loc;
-
-  INC_AFL_AREA(afl_idx);
-
-#if defined(AFL_DEBUG)
-  printf("[d] At loc 0x%lx: prev: 0x%lx, afl_idx: %lu, map[afl_idx]: %d\n", cur_loc, uc->afl_prev_loc, afl_idx, afl_area_ptr[afl_idx]);
-#endif
-
-  uc->afl_prev_loc = cur_loc >> 1;
 
 }
 

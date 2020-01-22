@@ -10,9 +10,6 @@
 
 UNICORN_DEBUG ?= no
 
-################################################################################
-# Enable additional debug logging for unicornafl
-AFL_DEBUG ?= no
 
 ################################################################################
 # Specify which archs you want to compile in. By default, we build all archs.
@@ -38,3 +35,10 @@ UNICORN_SHARED ?= yes
 # Changing 'UNICORN_AFLL = yes' to 'UNICORN_AFL = no' disables AFL instrumentation
 
 UNICORN_AFL ?= yes
+
+
+################################################################################
+# Enable debug logging for unicornafl
+#
+AFL_DEBUG ?= no
+

@@ -35,6 +35,11 @@
 
 #include "exec/gen-icount.h"
 
+#if defined(UNICORN_AFL)
+#undef ARCH_HAS_COMPCOV
+#include "../../afl-unicorn-cpu-translate-inl.h"
+#endif
+
 #ifdef CONFIG_USER_ONLY
 static TCGv_i64 cpu_exclusive_test;
 static TCGv_i32 cpu_exclusive_info;
@@ -11154,6 +11159,11 @@ void gen_intermediate_code_internal_a64(ARMCPU *cpu,
     } else {
         env->uc->size_arg = -1;
     }
+
+#if defined(UNICORN_AFL)
+    /* Generate instrumentation for AFL. */
+    afl_gen_maybe_log(env->uc->tcg_ctx, tb->pc);
+#endif
 
     gen_tb_start(tcg_ctx);
 

@@ -64,6 +64,7 @@ static TCGv_i32 cpu_exclusive_info;
 #endif
 
 #if defined(UNICORN_AFL)
+#define ARCH_HAS_COMPCOV
 #include "../../afl-unicorn-cpu-translate-inl.h"
 #else
 #define afl_gen_compcov(a,b,c,d,e,f) do {} while (0)
@@ -11323,6 +11324,11 @@ static inline void gen_intermediate_code_internal(ARMCPU *cpu,
     } else {
         env->uc->size_arg = -1;
     }
+
+#if defined(UNICORN_AFL)
+    /* Generate instrumentation for AFL. */
+    afl_gen_maybe_log(env->uc->tcg_ctx, tb->pc);
+#endif
 
     gen_tb_start(tcg_ctx);
 

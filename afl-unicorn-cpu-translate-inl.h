@@ -32,6 +32,29 @@
 
 #include "config.h"
 
+/* These are executed on code generation. Execution is in afl-unicorn-tcg-runtime-inl.h */
+/* Roughly afl_gen_maybe_log -> gen_afl_maybe_log -> emit HELPER(afl_maybe_log) -> call afl_maybe_log */
+
+static void afl_gen_maybe_log(TCGContext *s, uint64_t cur_loc) {
+
+  if (!s->uc->afl_area_ptr) return;
+
+  /* "Hash" */
+
+  cur_loc = (cur_loc >> 4) ^ (cur_loc << 8);
+  cur_loc &= MAP_SIZE - 7;
+
+  /* Implement probabilistic instrumentation by looking at scrambled block
+     address. This keeps the instrumented locations stable across runs. */
+
+  if (cur_loc >= s->uc->afl_inst_rms) return;
+
+    gen_afl_maybe_log(s, cur_loc);
+
+}
+
+// Currently only arm32 and x86. We undefine it for others to silence unused func compiler warnings.
+#if defined(ARCH_HAS_COMPCOV)
 static void afl_gen_compcov(TCGContext *s, uint64_t cur_loc, TCGv arg1,
                             TCGv arg2, TCGMemOp ot, int is_imm) {
 
@@ -54,4 +77,4 @@ static void afl_gen_compcov(TCGContext *s, uint64_t cur_loc, TCGv arg1,
   }
 
 }
-
+#endif
