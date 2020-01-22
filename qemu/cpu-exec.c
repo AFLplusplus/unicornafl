@@ -289,10 +289,6 @@ int cpu_exec(struct uc_struct *uc, CPUArchState *env)   // qq
                             next_tb & TB_EXIT_MASK, tb);
                 }
 
-#if defined(UNICORN_AFL)
-                afl_maybe_log(env->uc, tb->pc); 
-#endif
-
                 /* cpu_interrupt might be called while translating the
                    TB, but before it is linked into a potentially
                    infinite loop and becomes env->current_tb. Avoid
@@ -456,9 +452,6 @@ not_found:
 #if defined(UNICORN_AFL)
     /* There seems to be no chaining in unicorn ever? :( */
     afl_request_tsl(env->uc, pc, cs_base, flags);
-#if defined(AFL_DEBUG)
-    printf(" finished 0x%lx.\n", (uint64_t) pc);
-#endif
 #endif
 
 found:
