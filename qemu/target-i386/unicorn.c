@@ -918,6 +918,9 @@ int x86_reg_write(struct uc_struct *uc, unsigned int *regs, void *const *vals, i
                     case UC_X86_REG_GS:
                         load_seg_16_helper(&X86_CPU(uc, mycpu)->env, R_GS, *(uint16_t *)value);
                         continue;
+                    case UC_X86_REG_FS_BASE:
+                        X86_CPU(uc, mycpu)->env.segs[R_FS].base = *(uint32_t *)value;
+                        continue;
                 }
                 // fall-thru
             case UC_MODE_32:

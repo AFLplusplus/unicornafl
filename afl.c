@@ -11,10 +11,11 @@
 
 #include <string.h>
 
-#include "uc_priv.h"
-
 #include <sys/mman.h> 
 #include <sys/stat.h>
+
+#include "config.h"
+#include "uc_priv.h"
 
 UNICORN_EXPORT
 uc_afl_ret uc_afl_forkserver_start(uc_engine *uc, uint64_t *exits, size_t exit_count)
@@ -107,7 +108,7 @@ int uc_afl_emu_start(uc_engine *uc) {
 
 /* similar to __afl_persistent loop */
 UNICORN_EXPORT
-uc_afl_ret uc_afl_next(uc_engine *uc)
+uc_afl_ret uc_afl_next(uc_engine *uc, bool crash_found)
 {
 
     if (unlikely(!uc->afl_area_ptr)) {
@@ -118,8 +119,7 @@ uc_afl_ret uc_afl_next(uc_engine *uc)
     // Tell the parent we need a new testcase, then stop until testcase is available.
     if (uc->afl_child_request_next) {
 
-        if (uc->afl_child_request_next() == UC_AFL_RET_ERROR) return UC_AFL_RET_ERROR;
-        raise(SIGSTOP);
+        if (uc->afl_child_request_next(uc, crash_found) == UC_AFL_RET_ERROR) return UC_AFL_RET_ERROR;
 
         return UC_AFL_RET_CHILD;
 
@@ -186,6 +186,7 @@ uc_afl_ret uc_afl_fuzz(
     }
 
     bool first_round = true;
+    bool crash_found = false;
 
     // 0 means never stop child in persistence mode.
     uint32_t i;
@@ -195,7 +196,8 @@ uc_afl_ret uc_afl_fuzz(
         if (first_round) {
             first_round = false;
         } else {
-            uc_afl_next(uc);
+            uc_afl_next(uc, crash_found);
+            crash_found = false;
         }
 
         // map input, call place input callback, emulate, unmap input
@@ -222,9 +224,15 @@ uc_afl_ret uc_afl_fuzz(
                 // The callback thinks this is not a valid crash. Ignore.
                 goto next_iter;
             }
+            if (persistent_iters != 1) { 
+                // We're inpersistent mode and can report the crash via afl_next. No reason to die.
+                crash_found = true;
+                goto next_iter;
+            }
 
             fprintf(stderr, "[!] UC returned Error: '%s' - let's abort().\n", uc_strerror(uc_emu_ret));
             fflush(stderr);
+
             abort();
 
         }
@@ -248,4 +256,4 @@ next_iter:
     return UC_AFL_RET_NO_AFL;
 }
 
-#endif /* UNICORN_AFL */
+#endif /* UNICORN_AFL */ 

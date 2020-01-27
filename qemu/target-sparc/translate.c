@@ -33,6 +33,11 @@
 
 #include "exec/gen-icount.h"
 
+#if defined(UNICORN_AFL)
+#undef ARCH_HAS_COMPCOV
+#include "../../afl-unicorn-cpu-translate-inl.h"
+#endif
+
 #define DYNAMIC_PC  1 /* dynamic pc value */
 #define JUMP_PC     2 /* dynamic pc value which takes only two values
                          according to jump_pc[T2] */
@@ -2668,7 +2673,7 @@ static void disas_sparc_insn(DisasContext * dc, unsigned int insn, bool hook_ins
                     target = GET_FIELD_SP(insn, 0, 13) |
                         (GET_FIELD_SP(insn, 20, 21) << 14);
                     target = sign_extend(target, 16);
-                    target <<= 2;
+                    target = (int32_t)((uint32_t)target << 2);
                     cpu_src1 = get_src1(dc, insn);
                     do_branch_reg(dc, target, insn, cpu_src1);
                     goto jmp_insn;
@@ -2681,7 +2686,7 @@ static void disas_sparc_insn(DisasContext * dc, unsigned int insn, bool hook_ins
                     }
                     target = GET_FIELD_SP(insn, 0, 18);
                     target = sign_extend(target, 19);
-                    target <<= 2;
+                    target = (int32_t)((uint32_t)target << 2);
                     do_fbranch(dc, target, insn, cc);
                     goto jmp_insn;
                 }
@@ -2695,7 +2700,7 @@ static void disas_sparc_insn(DisasContext * dc, unsigned int insn, bool hook_ins
                 {
                     target = GET_FIELD(insn, 10, 31);
                     target = sign_extend(target, 22);
-                    target <<= 2;
+                    target = (int32_t)((uint32_t)target << 2);
                     do_branch(dc, target, insn, 0);
                     goto jmp_insn;
                 }
@@ -2706,7 +2711,7 @@ static void disas_sparc_insn(DisasContext * dc, unsigned int insn, bool hook_ins
                     }
                     target = GET_FIELD(insn, 10, 31);
                     target = sign_extend(target, 22);
-                    target <<= 2;
+                    target = (int32_t)((uint32_t)target << 2);
                     do_fbranch(dc, target, insn, 0);
                     goto jmp_insn;
                 }
@@ -5453,6 +5458,11 @@ static inline void gen_intermediate_code_internal(SPARCCPU *cpu,
         env->uc->size_arg = tcg_ctx->gen_opparam_buf - tcg_ctx->gen_opparam_ptr + 1;
         gen_uc_tracecode(tcg_ctx, 0xf8f8f8f8, UC_HOOK_BLOCK_IDX, env->uc, pc_start);
     }
+
+#if defined(UNICORN_AFL)
+    /* Generate instrumentation for AFL. */
+    afl_gen_maybe_log(env->uc->tcg_ctx, tb->pc);
+#endif
 
     gen_tb_start(tcg_ctx);
     do {
