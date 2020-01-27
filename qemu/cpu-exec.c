@@ -164,7 +164,6 @@ int cpu_exec(struct uc_struct *uc, CPUArchState *env)   // qq
                     ret = cpu->exception_index;
                     break;
 #else
-<<<<<<< HEAD
                     if (uc->stop_interrupt && uc->stop_interrupt(cpu->exception_index)) {
                         // Unicorn: call registered invalid instruction callbacks
                         HOOK_FOREACH_VAR_DECLARE;
@@ -184,13 +183,6 @@ int cpu_exec(struct uc_struct *uc, CPUArchState *env)   // qq
                         }
                         if (!catched)
                             uc->invalid_error = UC_ERR_EXCEPTION;
-=======
-                    // Unicorn: call registered interrupt callbacks
-                    HOOK_FOREACH_VAR_DECLARE;
-                    HOOK_FOREACH(uc, hook, UC_HOOK_INTR) {
-                        ((uc_cb_hookintr_t)hook->callback)(uc, cpu->exception_index, hook->user_data);
-                        catched = true;
->>>>>>> initialize ret=0 in cpu_exec(). issue #1115
                     }
 
                     // Unicorn: If un-catched interrupt, stop executions.
