@@ -160,6 +160,10 @@ void x86_reg_reset(struct uc_struct *uc)
             env->hflags &= ~(HF_ADDSEG_MASK);
             env->efer |= MSR_EFER_LMA | MSR_EFER_LME; // extended mode activated
             cpu_x86_update_cr0(env, CR0_PE_MASK); // protected mode
+            /* If we are operating in 64bit mode then add the Long Mode flag
+             * to the CPUID feature flag
+             */
+            env->features[FEAT_8000_0001_EDX] |= CPUID_EXT2_LM;
             break;
     }
 }
@@ -917,6 +921,9 @@ int x86_reg_write(struct uc_struct *uc, unsigned int *regs, void *const *vals, i
                         continue;
                     case UC_X86_REG_GS:
                         load_seg_16_helper(&X86_CPU(uc, mycpu)->env, R_GS, *(uint16_t *)value);
+                        continue;
+                    case UC_X86_REG_FS_BASE:
+                        X86_CPU(uc, mycpu)->env.segs[R_FS].base = *(uint32_t *)value;
                         continue;
                 }
                 // fall-thru

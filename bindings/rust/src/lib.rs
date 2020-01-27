@@ -296,6 +296,20 @@ pub trait Cpu<'a> {
     fn afl_forkserver_start(&self, exits: &[u64]) -> AflRet {
         self.emu().afl_forkserver_start(exits)
     }
+
+    fn afl_fuzz<F, G>(&self, 
+        input_file: &str,
+        place_input_callback: F,
+        exits: &[u64],
+        validate_crash_callback: G,
+        always_validate: bool,
+        persistent_iters: u32) -> AflRet 
+            where
+                F: 'a + FnMut(&*const Unicorn<'a>, &[u8], i32) -> bool,
+                G: 'a + FnMut(&*const Unicorn<'a>, Error, &[u8], i32) -> bool
+    {
+        self.emu().afl_fuzz(input_file, place_input_callback, exits, validate_crash_callback, always_validate, persistent_iters)
+    }
 }
 
 implement_emulator!(
@@ -1026,7 +1040,7 @@ impl<'a> Unicorn<'a> {
             F: Fn(&'a Unicorn<'a>, &[u8], u32)
 */
 
-    pub fn afl_fuzz<F, G>(&'a self, 
+    pub fn afl_fuzz<F, G>(&self, 
         input_file: &str,
         place_input_callback: F,
         exits: &[u64],

@@ -24,15 +24,15 @@
 
 #include "uc_priv.h"
 
-#if defined(UNICORN_AFL)
-#include "../afl-unicorn-cpu-inl.h"
-#endif 
-
 static tcg_target_ulong cpu_tb_exec(CPUState *cpu, uint8_t *tb_ptr);
 static TranslationBlock *tb_find_slow(CPUArchState *env, target_ulong pc,
         target_ulong cs_base, uint64_t flags);
 static TranslationBlock *tb_find_fast(CPUArchState *env);
 static void cpu_handle_debug_exception(CPUArchState *env);
+
+#if defined(UNICORN_AFL)
+#include "../afl-unicorn-cpu-inl.h"
+#endif 
 
 void cpu_loop_exit(CPUState *cpu)
 {
@@ -289,10 +289,6 @@ int cpu_exec(struct uc_struct *uc, CPUArchState *env)   // qq
                             next_tb & TB_EXIT_MASK, tb);
                 }
 
-#if defined(UNICORN_AFL)
-                afl_maybe_log(env->uc, tb->pc); 
-#endif
-
                 /* cpu_interrupt might be called while translating the
                    TB, but before it is linked into a potentially
                    infinite loop and becomes env->current_tb. Avoid
@@ -344,7 +340,9 @@ int cpu_exec(struct uc_struct *uc, CPUArchState *env)   // qq
     // TODO: optimize this for better performance
 #if defined (UNICORN_AFL)
     if (uc->afl_area_ptr) {
-        //printf("[d] Found area ptr, not flushing\n");
+#if defined(AFL_DEBUG)
+        printf("[d] Found area ptr, not flushing translation cache.\n");
+#endif
     }
     else
 #endif
@@ -445,18 +443,21 @@ static TranslationBlock *tb_find_slow(CPUArchState *env, target_ulong pc,
         ptb1 = &tb->phys_hash_next;
     }
 not_found:
-    //printf("[d] translating 0x%llx...", pc);
+#if defined(AFL_DEBUG)
+    printf("[d] translating 0x%lx...", (uint64_t) pc);
+#endif
     /* if no translated code available, then translate it now */
     tb = tb_gen_code(cpu, pc, cs_base, (int)flags, 0);   // qq
     
 #if defined(UNICORN_AFL)
     /* There seems to be no chaining in unicorn ever? :( */
     afl_request_tsl(env->uc, pc, cs_base, flags);
-    //printf(" finished 0x%llx.", pc);
 #endif
 
 found:
-    //printf("[d] got translated block 0x%llx\n", pc);
+#if defined(AFL_DEBUG)
+    printf("[d] got translated block 0x%lx\n", (uint64_t) pc);
+#endif
     /* Move the last found TB to the head of the list */
     if (likely(*ptb1)) {
         *ptb1 = tb->phys_hash_next;

@@ -854,7 +854,7 @@ static inline uint64_t helper_extrq(uint64_t src, int shift, int len)
     } else {
         mask = (1ULL << (len & 0x3f)) - 1;
     }
-    return (src >> shift) & mask;
+    return (src >> (shift & 0x3f)) & mask;
 }
 
 void helper_extrq_r(CPUX86State *env, XMMReg *d, XMMReg *s)
@@ -876,7 +876,7 @@ static inline uint64_t helper_insertq(uint64_t src, int shift, int len)
     } else {
         mask = (1ULL << (len & 0x3f)) - 1;
     }
-    return (src & ~(mask << shift)) | ((src & mask) << shift);
+    return (src & ~(mask << (shift & 0x3f))) | ((src & mask) << (shift & 0x3f));
 }
 
 void helper_insertq_r(CPUX86State *env, XMMReg *d, XMMReg *s)
@@ -1489,7 +1489,7 @@ void glue(helper_phsubsw, SUFFIX)(CPUX86State *env, Reg *d, Reg *s)
 
 #define FABSB(_, x) (x > INT8_MAX  ? -(int8_t)x : x)
 #define FABSW(_, x) (x > INT16_MAX ? -(int16_t)x : x)
-#define FABSL(_, x) (x > INT32_MAX ? -(int32_t)x : x)
+#define FABSL(_, x) ((x > INT32_MAX && x != 0x80000000) ? -(int32_t)x : x)
 SSE_HELPER_B(helper_pabsb, FABSB)
 SSE_HELPER_W(helper_pabsw, FABSW)
 SSE_HELPER_L(helper_pabsd, FABSL)
@@ -1941,7 +1941,7 @@ SSE_HELPER_Q(helper_pcmpgtq, FCMPGTQ)
 
 static inline int pcmp_elen(CPUX86State *env, int reg, uint32_t ctrl)
 {
-    int val;
+    unsigned int val;
 
     /* Presence of REX.W is indicated by a bit higher than 7 set */
     if (ctrl >> 8) {
@@ -1958,6 +1958,9 @@ static inline int pcmp_elen(CPUX86State *env, int reg, uint32_t ctrl)
         if (val > 16) {
             return 16;
         }
+    }
+    if (val == 0x80000000) {
+        val = 0;
     }
     return val;
 }

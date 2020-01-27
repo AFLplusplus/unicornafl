@@ -1719,6 +1719,9 @@ static void tcg_liveness_analysis(TCGContext *s)
                implies side effects */
             if (!(def->flags & TCG_OPF_SIDE_EFFECTS) && nb_oargs != 0) {
                 for(i = 0; i < nb_oargs; i++) {
+                    if (args[i] >= TCG_MAX_TEMPS) {
+                        continue;
+                    }
                     arg = args[i];
                     if (!dead_temps[arg] || mem_temps[arg]) {
                         goto do_not_remove;
@@ -2375,7 +2378,7 @@ static int tcg_reg_alloc_call(TCGContext *s, const TCGOpDef *def,
     flags = args[nb_oargs + nb_iargs + 1];
 
     nb_regs = ARRAY_SIZE(tcg_target_call_iarg_regs);
-#if TCG_TARGET_REG_BITS == 32
+#if TCG_TARGET_REG_BITS == 32 && defined(_M_IX86)
     // do this because msvc cannot have arrays with 0 entries.
     nb_regs = 0;
 #endif

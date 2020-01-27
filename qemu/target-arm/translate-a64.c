@@ -35,6 +35,11 @@
 
 #include "exec/gen-icount.h"
 
+#if defined(UNICORN_AFL)
+#undef ARCH_HAS_COMPCOV
+#include "../../afl-unicorn-cpu-translate-inl.h"
+#endif
+
 #ifdef CONFIG_USER_ONLY
 static TCGv_i64 cpu_exclusive_test;
 static TCGv_i32 cpu_exclusive_info;
@@ -5661,7 +5666,7 @@ static void handle_simd_dupg(DisasContext *s, int is_q, int rd, int rn,
                              int imm5)
 {
     int size = ctz32(imm5);
-    int esize = 8 << size;
+    int esize = 8 << (size & 0x1f);
     int elements = (is_q ? 128 : 64)/esize;
     int i = 0;
 
@@ -11154,6 +11159,11 @@ void gen_intermediate_code_internal_a64(ARMCPU *cpu,
     } else {
         env->uc->size_arg = -1;
     }
+
+#if defined(UNICORN_AFL)
+    /* Generate instrumentation for AFL. */
+    afl_gen_maybe_log(env->uc->tcg_ctx, tb->pc);
+#endif
 
     gen_tb_start(tcg_ctx);
 
