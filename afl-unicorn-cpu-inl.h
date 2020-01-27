@@ -191,7 +191,7 @@ static inline uc_afl_ret afl_forkserver(CPUArchState* env) {
     condition and afl-fuzz already issued SIGKILL, write off the old
     process. */
 
-    if ((child_ret == AFL_CHILD_NEXT || child_ret == AFL_CHILD_EXITED) && was_killed) {
+    if ((child_ret != AFL_CHILD_EXITED) && was_killed) {
     
 #if defined(AFL_DEBUG)
       printf("[d] Child was killed by AFL in the meantime.\n");
@@ -212,7 +212,7 @@ static inline uc_afl_ret afl_forkserver(CPUArchState* env) {
 
       /* close the read fd of previous round. */
 
-      if _R(env->uc->afl_child_pipe) {
+      if (_R(env->uc->afl_child_pipe)) {
         close(_R(env->uc->afl_child_pipe));
         close(_W(env->uc->afl_parent_pipe));
       }
