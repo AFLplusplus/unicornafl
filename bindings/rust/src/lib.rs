@@ -297,18 +297,14 @@ pub trait Cpu<'a> {
         self.emu().afl_forkserver_start(exits)
     }
 
-    fn afl_fuzz<F, G>(&self, 
+    fn afl_fuzz<T: AflCallbackHandler>(&self, 
         input_file: &str,
-        place_input_callback: F,
+        callback_handler: &Box<dyn AflCallbackHandler>,
         exits: &[u64],
-        validate_crash_callback: G,
         always_validate: bool,
-        persistent_iters: u32) -> AflRet 
-            where
-                F: 'a + FnMut(&*const Unicorn<'a>, &[u8], i32) -> bool,
-                G: 'a + FnMut(&*const Unicorn<'a>, Error, &[u8], i32) -> bool
+        persistent_iters: u32) -> unicorn_const::AflRet
     {
-        self.emu().afl_fuzz(input_file, place_input_callback, exits, validate_crash_callback, always_validate, persistent_iters)
+        self.emu().afl_fuzz::<T>(input_file, callback_handler, exits, always_validate, persistent_iters)
     }
 }
 
@@ -421,39 +417,37 @@ extern "C" fn insn_sys_hook_proxy(_: uc_handle, user_data: *mut InsnSysHook<'_>)
     callback(unicorn)
 }
 
-extern "C" fn afl_place_input_callback_proxy(
-    _: uc_handle, 
-    input: *const u8, 
-    input_len: libc::c_int, 
-    persistent_round: libc::c_int, 
-    user_data: *mut libc::c_void
-) -> bool {
-    let data = unsafe { &mut *(user_data as *mut AflFuzzCallbacks<'_>) };
-    let input_slice = unsafe{ slice::from_raw_parts(input, input_len as usize) };
-    (data.place_input_callback)(
-        &data.unicorn,
-        input_slice, 
-        i32::try_from(persistent_round).unwrap()
-    )
+pub trait AflCallbackHandler {
+    fn handle_input(&self, input: &[u8], rounds: u32);
+    fn handle_crash(&self, err: u64, input: &[u8], rounds: u32);
 }
 
-extern "C" fn afl_validate_crash_callback_proxy<'a, 'b>(
-    _: uc_handle, 
-    unicorn_result: Error,
+pub extern fn place_input_callback_proxy_exp<T: AflCallbackHandler> (
+    uc: uc_handle, 
     input: *const u8, 
-    input_len: libc::c_int, 
+    input_len: libc::size_t, 
     persistent_round: libc::c_int, 
     user_data: *mut libc::c_void
-) -> bool {
-    let data = unsafe { &mut *(user_data as *mut AflFuzzCallbacks<'_>) };
+) {
+    println!("user data: {:#x}", user_data as u64);
+    let place_input: &mut T = unsafe { mem::transmute(user_data) };
+    let input_slice = unsafe { std::slice::from_raw_parts(input, input_len as usize) };
 
-    let input_slice = unsafe{ slice::from_raw_parts(input, input_len as usize) };
-    (data.validate_crash_callback)(
-        &data.unicorn, 
-        unicorn_result, 
-        input_slice, 
-        i32::try_from(persistent_round).unwrap(), 
-    )
+    place_input.handle_input(input_slice, persistent_round as u32);
+}
+
+pub extern fn validate_crash_callback_proxy_exp<T: AflCallbackHandler>(
+    _: uc_handle, 
+    error: u64,
+    input: *const u8, 
+    input_len: libc::size_t, 
+    persistent_round: libc::c_int, 
+    user_data: *mut libc::c_void
+) {
+    let place_input: &mut T = unsafe { mem::transmute(user_data) };
+    let input_slice = unsafe { std::slice::from_raw_parts(input, input_len as usize) };
+
+    place_input.handle_crash(error, input_slice, persistent_round as u32);
 }
 
 type CodeHook<'a> = UnicornHook<'a, Box<dyn 'a + FnMut(&'a Unicorn<'a>, u64, u32)>>;
@@ -471,7 +465,7 @@ type InsnSysHook<'a> = UnicornHook<'a, Box<dyn 'a + FnMut(&'a Unicorn<'a>)>>;
 
 /// Internal : A Unicorn emulator instance, use one of the Cpu structs instead.
 pub struct Unicorn<'a> {
-    handle: libc::size_t, // Opaque handle to uc_engine
+    pub handle: libc::size_t, // Opaque handle to uc_engine
     code_callbacks: RefCell<HashMap<uc_hook, Box<CodeHook<'a>>>>,
     intr_callbacks: RefCell<HashMap<uc_hook, Box<IntrHook<'a>>>>,
     mem_callbacks: RefCell<HashMap<uc_hook, Box<MemHook<'a>>>>,
@@ -479,6 +473,12 @@ pub struct Unicorn<'a> {
     insn_out_callbacks: RefCell<HashMap<uc_hook, Box<InsnOutHook<'a>>>>,
     insn_sys_callbacks: RefCell<HashMap<uc_hook, Box<InsnSysHook<'a>>>>,
     phantom: PhantomData<&'a libc::size_t>,
+}
+
+impl<'a> std::fmt::Debug for Unicorn<'a> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "Unicorn: {{ handle: 0x{:x} }}", self.handle)
+    }
 }
 
 /// Returns a tuple `(major, minor)` for the unicorn version number.
@@ -1040,17 +1040,13 @@ impl<'a> Unicorn<'a> {
             F: Fn(&'a Unicorn<'a>, &[u8], u32)
 */
 
-    pub fn afl_fuzz<F, G>(&self, 
+    pub fn afl_fuzz<T: AflCallbackHandler>(&self, 
         input_file: &str,
-        place_input_callback: F,
+        callback_handler: &mut Box<Box<dyn AflCallbackHandler>>,
         exits: &[u64],
-        validate_crash_callback: G,
         always_validate: bool,
         persistent_iters: u32
     ) -> unicorn_const::AflRet
-            where
-                F: 'a + FnMut(&*const Unicorn<'a>, &[u8], i32) -> bool,
-                G: 'a + FnMut(&*const Unicorn<'a>, Error, &[u8], i32) -> bool
     {
 //(uc_handle, Error, libc::c_void, libc::c_int, libc::c_int, libc::c_void) -> bool;
 
@@ -1063,22 +1059,17 @@ impl<'a> Unicorn<'a> {
         //     let input_slice = unsafe{ slice::from_raw_parts(input, input_len as usize) };
         //     validate_crash_callback(&self, unicorn_result, input_slice, i32::try_from(persistent_round).unwrap(), &data)
         // };
-        let afl_fuzz_callbacks = Box::new(AflFuzzCallbacks {
-            unicorn: self,
-            place_input_callback: Box::new(place_input_callback),
-            validate_crash_callback: Box::new(validate_crash_callback),
-        });
 
         unsafe { uc_afl_fuzz(
             self.handle,
             input_file.as_ptr(),
-            afl_place_input_callback_proxy as _,
+            place_input_callback_proxy_exp::<T> as _,
             exits.as_ptr(),
             exits.len(),
-            afl_validate_crash_callback_proxy as _,
+            validate_crash_callback_proxy_exp::<T> as _,
             always_validate,
             persistent_iters,
-            &afl_fuzz_callbacks as *const _ as *const libc::c_void
+            callback_handler as *const Box<Box<dyn AflCallbackHandler>> as _
         ) }
     }
 }
