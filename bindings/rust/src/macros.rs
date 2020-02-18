@@ -11,6 +11,7 @@ macro_rules! implement_register {
 macro_rules! implement_emulator {
     ($emu_type_doc:meta, $emu_instance_doc:meta, $cpu:ident, $arch:expr, $reg:ty) => {
         #[$emu_type_doc]
+        #[derive(std::fmt::Debug)]
         pub struct $cpu<'a> {
             emu: Box<Unicorn<'a>>,
         }
