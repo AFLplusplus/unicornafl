@@ -1,7 +1,0 @@
-Cargo.lock
-*.bk
-**/target/**
-.vscode
-CMakeLists.txt
-cmake-build-debug/
-.idea/
