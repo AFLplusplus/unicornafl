@@ -1,5 +1,6 @@
 
 use std::ffi::c_void;
+use std::pin::Pin;
 use bitflags::bitflags;
 use libc::{c_char, c_int};
 
@@ -85,7 +86,7 @@ extern "C" {
         validate_crash_callback: *mut c_void,
         always_validate: bool,
         persistent_iters: u32,
-        data: *const c_void
+        data: *mut c_void
     ) -> AflRet;
 }
 
@@ -257,21 +258,22 @@ impl Mode {
 }
 
 pub struct CodeHook<D> {
-    pub unicorn: *mut crate::Unicorn<D>,
-    pub callback: Box<dyn FnMut(&mut crate::Unicorn<D>, u64, u32)>
+    pub unicorn: *mut crate::UnicornInner<D>,
+    pub callback: Box<dyn FnMut(crate::UnicornHandle<D>, u64, u32)>
 }
 
 pub struct AflFuzzCallback<D> {
-    pub unicorn: *mut crate::Unicorn<D>,
-    pub input_callback: Box<dyn FnMut(&mut crate::Unicorn<D>, &[u8], i32) -> bool>,
-    pub validate_callback: Box<dyn FnMut(&mut crate::Unicorn<D>, Error, &[u8], i32) -> bool>
+    pub unicorn: *mut crate::UnicornInner<D>,
+    pub input_callback: Box<dyn FnMut(crate::UnicornHandle<D>, &[u8], i32) -> bool>,
+    pub validate_callback: Box<dyn FnMut(crate::UnicornHandle<D>, Error, &[u8], i32) -> bool>
 }
 
 pub extern "C" fn code_hook_proxy<D>(uc: uc_handle, address: u64, size: u32, user_data: *mut CodeHook<D>) {
+    println!("code_hook_proxy");
     let unicorn = unsafe { &mut *(*user_data).unicorn };
     let callback = &mut unsafe { &mut *(*user_data).callback };
     assert_eq!(uc, unicorn.uc);
-    callback(unicorn, address, size);
+    callback(crate::UnicornHandle { inner: unsafe { Pin::new_unchecked(unicorn) }, _pin: std::marker::PhantomPinned }, address, size);
 }
 
 pub extern "C" fn input_placement_callback_proxy<D>(uc: uc_handle,
@@ -279,11 +281,12 @@ pub extern "C" fn input_placement_callback_proxy<D>(uc: uc_handle,
     input_len: c_int,
     persistent_round: c_int,
     user_data: *mut AflFuzzCallback<D>) -> bool {
+    println!("input_placement_callback_proxy");
     let unicorn = unsafe { &mut *(*user_data).unicorn };
     let callback = &mut unsafe { &mut *(*user_data).input_callback };
     let safe_input = unsafe { std::slice::from_raw_parts(input, input_len as usize) };
     assert_eq!(uc, unicorn.uc);
-    callback(unicorn, safe_input, persistent_round)
+    callback(crate::UnicornHandle { inner: unsafe { Pin::new_unchecked(unicorn) }, _pin: std::marker::PhantomPinned }, safe_input, persistent_round)
 }
 
 pub extern "C" fn crash_validation_callback_proxy<D>(uc: uc_handle,
@@ -293,9 +296,10 @@ pub extern "C" fn crash_validation_callback_proxy<D>(uc: uc_handle,
     persistent_round: c_int,
     user_data: *mut AflFuzzCallback<D>
     ) -> bool {
+    println!("crash_validation_callback_proxy");
     let unicorn = unsafe { &mut *(*user_data).unicorn };
     let callback = &mut unsafe { &mut *(*user_data).validate_callback };
     assert_eq!(uc, unicorn.uc);
     let safe_input = unsafe { std::slice::from_raw_parts(input, input_len as usize) };
-    callback(unicorn, unicorn_result, safe_input, persistent_round) 
+    callback(crate::UnicornHandle { inner: unsafe { Pin::new_unchecked(unicorn) }, _pin: std::marker::PhantomPinned }, unicorn_result, safe_input, persistent_round) 
 }
