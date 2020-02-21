@@ -7,8 +7,6 @@ use std::collections::HashMap;
 use ffi::{Protection, MemRegion, uc_handle};
 use std::pin::Pin;
 use std::marker::PhantomPinned;
-use std::ops::Deref;
-use std::ops::DerefMut;
 
 pub const API_MAJOR: u64 = 1;
 pub const API_MINOR: u64 = 0;
