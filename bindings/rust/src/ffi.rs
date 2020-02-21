@@ -1,14 +1,12 @@
+#![allow(non_camel_case_types)]
 
 use std::ffi::c_void;
 use std::pin::Pin;
 use bitflags::bitflags;
 use libc::{c_char, c_int};
 
-#[allow(non_camel_case_types)]
 pub type uc_handle = *mut c_void;
-#[allow(non_camel_case_types)]
 pub type uc_hook = *mut c_void;
-#[allow(non_camel_case_types)]
 pub type uc_context = *mut c_void;
 
 extern "C" {
@@ -269,7 +267,6 @@ pub struct AflFuzzCallback<D> {
 }
 
 pub extern "C" fn code_hook_proxy<D>(uc: uc_handle, address: u64, size: u32, user_data: *mut CodeHook<D>) {
-    println!("code_hook_proxy");
     let unicorn = unsafe { &mut *(*user_data).unicorn };
     let callback = &mut unsafe { &mut *(*user_data).callback };
     assert_eq!(uc, unicorn.uc);
@@ -281,7 +278,6 @@ pub extern "C" fn input_placement_callback_proxy<D>(uc: uc_handle,
     input_len: c_int,
     persistent_round: c_int,
     user_data: *mut AflFuzzCallback<D>) -> bool {
-    println!("input_placement_callback_proxy");
     let unicorn = unsafe { &mut *(*user_data).unicorn };
     let callback = &mut unsafe { &mut *(*user_data).input_callback };
     let safe_input = unsafe { std::slice::from_raw_parts(input, input_len as usize) };
@@ -296,7 +292,6 @@ pub extern "C" fn crash_validation_callback_proxy<D>(uc: uc_handle,
     persistent_round: c_int,
     user_data: *mut AflFuzzCallback<D>
     ) -> bool {
-    println!("crash_validation_callback_proxy");
     let unicorn = unsafe { &mut *(*user_data).unicorn };
     let callback = &mut unsafe { &mut *(*user_data).validate_callback };
     assert_eq!(uc, unicorn.uc);
