@@ -23,14 +23,14 @@ pub struct Unicorn<D> {
 
 #[derive(Debug)]
 pub struct UnicornHandle<'a, D> {
-    inner: Pin<&'a mut UnicornInner<D>>,
-    _pin: PhantomPinned
+    inner: Pin<&'a mut UnicornInner<D>>
 }
 
 pub struct UnicornInner<D> {
     pub uc: uc_handle,
     pub code_hooks: HashMap<*mut libc::c_void, Box<ffi::CodeHook<D>>>,
-    pub data: D
+    pub data: D,
+    _pin: PhantomPinned
 }
 
 impl<D> Unicorn<D> {
@@ -42,7 +42,8 @@ impl<D> Unicorn<D> {
                 inner: Box::pin(UnicornInner {
                 uc: handle,
                 code_hooks: HashMap::new(),
-                data: data
+                data: data,
+                _pin: std::marker::PhantomPinned
             })})
         } else {
             Err(err)
@@ -50,7 +51,7 @@ impl<D> Unicorn<D> {
     }
 
     pub fn borrow<'a>(&'a mut self) -> UnicornHandle<'a, D> {
-        UnicornHandle { inner: self.inner.as_mut(), _pin: std::marker::PhantomPinned }
+        UnicornHandle { inner: self.inner.as_mut() }
     }
 }
 

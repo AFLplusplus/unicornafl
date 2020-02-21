@@ -270,7 +270,7 @@ pub extern "C" fn code_hook_proxy<D>(uc: uc_handle, address: u64, size: u32, use
     let unicorn = unsafe { &mut *(*user_data).unicorn };
     let callback = &mut unsafe { &mut *(*user_data).callback };
     assert_eq!(uc, unicorn.uc);
-    callback(crate::UnicornHandle { inner: unsafe { Pin::new_unchecked(unicorn) }, _pin: std::marker::PhantomPinned }, address, size);
+    callback(crate::UnicornHandle { inner: unsafe { Pin::new_unchecked(unicorn) } }, address, size);
 }
 
 pub extern "C" fn input_placement_callback_proxy<D>(uc: uc_handle,
@@ -282,7 +282,7 @@ pub extern "C" fn input_placement_callback_proxy<D>(uc: uc_handle,
     let callback = &mut unsafe { &mut *(*user_data).input_callback };
     let safe_input = unsafe { std::slice::from_raw_parts(input, input_len as usize) };
     assert_eq!(uc, unicorn.uc);
-    callback(crate::UnicornHandle { inner: unsafe { Pin::new_unchecked(unicorn) }, _pin: std::marker::PhantomPinned }, safe_input, persistent_round)
+    callback(crate::UnicornHandle { inner: unsafe { Pin::new_unchecked(unicorn) } }, safe_input, persistent_round)
 }
 
 pub extern "C" fn crash_validation_callback_proxy<D>(uc: uc_handle,
@@ -296,5 +296,5 @@ pub extern "C" fn crash_validation_callback_proxy<D>(uc: uc_handle,
     let callback = &mut unsafe { &mut *(*user_data).validate_callback };
     assert_eq!(uc, unicorn.uc);
     let safe_input = unsafe { std::slice::from_raw_parts(input, input_len as usize) };
-    callback(crate::UnicornHandle { inner: unsafe { Pin::new_unchecked(unicorn) }, _pin: std::marker::PhantomPinned }, unicorn_result, safe_input, persistent_round) 
+    callback(crate::UnicornHandle { inner: unsafe { Pin::new_unchecked(unicorn) } }, unicorn_result, safe_input, persistent_round) 
 }
