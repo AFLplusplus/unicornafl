@@ -159,18 +159,19 @@ impl<'a, D> UnicornHandle<'a, D> {
         }
     }
 
-    pub fn add_code_hook(
+    pub fn add_code_hook<F: 'static>(
         &mut self,
         hook_type: ffi::HookType,
         begin: u64,
         end: u64,
-        callback: Box<dyn FnMut(UnicornHandle<D>, u64, u32)>,
+        callback: F,
     ) -> Result<ffi::uc_hook, ffi::Error>
+    where F: FnMut(UnicornHandle<D>, u64, u32)
     {
         let mut hook_ptr = std::ptr::null_mut();
         let mut user_data = Box::new(ffi::CodeHook {
             unicorn: unsafe { self.inner.as_mut().get_unchecked_mut() } as _,
-            callback: callback,
+            callback: Box::new(callback),
         });
         
         let err = unsafe {
@@ -219,17 +220,20 @@ impl<'a, D> UnicornHandle<'a, D> {
         }
     }
 
-    pub fn afl_fuzz(&mut self,
+    pub fn afl_fuzz<F: 'static, G: 'static>(&mut self,
             input_file: &str,
-            input_placement_callback: Box<dyn FnMut(UnicornHandle<D>, &[u8], i32) -> bool>,
+            input_placement_callback: F,
             exits: &[u64],
-            crash_validation_callback: Box<dyn FnMut(UnicornHandle<D>, ffi::Error, &[u8], i32) -> bool>,
+            crash_validation_callback: G,
             always_validate: bool,
-            persistent_iters: u32) -> Result<(), ffi::AflRet> {
+            persistent_iters: u32) -> Result<(), ffi::AflRet> 
+        where
+            F: FnMut(UnicornHandle<D>, &[u8], i32) -> bool,
+            G: FnMut(UnicornHandle<D>, ffi::Error, &[u8], i32) -> bool {
         let afl_fuzz_callback = Box::pin(ffi::AflFuzzCallback {
             unicorn: unsafe { self.inner.as_mut().get_unchecked_mut() }, 
-            input_callback: input_placement_callback,
-            validate_callback: crash_validation_callback
+            input_callback: Box::new(input_placement_callback),
+            validate_callback: Box::new(crash_validation_callback)
         });
         //todo 0-terminated?
     
