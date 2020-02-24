@@ -260,6 +260,11 @@ pub struct CodeHook<D> {
     pub callback: Box<dyn FnMut(crate::UnicornHandle<D>, u64, u32)>
 }
 
+pub struct MemHook<D> {
+    pub unicorn: *mut crate::UnicornInner<D>,
+    pub callback: Box<dyn FnMut(crate::UnicornHandle<D>, MemType, u64, usize, i64)>
+}
+
 pub struct AflFuzzCallback<D> {
     pub unicorn: *mut crate::UnicornInner<D>,
     pub input_callback: Box<dyn FnMut(crate::UnicornHandle<D>, &[u8], i32) -> bool>,
@@ -271,6 +276,13 @@ pub extern "C" fn code_hook_proxy<D>(uc: uc_handle, address: u64, size: u32, use
     let callback = &mut unsafe { &mut *(*user_data).callback };
     assert_eq!(uc, unicorn.uc);
     callback(crate::UnicornHandle { inner: unsafe { Pin::new_unchecked(unicorn) } }, address, size);
+}
+
+pub extern "C" fn mem_hook_proxy<D>(uc: uc_handle, mem_type: MemType, address: u64, size: u32, value: i64, user_data: *mut MemHook<D>) {
+    let unicorn = unsafe { &mut *(*user_data).unicorn };
+    let callback = &mut unsafe { &mut *(*user_data).callback };
+    assert_eq!(uc, unicorn.uc);
+    callback(crate::UnicornHandle { inner: unsafe { Pin::new_unchecked(unicorn) } }, mem_type, address, size as usize, value);
 }
 
 pub extern "C" fn input_placement_callback_proxy<D>(uc: uc_handle,
