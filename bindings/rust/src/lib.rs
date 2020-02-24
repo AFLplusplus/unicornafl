@@ -29,6 +29,7 @@ pub struct UnicornHandle<'a, D> {
 pub struct UnicornInner<D> {
     pub uc: uc_handle,
     pub code_hooks: HashMap<*mut libc::c_void, Box<ffi::CodeHook<D>>>,
+    pub mem_hooks: HashMap<*mut libc::c_void, Box<ffi::MemHook<D>>>,
     pub data: D,
     _pin: PhantomPinned
 }
@@ -42,6 +43,7 @@ impl<D> Unicorn<D> {
                 inner: Box::pin(UnicornInner {
                 uc: handle,
                 code_hooks: HashMap::new(),
+                mem_hooks: HashMap::new(),
                 data: data,
                 _pin: std::marker::PhantomPinned
             })})
@@ -187,6 +189,40 @@ impl<'a, D> UnicornHandle<'a, D> {
         };
         if err == ffi::Error::OK {
             unsafe { self.inner.as_mut().get_unchecked_mut() }.code_hooks.insert(hook_ptr, user_data);
+            Ok(hook_ptr)
+        } else {
+            Err(err)
+        }
+    }
+
+    pub fn add_mem_hook<F: 'static>(
+        &mut self,
+        hook_type: ffi::HookType,
+        begin: u64,
+        end: u64,
+        callback: F,
+    ) -> Result<ffi::uc_hook, ffi::Error>
+    where F: FnMut(UnicornHandle<D>, ffi::MemType, u64, usize, i64)
+    { 
+        let mut hook_ptr = std::ptr::null_mut();
+        let mut user_data = Box::new(ffi::MemHook {
+            unicorn: unsafe { self.inner.as_mut().get_unchecked_mut() } as _,
+            callback: Box::new(callback),
+        });
+        
+        let err = unsafe {
+            ffi::uc_hook_add(
+                self.inner.uc,
+                &mut hook_ptr,
+                hook_type,
+                ffi::mem_hook_proxy::<D> as _,
+                user_data.as_mut() as *mut _ as _,
+                begin,
+                end,
+            )
+        };
+        if err == ffi::Error::OK {
+            unsafe { self.inner.as_mut().get_unchecked_mut() }.mem_hooks.insert(hook_ptr, user_data);
             Ok(hook_ptr)
         } else {
             Err(err)
