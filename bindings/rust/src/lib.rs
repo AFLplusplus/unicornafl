@@ -229,6 +229,22 @@ impl<'a, D> UnicornHandle<'a, D> {
         }
     }
 
+    pub fn remove_hook(&mut self, hook: ffi::uc_hook) -> Result<(), ffi::Error> {
+        let err = unsafe { ffi::uc_hook_del(self.inner.uc, hook) } as ffi::Error;
+        match err {
+            ffi::Error::OK => {},
+            _ => return Err(err)
+        }
+
+        if unsafe { self.inner.as_mut().get_unchecked_mut() }.code_hooks.remove(&hook).is_some() {
+            Ok(())
+        } else if unsafe { self.inner.as_mut().get_unchecked_mut() }.mem_hooks.remove(&hook).is_some() {
+            Ok(())
+        } else {
+            Err(ffi::Error::HANDLE)
+        }
+    }
+
     pub fn emu_start(&mut self, begin: u64, until: u64, timeout: u64, count: usize) -> Result<(), ffi::Error> {
         let err = unsafe { ffi::uc_emu_start(self.inner.uc, begin, until, timeout, count as _) };
         if err == ffi::Error::OK {
