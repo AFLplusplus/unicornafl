@@ -137,6 +137,15 @@ impl<'a, D> UnicornHandle<'a, D> {
         }
     }
 
+    pub fn mem_protect(&mut self, address: u64, size: libc::size_t, perms: Protection) -> Result<(), ffi::uc_error> {
+        let err = unsafe { ffi::uc_mem_protect(self.inner.uc, address, size, perms.bits()) };
+        if err == ffi::uc_error::OK {
+            Ok(())
+        } else {
+            Err(err)
+        }
+    }
+
     pub fn reg_write<T: Into<i32>>(&mut self, regid: T, value: u64) -> Result<(), ffi::uc_error> {
         let err = unsafe { ffi::uc_reg_write(self.inner.uc, regid.into(), &value as *const _ as _) };
         if err == ffi::uc_error::OK {
