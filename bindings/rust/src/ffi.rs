@@ -12,49 +12,49 @@ pub type uc_context = *mut c_void;
 extern "C" {
     pub fn uc_version(major: *mut u32, minor: *mut u32) -> u32;
     pub fn uc_arch_supported(arch: Arch) -> bool;
-    pub fn uc_open(arch: Arch, mode: Mode, engine: *mut uc_handle) -> Error;
-    pub fn uc_close(engine: uc_handle) -> Error;
-    pub fn uc_free(mem: libc::size_t) -> Error;
-    pub fn uc_errno(engine: uc_handle) -> Error;
-    pub fn uc_strerror(error_code: Error) -> *const c_char;
-    pub fn uc_reg_write(engine: uc_handle, regid: c_int, value: *const c_void) -> Error;
-    pub fn uc_reg_read(engine: uc_handle, regid: c_int, value: *mut c_void) -> Error;
+    pub fn uc_open(arch: Arch, mode: Mode, engine: *mut uc_handle) -> uc_error;
+    pub fn uc_close(engine: uc_handle) -> uc_error;
+    pub fn uc_free(mem: libc::size_t) -> uc_error;
+    pub fn uc_errno(engine: uc_handle) -> uc_error;
+    pub fn uc_strerror(error_code: uc_error) -> *const c_char;
+    pub fn uc_reg_write(engine: uc_handle, regid: c_int, value: *const c_void) -> uc_error;
+    pub fn uc_reg_read(engine: uc_handle, regid: c_int, value: *mut c_void) -> uc_error;
     pub fn uc_mem_write(
         engine: uc_handle,
         address: u64,
         bytes: *const u8,
         size: libc::size_t,
-    ) -> Error;
+    ) -> uc_error;
     pub fn uc_mem_read(
         engine: uc_handle,
         address: u64,
         bytes: *mut u8,
         size: libc::size_t,
-    ) -> Error;
-    pub fn uc_mem_map(engine: uc_handle, address: u64, size: libc::size_t, perms: u32) -> Error;
+    ) -> uc_error;
+    pub fn uc_mem_map(engine: uc_handle, address: u64, size: libc::size_t, perms: u32) -> uc_error;
     pub fn uc_mem_map_ptr(
         engine: uc_handle,
         address: u64,
         size: libc::size_t,
         perms: u32,
         ptr: *mut c_void,
-    ) -> Error;
-    pub fn uc_mem_unmap(engine: uc_handle, address: u64, size: libc::size_t) -> Error;
+    ) -> uc_error;
+    pub fn uc_mem_unmap(engine: uc_handle, address: u64, size: libc::size_t) -> uc_error;
     pub fn uc_mem_protect(engine: uc_handle, address: u64, size: libc::size_t, perms: u32)
-        -> Error;
+        -> uc_error;
     pub fn uc_mem_regions(
         engine: uc_handle,
         regions: *const *const MemRegion,
         count: *mut u32,
-    ) -> Error;
+    ) -> uc_error;
     pub fn uc_emu_start(
         engine: uc_handle,
         begin: u64,
         until: u64,
         timeout: u64,
         count: libc::size_t,
-    ) -> Error;
-    pub fn uc_emu_stop(engine: uc_handle) -> Error;
+    ) -> uc_error;
+    pub fn uc_emu_stop(engine: uc_handle) -> uc_error;
     pub fn uc_hook_add(
         engine: uc_handle,
         hook: *mut uc_hook,
@@ -64,12 +64,12 @@ extern "C" {
         begin: u64,
         end: u64,
         ...
-    ) -> Error;
-    pub fn uc_hook_del(engine: uc_handle, hook: uc_hook) -> Error;
-    pub fn uc_query(engine: uc_handle, query_type: Query, result: *mut libc::size_t) -> Error;
-    pub fn uc_context_alloc(engine: uc_handle, context: *mut uc_context) -> Error;
-    pub fn uc_context_save(engine: uc_handle, context: uc_context) -> Error;
-    pub fn uc_context_restore(engine: uc_handle, context: uc_context) -> Error;
+    ) -> uc_error;
+    pub fn uc_hook_del(engine: uc_handle, hook: uc_hook) -> uc_error;
+    pub fn uc_query(engine: uc_handle, query_type: Query, result: *mut libc::size_t) -> uc_error;
+    pub fn uc_context_alloc(engine: uc_handle, context: *mut uc_context) -> uc_error;
+    pub fn uc_context_save(engine: uc_handle, context: uc_context) -> uc_error;
+    pub fn uc_context_restore(engine: uc_handle, context: uc_context) -> uc_error;
     pub fn uc_afl_forkserver_start(
         engine: uc_handle,
         exits: *const u64,
@@ -90,7 +90,7 @@ extern "C" {
 
 #[repr(C)]
 #[derive(PartialEq, Debug, Clone, Copy)]
-pub enum Error {
+pub enum uc_error {
     OK = 0,
     NOMEM = 1,
     ARCH = 2,
@@ -113,6 +113,15 @@ pub enum Error {
     HOOK_EXIST = 19,
     RESOURCE = 20,
     EXCEPTION = 21,
+}
+
+impl uc_error {
+    pub fn to_result(&self) -> Result<(), crate::UnicornError> {
+        match self {
+            uc_error::OK => Ok(()),
+            _ => Err(crate::UnicornError::Internal)
+        }
+    }
 }
 
 #[repr(C)]
@@ -268,7 +277,7 @@ pub struct MemHook<D> {
 pub struct AflFuzzCallback<D> {
     pub unicorn: *mut crate::UnicornInner<D>,
     pub input_callback: Box<dyn FnMut(crate::UnicornHandle<D>, &[u8], i32) -> bool>,
-    pub validate_callback: Box<dyn FnMut(crate::UnicornHandle<D>, Error, &[u8], i32) -> bool>
+    pub validate_callback: Box<dyn FnMut(crate::UnicornHandle<D>, uc_error, &[u8], i32) -> bool>
 }
 
 pub extern "C" fn code_hook_proxy<D>(uc: uc_handle, address: u64, size: u32, user_data: *mut CodeHook<D>) {
@@ -298,7 +307,7 @@ pub extern "C" fn input_placement_callback_proxy<D>(uc: uc_handle,
 }
 
 pub extern "C" fn crash_validation_callback_proxy<D>(uc: uc_handle,
-    unicorn_result: Error,
+    unicorn_result: uc_error,
     input: *const u8,
     input_len: c_int,
     persistent_round: c_int,

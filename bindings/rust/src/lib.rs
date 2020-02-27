@@ -34,11 +34,16 @@ pub struct UnicornInner<D> {
     _pin: PhantomPinned
 }
 
+#[derive(Debug)]
+pub enum UnicornError {
+    Internal
+}
+
 impl<D> Unicorn<D> {
-    pub fn new(arch: ffi::Arch, mode: ffi::Mode, data: D) -> Result<Unicorn<D>, ffi::Error> {
+    pub fn new(arch: ffi::Arch, mode: ffi::Mode, data: D) -> Result<Unicorn<D>, ffi::uc_error> {
         let mut handle = std::ptr::null_mut();
         let err = unsafe { ffi::uc_open(arch, mode, &mut handle) };
-        if err == ffi::Error::OK {
+        if err == ffi::uc_error::OK {
             Ok(Unicorn {
                 inner: Box::pin(UnicornInner {
                 uc: handle,
@@ -77,14 +82,14 @@ impl<'a, D> UnicornHandle<'a, D> {
         unsafe { &mut self.inner.as_mut().get_unchecked_mut().data }
     }
 
-    pub fn mem_regions(&self) -> Result<Vec<MemRegion>, ffi::Error> {
+    pub fn mem_regions(&self) -> Result<Vec<MemRegion>, ffi::uc_error> {
         // We make a copy of the MemRegion structs that are returned by uc_mem_regions()
         // as they have to be freed to the caller. It is simpler to make a copy and free()
         // the originals right away.
         let mut nb_regions: u32 = 0;
         let mut p_regions: *const MemRegion = std::ptr::null_mut();
         let err = unsafe { ffi::uc_mem_regions(self.inner.uc, &mut p_regions, &mut nb_regions) };
-        if err == ffi::Error::OK {
+        if err == ffi::uc_error::OK {
             let mut regions = Vec::new();
             for i in 0..nb_regions {
                 regions.push(unsafe { std::mem::transmute_copy(&*p_regions.offset(i as isize)) });
@@ -96,65 +101,65 @@ impl<'a, D> UnicornHandle<'a, D> {
         }
     }
 
-    pub fn mem_read(&self, address: u64, buf: &mut [u8]) -> Result<(), ffi::Error> {
+    pub fn mem_read(&self, address: u64, buf: &mut [u8]) -> Result<(), ffi::uc_error> {
         let err = unsafe { ffi::uc_mem_read(self.inner.uc, address, buf.as_mut_ptr(), buf.len()) };
-        if err == ffi::Error::OK {
+        if err == ffi::uc_error::OK {
             Ok(())
         } else {
             Err(err)
         }
     }
 
-    pub fn mem_write(&mut self, address: u64, bytes: &[u8]) -> Result<(), ffi::Error> {
+    pub fn mem_write(&mut self, address: u64, bytes: &[u8]) -> Result<(), ffi::uc_error> {
         let err = unsafe { ffi::uc_mem_write(self.inner.uc, address, bytes.as_ptr(), bytes.len()) };
-        if err == ffi::Error::OK {
+        if err == ffi::uc_error::OK {
             Ok(())
         } else {
             Err(err)
         }
     }
 
-    pub fn mem_map_ptr(&mut self, address: u64, size: usize, perms: Protection, ptr: *mut c_void) -> Result<(), ffi::Error> {
+    pub fn mem_map_ptr(&mut self, address: u64, size: usize, perms: Protection, ptr: *mut c_void) -> Result<(), ffi::uc_error> {
         let err = unsafe { ffi::uc_mem_map_ptr(self.inner.uc, address, size, perms.bits(), ptr) };
-        if err == ffi::Error::OK {
+        if err == ffi::uc_error::OK {
             Ok(())
         } else {
             Err(err)
         }
     }
 
-    pub fn mem_map(&mut self, address: u64, size: libc::size_t, perms: Protection) -> Result<(), ffi::Error> {
+    pub fn mem_map(&mut self, address: u64, size: libc::size_t, perms: Protection) -> Result<(), ffi::uc_error> {
         let err = unsafe { ffi::uc_mem_map(self.inner.uc, address, size, perms.bits()) };
-        if err == ffi::Error::OK {
+        if err == ffi::uc_error::OK {
             Ok(())
         } else {
             Err(err)
         }
     }
 
-    pub fn reg_write<T: Into<i32>>(&mut self, regid: T, value: u64) -> Result<(), ffi::Error> {
+    pub fn reg_write<T: Into<i32>>(&mut self, regid: T, value: u64) -> Result<(), ffi::uc_error> {
         let err = unsafe { ffi::uc_reg_write(self.inner.uc, regid.into(), &value as *const _ as _) };
-        if err == ffi::Error::OK {
+        if err == ffi::uc_error::OK {
             Ok(())
         } else {
             Err(err)
         }
     }
 
-    pub fn reg_read<T: Into<i32>>(&self, regid: T) -> Result<u64, ffi::Error> {
+    pub fn reg_read<T: Into<i32>>(&self, regid: T) -> Result<u64, ffi::uc_error> {
         let mut value: u64 = 0;
         let err = unsafe { ffi::uc_reg_read(self.inner.uc, regid.into(), &mut value as *mut u64 as _) };
-        if err == ffi::Error::OK {
+        if err == ffi::uc_error::OK {
             Ok(value)
         } else {
             Err(err)
         }
     }
 
-    pub fn reg_read_i32<T: Into<i32>>(&self, regid: T) -> Result<i32, ffi::Error> {
+    pub fn reg_read_i32<T: Into<i32>>(&self, regid: T) -> Result<i32, ffi::uc_error> {
         let mut value: i32 = 0;
         let err = unsafe { ffi::uc_reg_read(self.inner.uc, regid.into(), &mut value as *mut i32 as _) };
-        if err == ffi::Error::OK {
+        if err == ffi::uc_error::OK {
             Ok(value)
         } else {
             Err(err)
@@ -167,7 +172,7 @@ impl<'a, D> UnicornHandle<'a, D> {
         begin: u64,
         end: u64,
         callback: F,
-    ) -> Result<ffi::uc_hook, ffi::Error>
+    ) -> Result<ffi::uc_hook, ffi::uc_error>
     where F: FnMut(UnicornHandle<D>, u64, u32)
     {
         let mut hook_ptr = std::ptr::null_mut();
@@ -187,7 +192,7 @@ impl<'a, D> UnicornHandle<'a, D> {
                 end,
             )
         };
-        if err == ffi::Error::OK {
+        if err == ffi::uc_error::OK {
             unsafe { self.inner.as_mut().get_unchecked_mut() }.code_hooks.insert(hook_ptr, user_data);
             Ok(hook_ptr)
         } else {
@@ -201,7 +206,7 @@ impl<'a, D> UnicornHandle<'a, D> {
         begin: u64,
         end: u64,
         callback: F,
-    ) -> Result<ffi::uc_hook, ffi::Error>
+    ) -> Result<ffi::uc_hook, ffi::uc_error>
     where F: FnMut(UnicornHandle<D>, ffi::MemType, u64, usize, i64)
     { 
         let mut hook_ptr = std::ptr::null_mut();
@@ -221,7 +226,7 @@ impl<'a, D> UnicornHandle<'a, D> {
                 end,
             )
         };
-        if err == ffi::Error::OK {
+        if err == ffi::uc_error::OK {
             unsafe { self.inner.as_mut().get_unchecked_mut() }.mem_hooks.insert(hook_ptr, user_data);
             Ok(hook_ptr)
         } else {
@@ -229,34 +234,33 @@ impl<'a, D> UnicornHandle<'a, D> {
         }
     }
 
-    pub fn remove_hook(&mut self, hook: ffi::uc_hook) -> Result<(), ffi::Error> {
-        let err = unsafe { ffi::uc_hook_del(self.inner.uc, hook) } as ffi::Error;
-        match err {
-            ffi::Error::OK => {},
-            _ => return Err(err)
-        }
-
-        if unsafe { self.inner.as_mut().get_unchecked_mut() }.code_hooks.remove(&hook).is_some() {
+    pub fn remove_hook(&mut self, hook: ffi::uc_hook) -> Result<(), UnicornError> {
+        let handle = unsafe { self.inner.as_mut().get_unchecked_mut() };
+        if handle.code_hooks.contains_key(&hook) {
+            unsafe { ffi::uc_hook_del(handle.uc, hook) }.to_result()?;
+            handle.code_hooks.remove(&hook);
             Ok(())
-        } else if unsafe { self.inner.as_mut().get_unchecked_mut() }.mem_hooks.remove(&hook).is_some() {
+        } else if handle.mem_hooks.contains_key(&hook) {
+            unsafe { ffi::uc_hook_del(handle.uc, hook) }.to_result()?;
+            handle.mem_hooks.remove(&hook);
             Ok(())
         } else {
-            Err(ffi::Error::HANDLE)
+            Err(UnicornError::Internal)
         }
     }
 
-    pub fn emu_start(&mut self, begin: u64, until: u64, timeout: u64, count: usize) -> Result<(), ffi::Error> {
+    pub fn emu_start(&mut self, begin: u64, until: u64, timeout: u64, count: usize) -> Result<(), ffi::uc_error> {
         let err = unsafe { ffi::uc_emu_start(self.inner.uc, begin, until, timeout, count as _) };
-        if err == ffi::Error::OK {
+        if err == ffi::uc_error::OK {
             Ok(())
         } else {
             Err(err)
         }
     }
 
-    pub fn emu_stop(&mut self) -> Result<(), ffi::Error> {
+    pub fn emu_stop(&mut self) -> Result<(), ffi::uc_error> {
         let err = unsafe { ffi::uc_emu_stop(self.inner.uc) };
-        if err == ffi::Error::OK {
+        if err == ffi::uc_error::OK {
             Ok(())
         } else {
             Err(err)
@@ -281,13 +285,12 @@ impl<'a, D> UnicornHandle<'a, D> {
             persistent_iters: u32) -> Result<(), ffi::AflRet> 
         where
             F: FnMut(UnicornHandle<D>, &[u8], i32) -> bool,
-            G: FnMut(UnicornHandle<D>, ffi::Error, &[u8], i32) -> bool {
+            G: FnMut(UnicornHandle<D>, ffi::uc_error, &[u8], i32) -> bool {
         let afl_fuzz_callback = Box::pin(ffi::AflFuzzCallback {
             unicorn: unsafe { self.inner.as_mut().get_unchecked_mut() }, 
             input_callback: Box::new(input_placement_callback),
             validate_callback: Box::new(crash_validation_callback)
         });
-        //todo 0-terminated?
     
         let cstyle_input_file = std::ffi::CString::new(input_file).unwrap();
         let err = unsafe { ffi::uc_afl_fuzz(self.inner.uc,
