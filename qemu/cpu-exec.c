@@ -449,8 +449,14 @@ not_found:
     /* if no translated code available, then translate it now */
     tb = tb_gen_code(cpu, pc, cs_base, (int)flags, 0);   // qq
     
+    if (tb == NULL) {
+#if defined(AFL_DEBUG)
+        printf("[e] no TranslationBlock returned from gen_code");
+#endif
+        return NULL;
+    }
+
 #if defined(UNICORN_AFL)
-    /* There seems to be no chaining in unicorn ever? :( */
     afl_request_tsl(env->uc, pc, cs_base, flags);
 #endif
 
