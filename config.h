@@ -5,8 +5,9 @@
    Originally written by Michal Zalewski
 
    Now maintained by Marc Heuse <mh@mh-sec.de>,
-                        Heiko Eißfeldt <heiko.eissfeldt@hexco.de> and
-                        Andrea Fioraldi <andreafioraldi@gmail.com>
+                     Heiko Eißfeldt <heiko.eissfeldt@hexco.de>,
+                     Andrea Fioraldi <andreafioraldi@gmail.com>,
+                     Dominik Maier <mail@dmnk.co>
 
    Copyright 2016, 2017 Google Inc. All rights reserved.
    Copyright 2019-2020 AFLplusplus Project. All rights reserved.
@@ -26,8 +27,8 @@
 
 /* Version string: */
 
- // c = release, d = volatile github dev, e = experimental branch
-#define VERSION "++2.60d"
+// c = release, d = volatile github dev, e = experimental branch
+#define VERSION "++2.62d"
 
 /******************************************************
  *                                                    *
@@ -39,6 +40,11 @@
    a lot less nice): */
 
 #define USE_COLOR
+
+/* If you want to have the original afl internal memory corruption checks.
+   Disabled by default for speed. it is better to use "make ASAN_BUILD=1". */
+
+//#define _WANT_ORIGINAL_AFL_ALLOC
 
 /* Comment out to disable fancy ANSI boxes and use poor man's 7-bit UI: */
 
