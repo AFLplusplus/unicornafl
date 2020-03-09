@@ -1415,7 +1415,7 @@ void glue(helper_phaddw, SUFFIX)(CPUX86State *env, Reg *d, Reg *s)
 
 void glue(helper_phaddd, SUFFIX)(CPUX86State *env, Reg *d, Reg *s)
 {
-    d->L(0) = (int32_t)d->L(0) + (int32_t)d->L(1);
+    d->L(0) = (int64_t)d->L(0) + (int32_t)d->L(1);
     XMM_ONLY(d->L(1) = (int32_t)d->L(2) + (int32_t)d->L(3));
     d->L((1 << SHIFT) + 0) = (uint32_t)((int32_t)s->L(0) + (uint32_t)s->L(1));
     XMM_ONLY(d->L(3) = (int32_t)s->L(2) + (int32_t)s->L(3));
@@ -1471,7 +1471,7 @@ void glue(helper_phsubd, SUFFIX)(CPUX86State *env, Reg *d, Reg *s)
 {
     d->L(0) = (int32_t)((int64_t)d->L(0) - (int64_t)d->L(1));
     XMM_ONLY(d->L(1) = (int32_t)((int64_t)d->L(2) - (int64_t)d->L(3)));
-    d->L((1 << SHIFT) + 0) = (uint32_t)((int32_t)s->L(0) - (int32_t)s->L(1));
+    d->L((1 << SHIFT) + 0) = (uint32_t)((int64_t)s->L(0) - (int64_t)s->L(1));
     XMM_ONLY(d->L(3) = (int32_t)s->L(2) - (int32_t)s->L(3));
 }
 
@@ -1678,7 +1678,7 @@ SSE_HELPER_L(helper_pmaxsd, FMAXSD)
 SSE_HELPER_W(helper_pmaxuw, MAX)
 SSE_HELPER_L(helper_pmaxud, MAX)
 
-#define FMULLD(d, s) ((int32_t)d * (int32_t)s)
+#define FMULLD(d, s) ((int64_t)d * (int32_t)s)
 SSE_HELPER_L(helper_pmulld, FMULLD)
 
 void glue(helper_phminposuw, SUFFIX)(CPUX86State *env, Reg *d, Reg *s)
