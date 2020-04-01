@@ -11,7 +11,7 @@
 
 #include <string.h>
 
-#include <sys/mman.h> 
+#include <sys/mman.h>
 #include <sys/stat.h>
 
 #include "config.h"
@@ -123,7 +123,7 @@ uc_afl_ret uc_afl_next(uc_engine *uc, bool crash_found)
 
         return UC_AFL_RET_CHILD;
 
-    }     
+    }
 
     return UC_AFL_RET_NO_AFL;
 
@@ -131,12 +131,12 @@ uc_afl_ret uc_afl_next(uc_engine *uc, bool crash_found)
 
 UNICORN_EXPORT
 uc_afl_ret uc_afl_fuzz(
-        uc_engine *uc, 
-        char* input_file, 
-        uc_afl_cb_place_input_t place_input_callback, 
-        uint64_t *exits, 
-        size_t exit_count, 
-        uc_afl_cb_validate_crash_t validate_crash_callback, 
+        uc_engine *uc,
+        char* input_file,
+        uc_afl_cb_place_input_t place_input_callback,
+        uint64_t *exits,
+        size_t exit_count,
+        uc_afl_cb_validate_crash_t validate_crash_callback,
         bool always_validate,
         uint32_t persistent_iters,
         void *data
@@ -214,17 +214,17 @@ uc_afl_ret uc_afl_fuzz(
             // Apparently the input was not to the users' liking. Let's continue.
             goto next_iter;
         }
-        
+
         uc_err uc_emu_ret = uc_afl_emu_start(uc);
 
         if (unlikely((uc_emu_ret != UC_ERR_OK) || (always_validate && validate_crash_callback))) {
-            
+
             if (validate_crash_callback != NULL && validate_crash_callback(
                     uc, uc_emu_ret, in_buf, in_len, i, data) != true) {
                 // The callback thinks this is not a valid crash. Ignore.
                 goto next_iter;
             }
-            if (persistent_iters != 1) { 
+            if (persistent_iters != 1) {
                 // We're inpersistent mode and can report the crash via afl_next. No reason to die.
                 crash_found = true;
                 goto next_iter;
@@ -239,7 +239,7 @@ uc_afl_ret uc_afl_fuzz(
 next_iter:
         munmap(in_buf, in_len);
     }
-    // UC_AFL_RET_CHILD -> We looped through all iters. 
+    // UC_AFL_RET_CHILD -> We looped through all iters.
     // We are still in the child, nothing good will come after this.
     // Exit and let the next generation run.
     if (likely(afl_ret == UC_AFL_RET_CHILD)) {
@@ -256,4 +256,4 @@ next_iter:
     return UC_AFL_RET_NO_AFL;
 }
 
-#endif /* UNICORN_AFL */ 
+#endif /* UNICORN_AFL */
