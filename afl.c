@@ -38,8 +38,10 @@ uc_afl_ret uc_afl_forkserver_start(uc_engine *uc, uint64_t *exits, size_t exit_c
         return UC_AFL_RET_ERROR;
     }
     if (unlikely(uc->afl_area_ptr)) {
+#if defined(AFL_DEBUG)
         fprintf(stderr, "[!] forkserver_start(...) called twice. Already fuzzing!\n");
-        return UC_AFL_RET_ERROR;
+#endif
+        return UC_AFL_RET_CALLED_TWICE; // AFL has already been started before.
     }
 
     /* Copy exits to unicorn env buffer */
@@ -177,6 +179,7 @@ uc_afl_ret uc_afl_fuzz(
             // Nothing more to do
             return afl_ret;
         case UC_AFL_RET_ERROR:
+        case UC_AFL_RET_CALLED_TWICE:
             // Nothing more we can do
             return afl_ret;
         default:

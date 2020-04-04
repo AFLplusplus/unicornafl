@@ -252,7 +252,7 @@ struct uc_struct {
     uint32_t target_page_align;
     uint64_t next_pc;   // save next PC for some special cases
     bool hook_insert;	// insert new hook at begin of the hook list (append by default)
-    
+
 #ifdef UNICORN_AFL
     uc_args_int_uc_t afl_forkserver_start; // function to start afl forkserver
     uc_afl_ret_uc_bool_t afl_child_request_next; // function from child to ask for new testcase (if in child)
@@ -261,7 +261,7 @@ struct uc_struct {
     uint8_t *afl_area_ptr; // map, shared with afl, to report coverage feedback etc. during runs
     uint64_t afl_prev_loc; // previous location
     int afl_compcov_level; // how much compcove we want
-    unsigned int afl_inst_rms; 
+    unsigned int afl_inst_rms;
     size_t exit_count; // number of exits set in afl_fuzz or afl_forkserver
     uint64_t *exits; // pointer to the actual exits
 #endif
