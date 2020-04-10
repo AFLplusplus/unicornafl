@@ -164,7 +164,7 @@ static int afl_find_wifsignaled_id(void) {
 
 static inline uc_afl_ret afl_forkserver(CPUArchState* env) {
 
-  static unsigned char tmp[4] = {0};
+  static unsigned char tmp[4] = {0, 0, 0, 0};
   pid_t   child_pid;
   enum afl_child_ret child_ret = AFL_CHILD_EXITED;
   bool first_round = true;
