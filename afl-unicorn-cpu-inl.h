@@ -168,8 +168,16 @@ static inline uc_afl_ret afl_forkserver(CPUArchState* env) {
   pid_t   child_pid;
   enum afl_child_ret child_ret = AFL_CHILD_EXITED;
   bool first_round = true;
+  u32  map_size = 0;
 
   if (!env->uc->afl_area_ptr) return UC_AFL_RET_NO_AFL;
+
+  if (MAP_SIZE <= 0x800000) {
+
+    map_size = (FS_OPT_ENABLED | FS_OPT_MAPSIZE | FS_OPT_SET_MAPSIZE(MAP_SIZE));
+    memcpy(tmp, &map_size, 4);
+
+  }
 
   /* Phone home and tell the parent that we're OK. If parent isn't there,
      assume we're not running in forkserver mode and just execute program. */
