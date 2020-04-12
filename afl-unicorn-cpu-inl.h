@@ -49,6 +49,15 @@
 #define _R(pipe) ((pipe)[0])
 #define _W(pipe) ((pipe)[1])
 
+/* Extended forkserver */
+
+#define FS_OPT_ENABLED 0x8f000001
+#define FS_OPT_MAPSIZE 0x40000000
+#define FS_OPT_SNAPSHOT 0x20000000
+#define FS_OPT_AUTODICT 0x10000000
+#define FS_OPT_GET_MAPSIZE(x) (((x & 0x00fffffe) >> 1) + 1)
+#define FS_OPT_SET_MAPSIZE(x) \
+  (x <= 1 || x > MAP_SIZE || x > 0x1000000 ? 0 : ((x - 1) << 1))
 
 /* Function declarations. */
 
