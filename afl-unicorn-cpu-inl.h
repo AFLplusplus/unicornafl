@@ -173,7 +173,7 @@ static int afl_find_wifsignaled_id(void) {
 
 static inline uc_afl_ret afl_forkserver(CPUArchState* env) {
 
-  static unsigned char tmp[4] = {0, 0, 0, 0};
+  unsigned char tmp[4] = {0};
   pid_t   child_pid;
   enum afl_child_ret child_ret = AFL_CHILD_EXITED;
   bool first_round = true;
@@ -384,7 +384,7 @@ static inline void afl_request_tsl(struct uc_struct* uc, target_ulong pc, target
 static uc_afl_ret afl_request_next(struct uc_struct* uc, bool crash_found) {
 
   enum afl_child_ret msg = crash_found? AFL_CHILD_FOUND_CRASH : AFL_CHILD_NEXT;
-  static unsigned char tmp[4] = {0};
+  unsigned char tmp[4] = {0};
 
 #if defined(AFL_DEBUG)
   printf("[d] request next. crash found: %s\n", crash_found ? "true": "false");
