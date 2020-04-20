@@ -3,7 +3,10 @@
 import ctypes
 import ctypes.util
 import distutils.sysconfig
-from typing import Optional, List, Callable, Any
+try:
+    from typing import Optional, List, Callable, Any
+except ImportError as _:
+    pass
 
 import pkg_resources
 import inspect

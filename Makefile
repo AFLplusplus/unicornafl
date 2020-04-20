@@ -307,10 +307,13 @@ qemu/config-host.mak: qemu/configure
 	./configure --cc="${CC}" --extra-cflags="$(UNICORN_CFLAGS)" --target-list="$(UNICORN_TARGETS)" ${UNICORN_QEMU_FLAGS}
 	@printf "$(UNICORN_ARCHS)" > config.log
 
+afl.o: afl.c
+	$(CC) $(CFLAGS) afl.c -o afl.o
+
 uc.o: qemu/config-host.mak FORCE
 	$(MAKE) -C qemu $(SMP_MFLAGS)
 
-$(UC_TARGET_OBJ) list.o: uc.o
+$(UC_TARGET_OBJ) list.o: uc.o afl.o
 	@echo "--- $^ $@" > /dev/null
 
 unicorn: $(LIBRARY) $(ARCHIVE)
