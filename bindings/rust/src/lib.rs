@@ -1,6 +1,7 @@
 pub mod arm;
 pub mod unicorn_const;
 pub mod ffi;
+pub mod utils;
 
 use std::ffi::c_void;
 use std::collections::HashMap;
@@ -317,3 +318,4 @@ impl<'a, D> UnicornHandle<'a, D> {
         }
     }
 }
+
