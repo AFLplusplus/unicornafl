@@ -1,3 +1,4 @@
+#![allow(non_snake_case)]
 extern crate libc;
 
 use capstone::prelude::*;
@@ -9,39 +10,22 @@ use std::collections::HashMap;
 use libc::{mmap, munmap, c_void, size_t, MAP_ANON, MAP_PRIVATE,PROT_READ,PROT_WRITE};
 
 
-
 #[derive(Debug)]
 pub struct Chunk {
     pub offset: u64,
     pub len: size_t,
 }
 
+
 #[derive(Debug)]
 pub struct Heap {
     pub real_base: *mut c_void,
     pub uc_base: u64,
     pub len: size_t,
+    pub grow_dynamically: bool,
     pub chunk_map: HashMap<u64, Chunk>,
     pub top: u64,
     pub oob_hook: super::ffi::uc_hook, //TODO make private
-}
-
-fn vmmap<D>(uc: &mut super::UnicornHandle<D>) {
-    let regions = uc
-        .mem_regions()
-        .expect("failed to retrieve memory mappings");
-    println!("Regions : {}", regions.len());
-
-    for region in &regions {
-        println!("{:#010x?}", region);
-    }
-}
-
-
-fn heap_oob(mut uc: super::UnicornHandle<RefCell<Heap>>, mem_type: super::ffi::MemType, addr: u64, size: usize, val: i64) { 
-    #[cfg(debug_assertions)]
-    println!("");      
-    panic!("ERROR: unicornafl Sanitizer: heap-out-of-bounds access on address {:#020x}", addr);
 }
 
 
@@ -97,11 +81,16 @@ pub fn add_debug_prints_ARM<D>(uc: &mut super::UnicornHandle<D>, code_start: u64
 }
 
 
-// returns a new unicorn object with an initialized heap @addr 
-pub fn init_emu_with_heap(size: u32, base_addr: u64) -> Result<super::Unicorn<RefCell<Heap>>, super::ffi::uc_error> {
-    let heap = RefCell::new(Heap {real_base: 0 as _, uc_base: 0, len: 0, chunk_map: HashMap::new(), top: 0, oob_hook: 0 as _ });
+// returns a new unicorn object with an initialized heap @addr and active sanitizer
+pub fn init_emu_with_heap(mut size: u32, base_addr: u64, grow: bool) -> Result<super::Unicorn<RefCell<Heap>>, super::ffi::uc_error> {
+    let heap = RefCell::new(Heap {real_base: 0 as _, uc_base: 0, len: 0, grow_dynamically: false, chunk_map: HashMap::new(), top: 0, oob_hook: 0 as _ });
     let mut unicorn = super::Unicorn::new(Arch::ARM, Mode::LITTLE_ENDIAN, heap)?;
     let mut uc = unicorn.borrow(); // get handle
+
+    // uc memory regions have to be 8 byte aligned
+    if size % 8 != 0 {
+        size = ((size / 8) + 1) * 8;
+    }
 
     // init heap management struct for later use within unicorn
     let null_ptr = ptr::null_mut();
@@ -109,16 +98,120 @@ pub fn init_emu_with_heap(size: u32, base_addr: u64) -> Result<super::Unicorn<Re
         // manually mmap space for heap to know location
         let arena_ptr = mmap(null_ptr, size as usize, PROT_READ | PROT_WRITE, MAP_ANON | MAP_PRIVATE, 0, 0);
         uc.mem_map_ptr(base_addr, size as usize, Protection::READ | Protection::WRITE, arena_ptr).expect("failed to map heap arena into unicorn");
-        let h = uc.add_mem_hook(HookType::MEM_READ, base_addr, 0x91400000, Box::new(heap_oob)).expect("failed to add heap MEM_READ hook");
+        let h = uc.add_mem_hook(HookType::MEM_VALID, base_addr, base_addr + size as u64, Box::new(heap_oob)).expect("failed to add heap MEM_READ hook");
         let chunks = HashMap::new();
         let heap: &mut Heap = &mut *uc.get_data().borrow_mut();
         heap.real_base = arena_ptr; // heap pointer in process mem
         heap.uc_base = base_addr;
         heap.len = size as usize;
+        heap.grow_dynamically = grow; // let the heap grow dynamically (ATTENTION: There are no guarantees that the heap segment will be continuous in process mem any more)
         heap.chunk_map = chunks;
-        heap.top = base_addr; // heap pointer in unicorn mem, increases as heap grows
-        heap.oob_hook = h; // hook ID, needed to rearrange hooks when heap grows
+        heap.top = base_addr; // pointer to top of heap in unicorn mem, increases on allocations
+        heap.oob_hook = h; // hook ID, needed to rearrange hooks on allocations
     }
 
     return Ok(unicorn);
+}
+
+
+pub fn uc_alloc(uc: &mut super::UnicornHandle<RefCell<Heap>>, mut size: u64) -> Result<u64, super::ffi::uc_error> {
+    // 8 byte aligned
+    if size % 8 != 0 {
+        size = ((size / 8) + 1) * 8;
+    }
+    let addr = uc.get_data().borrow_mut().top;
+    let len = uc.get_data().borrow_mut().len;
+    let uc_base = uc.get_data().borrow_mut().uc_base;
+
+    if addr + size >= uc_base + len as u64 {
+        if !uc.get_data().borrow_mut().grow_dynamically {
+            return Err(super::ffi::uc_error::WRITE_UNMAPPED);
+        } else {
+            // grow heap
+            let mut increase_by = len / 2;
+            if increase_by % 8 != 0 {
+                increase_by = ((increase_by / 8) + 1) * 8;
+            }
+            uc.mem_map(uc_base + len as u64 + 1, increase_by,  Protection::READ | Protection::WRITE)?;
+            uc.get_data().borrow_mut().len += increase_by;
+        }
+    }
+    uc.mem_write(addr, b"\x77\x66\x55\x44")?;
+    uc.mem_write(addr + 4 + size, b"\x77\x66\x55\x44")?;
+    
+    // add new chunk
+    let curr_offset = addr + 4 - uc_base;
+    let curr_chunk = Chunk {offset: curr_offset, len: size as size_t};
+    uc.get_data().borrow_mut().chunk_map.insert(addr + 4, curr_chunk);
+    let new_top = uc.get_data().borrow_mut().top + size + 16; // canary*2 + space 
+    #[cfg(debug_assertions)]
+    println!("[*] New Allocation from {:#010x} to {:#010x}", uc.get_data().borrow().top, uc.get_data().borrow().top + size + 16);
+    uc.get_data().borrow_mut().top = new_top; 
+
+    // adjust oob hooks
+    let old_h = uc.get_data().borrow_mut().oob_hook;
+    uc.remove_hook(old_h);
+    let new_h = uc.add_mem_hook(HookType::MEM_VALID, new_top, uc_base + len as u64, Box::new(heap_oob))?;
+    uc.get_data().borrow_mut().oob_hook = new_h;
+
+    return Ok(addr + 4);
+}
+
+
+pub fn uc_free(uc: &mut super::UnicornHandle<RefCell<Heap>>, ptr: u64) -> Result<(), super::ffi::uc_error> {
+    #[cfg(debug_assertions)]
+    println!("Freeing {:#010x}", ptr);
+
+    if ptr != 0x0 {
+        let mut chunk_size = 0;
+        {
+            let mut heap = uc.get_data().borrow_mut();
+            let curr_chunk = heap.chunk_map.get(&ptr).expect("failed to find requested chunk on heap");
+            chunk_size = curr_chunk.len as u64;
+            // poison(heap.real_base + curr_chunk.offset, len)
+            let mut canary_0 = vec![0; 4];
+            uc.mem_read(ptr - 4, &mut canary_0).expect("failed to read canary_0");
+            let mut canary_1 = vec![0; 4];
+            uc.mem_read(ptr + chunk_size, &mut canary_1).expect("failed to read canary_1");
+            if canary_0 == b"\x77\x66\x55\x44" && canary_1 == b"\x77\x66\x55\x44" {
+                heap.chunk_map.remove(&ptr);
+            } else {
+                let pc = uc.reg_read(Register::PC as i32).expect("failed to read r0"); 
+                panic!("ERROR: unicornafl Sanitizer: Heap buffer-overflow around address {:#0x} at $pc: {:#010x}", ptr, pc);
+            }
+        }
+        uc.add_mem_hook(super::ffi::HookType::MEM_VALID, ptr - 4, ptr + chunk_size + 4, Box::new(heap_uaf))?;
+    }
+    return Ok(());
+} 
+
+
+fn vmmap<D>(uc: &mut super::UnicornHandle<D>) {
+    let regions = uc
+        .mem_regions()
+        .expect("failed to retrieve memory mappings");
+    println!("Regions : {}", regions.len());
+
+    for region in &regions {
+        println!("{:#010x?}", region);
+    }
+}
+
+
+fn heap_oob(uc: super::UnicornHandle<RefCell<Heap>>, _mem_type: super::ffi::MemType, addr: u64, _size: usize, _val: i64) {
+    let pc = uc.reg_read(Register::PC as i32).expect("failed to read r0"); 
+    panic!("ERROR: unicornafl Sanitizer: Heap out-of-bounds access on address {:#0x} at $pc: {:#010x}", addr, pc);
+}
+
+
+fn heap_uaf (uc: super::UnicornHandle<RefCell<Heap>>, _mem_type: super::ffi::MemType, addr: u64, _size: usize, _val: i64) {       
+    let pc = uc.reg_read(Register::PC as i32).expect("failed to read r0"); 
+    panic!("ERROR: unicornafl Sanitizer: Heap use-after-free on address {:#0x} at $pc: {:#010x}", addr, pc);
+    
+}
+
+
+fn heap_bo (uc: super::UnicornHandle<RefCell<Heap>>, _mem_type: super::ffi::MemType, addr: u64, _size: usize, _val: i64) {       
+    let pc = uc.reg_read(Register::PC as i32).expect("failed to read r0"); 
+    panic!("ERROR: unicornafl Sanitizer: Heap buffer-overflow on address {:#0x} at $pc: {:#010x}", addr, pc);
 }
