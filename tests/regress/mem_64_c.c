@@ -1,3 +1,4 @@
+#include <inttypes.h>
 #include <stdio.h>
 #include <unicorn/unicorn.h>
 

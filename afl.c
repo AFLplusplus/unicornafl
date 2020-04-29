@@ -45,12 +45,12 @@ uc_afl_ret uc_afl_forkserver_start(uc_engine *uc, uint64_t *exits, size_t exit_c
     }
 
     /* Copy exits to unicorn env buffer */
-    uc->exits = g_realloc(uc->exits, exit_count * sizeof(exits[0]));
+    uc->exits = g_realloc(uc->exits, sizeof(exits[0]) * exit_count);
     if (uc->exits == NULL) {
         perror("[!] malloc failed when starting forkserver.");
         return UC_AFL_RET_ERROR;
     }
-    memcpy(uc->exits, exits, sizeof(uint64_t) * exit_count);
+    memcpy(uc->exits, exits, sizeof(exits[0]) * exit_count);
     uc->exit_count = exit_count;
 
     /* Fork() :) */

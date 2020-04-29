@@ -3,6 +3,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <time.h>
+#include <inttypes.h>
 
 #include <unicorn/unicorn.h>
 
