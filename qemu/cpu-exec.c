@@ -444,7 +444,7 @@ static TranslationBlock *tb_find_slow(CPUArchState *env, target_ulong pc,
     }
 not_found:
 #if defined(AFL_DEBUG)
-    printf("[d] translating 0x%lx...", (uint64_t) pc);
+    printf("[d] translating 0x%llx...", (unsigned long long) pc);
 #endif
     /* if no translated code available, then translate it now */
     tb = tb_gen_code(cpu, pc, cs_base, (int)flags, 0);   // qq
@@ -462,7 +462,7 @@ not_found:
 
 found:
 #if defined(AFL_DEBUG)
-    printf("[d] got translated block 0x%lx\n", (uint64_t) pc);
+    printf("[d] got translated block 0x%llx\n", (unsigned long long) pc);
 #endif
     /* Move the last found TB to the head of the list */
     if (likely(*ptb1)) {

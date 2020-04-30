@@ -845,7 +845,7 @@ static bool split_region(struct uc_struct *uc, MemoryRegion *mr, uint64_t addres
 
     // RAM_PREALLOC is not defined outside exec.c and I didn't feel like
     // moving it
-	prealloc = !!(block->flags & 1);
+    prealloc = !!(block->flags & 1);
 
     if (block->flags & 1) {
         backup = block->host;

@@ -356,7 +356,7 @@ static inline void afl_request_tsl(struct uc_struct* uc, target_ulong pc, target
   };
 
 #if defined(AFL_DEBUG)
-  printf("Requesting tsl, pc=0x%lx, cb=0x%lx, flags=0x%lx\n", (uint64_t) pc, (uint64_t) cb, flags);
+  printf("Requesting tsl, pc=0x%llx, cb=0x%llx, flags=0x%llx\n", (unsigned long long) pc, (unsigned long long) cb, (unsigned long long) flags);
 #endif
 
   // We write tsl requests in two steps but that's fine since cache requests are not very common over the time of fuzzing.
