@@ -20,6 +20,9 @@ os:
   - windows
 matrix:
   fast_finish: true
+  allow_failures: 
+    # not supported by afl++, so not supported by unicornafl (shared maps, fork, ...)
+    - os: windows
   include:
     - name: "Linux 32bit"
       os: linux
