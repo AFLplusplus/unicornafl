@@ -17,29 +17,6 @@ UNAME_S := $(shell uname -s)
 # If you want to use 16 job threads, use "-j16".
 SMP_MFLAGS := -j4
 
-ifeq ($(UNICORN_ASAN),yes)
-CC = clang -fsanitize=address -fno-omit-frame-pointer
-CXX = clang++ -fsanitize=address -fno-omit-frame-pointer
-AR = llvm-ar
-LDFLAGS := -fsanitize=address ${LDFLAGS}
-endif
-
-ifeq ($(CROSS),)
-CC ?= cc
-AR ?= ar
-RANLIB ?= ranlib
-STRIP ?= strip
-else
-CC = $(CROSS)-gcc
-AR = $(CROSS)-ar
-RANLIB = $(CROSS)-ranlib
-STRIP = $(CROSS)-strip
-endif
-
-IS_WIN32 = $(shell $(CC) -dM -E - < /dev/null | grep '_WIN32'; \
-    if [ $$? = 0 ]; then echo yes; \
-    else echo no; fi)
-
 UC_GET_OBJ = $(shell for i in \
     $$(grep '$(1)' $(2) | \
     grep '\.o' | cut -d '=' -f 2); do \
@@ -54,7 +31,7 @@ UC_TARGET_OBJ += $(call UC_GET_OBJ,obj-,qemu/qapi/Makefile.objs, qemu/qapi/)
 UC_TARGET_OBJ += $(call UC_GET_OBJ,obj-,qemu/qobject/Makefile.objs, qemu/qobject/)
 UC_TARGET_OBJ += $(call UC_GET_OBJ,obj-,qemu/qom/Makefile.objs, qemu/qom/)
 UC_TARGET_OBJ += $(call UC_GET_OBJ,obj-y,qemu/util/Makefile.objs, qemu/util/)
-ifeq ($(IS_WIN32),yes)
+ifneq ($(filter MINGW%,$(UNAME_S)),)
 UC_TARGET_OBJ += $(call UC_GET_OBJ,obj-$$(CONFIG_WIN32),qemu/util/Makefile.objs, qemu/util/)
 else
 UC_TARGET_OBJ += $(call UC_GET_OBJ,obj-$$(CONFIG_POSIX),qemu/util/Makefile.objs, qemu/util/)
@@ -177,6 +154,25 @@ ifeq ($(AFL_DEBUG),yes)
 UNICORN_CFLAGS += -DAFL_DEBUG
 endif
 
+ifeq ($(UNICORN_ASAN),yes)
+CC = clang -fsanitize=address -fno-omit-frame-pointer
+CXX = clang++ -fsanitize=address -fno-omit-frame-pointer
+AR = llvm-ar
+LDFLAGS := -fsanitize=address ${LDFLAGS}
+endif
+
+ifeq ($(CROSS),)
+CC ?= cc
+AR ?= ar
+RANLIB ?= ranlib
+STRIP ?= strip
+else
+CC = $(CROSS)-gcc
+AR = $(CROSS)-ar
+RANLIB = $(CROSS)-ranlib
+STRIP = $(CROSS)-strip
+endif
+
 ifeq ($(PKG_EXTRA),)
 PKG_VERSION = $(PKG_MAJOR).$(PKG_MINOR)
 else
@@ -248,8 +244,6 @@ LIBRARY = lib$(LIBNAME).$(VERSION_EXT)
 LIBRARY_SYMLINK = lib$(LIBNAME).$(EXT)
 endif
 endif
-
-UNICORN_QEMU_FLAGS += --python=$(shell which /usr/bin/python || which python || which python2 || which python3)
 
 ifeq ($(UNICORN_STATIC),yes)
 ifneq ($(filter MINGW%,$(UNAME_S)),)
