@@ -136,6 +136,7 @@ else()
     endwhile(TRUE)
 
     set(EXTRA_CFLAGS "--extra-cflags=")
+    set (EXTRA_CFLAGS "${EXTRA_CFLAGS}-DUNICORN_AFL ")
     if (UNICORN_HAS_X86)
         set (EXTRA_CFLAGS "${EXTRA_CFLAGS}-DUNICORN_HAS_X86 ")
     endif()
