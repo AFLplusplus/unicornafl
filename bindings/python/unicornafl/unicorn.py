@@ -505,7 +505,7 @@ class Uc(object):
                 persistent_round,
                 data
             )
-            if ret is False or uc_err == uc.UC_ERR_OK:
+            if ret is False or (ret is None and uc_err == uc.UC_ERR_OK):
                 return False
             return True
 
