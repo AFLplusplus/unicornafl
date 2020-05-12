@@ -3,7 +3,7 @@ extern crate libc;
 
 use capstone::prelude::*;
 use super::arm::Register;
-use super::ffi::{Protection, Mode, Arch, HookType};
+use super::ucconst::{Protection, Mode, Arch, HookType, MemType, uc_error};
 use std::ptr;
 use std::cell::RefCell;
 use std::collections::HashMap;
@@ -83,7 +83,7 @@ pub fn add_debug_prints_ARM<D>(uc: &mut super::UnicornHandle<D>, code_start: u64
 
 
 // returns a new unicorn object with an initialized heap @addr and active sanitizer
-pub fn init_emu_with_heap(mut size: u32, base_addr: u64, grow: bool) -> Result<super::Unicorn<RefCell<Heap>>, super::ffi::uc_error> {
+pub fn init_emu_with_heap(mut size: u32, base_addr: u64, grow: bool) -> Result<super::Unicorn<RefCell<Heap>>, uc_error> {
     let heap = RefCell::new(Heap {real_base: 0 as _, uc_base: 0, len: 0, grow_dynamically: false, chunk_map: HashMap::new(), top: 0, unalloc_hook: 0 as _ });
     let mut unicorn = super::Unicorn::new(Arch::ARM, Mode::LITTLE_ENDIAN, heap)?;
     let mut uc = unicorn.borrow(); // get handle
@@ -115,7 +115,7 @@ pub fn init_emu_with_heap(mut size: u32, base_addr: u64, grow: bool) -> Result<s
 }
 
 
-pub fn uc_alloc(uc: &mut super::UnicornHandle<RefCell<Heap>>, mut size: u64) -> Result<u64, super::ffi::uc_error> {
+pub fn uc_alloc(uc: &mut super::UnicornHandle<RefCell<Heap>>, mut size: u64) -> Result<u64, uc_error> {
     // 8 byte aligned
     if size % 8 != 0 {
         size = ((size / 8) + 1) * 8;
@@ -126,7 +126,7 @@ pub fn uc_alloc(uc: &mut super::UnicornHandle<RefCell<Heap>>, mut size: u64) -> 
 
     if addr + size >= uc_base + len as u64 {
         if !uc.get_data().borrow_mut().grow_dynamically {
-            return Err(super::ffi::uc_error::WRITE_UNMAPPED);
+            return Err(uc_error::WRITE_UNMAPPED);
         } else {
             // grow heap
             let mut increase_by = len / 2;
@@ -164,7 +164,7 @@ pub fn uc_alloc(uc: &mut super::UnicornHandle<RefCell<Heap>>, mut size: u64) -> 
 }
 
 
-pub fn uc_free(uc: &mut super::UnicornHandle<RefCell<Heap>>, ptr: u64) -> Result<(), super::ffi::uc_error> {
+pub fn uc_free(uc: &mut super::UnicornHandle<RefCell<Heap>>, ptr: u64) -> Result<(), uc_error> {
     #[cfg(debug_assertions)]
     println!("[-] Freeing {:#010x}", ptr);
 
@@ -176,31 +176,31 @@ pub fn uc_free(uc: &mut super::UnicornHandle<RefCell<Heap>>, ptr: u64) -> Result
             chunk_size = curr_chunk.len as u64;
             curr_chunk.freed = true;
         }
-        uc.add_mem_hook(super::ffi::HookType::MEM_VALID, ptr, ptr + chunk_size - 1, Box::new(heap_uaf))?;
+        uc.add_mem_hook(HookType::MEM_VALID, ptr, ptr + chunk_size - 1, Box::new(heap_uaf))?;
     }
     return Ok(());
 } 
 
 
-fn heap_unalloc(uc: super::UnicornHandle<RefCell<Heap>>, _mem_type: super::ffi::MemType, addr: u64, _size: usize, _val: i64) {
+fn heap_unalloc(uc: super::UnicornHandle<RefCell<Heap>>, _mem_type: MemType, addr: u64, _size: usize, _val: i64) {
     let pc = uc.reg_read(Register::PC as i32).expect("failed to read pc"); 
     panic!("ERROR: unicornafl Sanitizer: Heap out-of-bounds access of unallocated memory on addr {:#0x}, $pc: {:#010x}", addr, pc);
 }
 
 
-fn heap_oob(uc: super::UnicornHandle<RefCell<Heap>>, _mem_type: super::ffi::MemType, addr: u64, _size: usize, _val: i64) {
+fn heap_oob(uc: super::UnicornHandle<RefCell<Heap>>, _mem_type: MemType, addr: u64, _size: usize, _val: i64) {
     let pc = uc.reg_read(Register::PC as i32).expect("failed to read pc"); 
     panic!("ERROR: unicornafl Sanitizer: Heap out-of-bounds read on addr {:#0x}, $pc: {:#010x}", addr, pc);
 }
 
 
-fn heap_bo (uc: super::UnicornHandle<RefCell<Heap>>, _mem_type: super::ffi::MemType, addr: u64, _size: usize, _val: i64) {       
+fn heap_bo (uc: super::UnicornHandle<RefCell<Heap>>, _mem_type: MemType, addr: u64, _size: usize, _val: i64) {       
     let pc = uc.reg_read(Register::PC as i32).expect("failed to read pc"); 
     panic!("ERROR: unicornafl Sanitizer: Heap buffer-overflow on addr {:#0x}, $pc: {:#010x}", addr, pc);
 }
 
 
-fn heap_uaf (uc: super::UnicornHandle<RefCell<Heap>>, _mem_type: super::ffi::MemType, addr: u64, _size: usize, _val: i64) {       
+fn heap_uaf (uc: super::UnicornHandle<RefCell<Heap>>, _mem_type: MemType, addr: u64, _size: usize, _val: i64) {       
     let pc = uc.reg_read(Register::PC as i32).expect("failed to read pc"); 
     panic!("ERROR: unicornafl Sanitizer: Heap use-after-free on addr {:#0x}, $pc: {:#010x}", addr, pc);
     
