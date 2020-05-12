@@ -73,8 +73,8 @@ public interface UnicornConst {
    public static final int UC_AFL_RET_ERROR = 0;
    public static final int UC_AFL_RET_CHILD = 1;
    public static final int UC_AFL_RET_NO_AFL = 2;
-   public static final int UC_AFL_RET_FINISHED = 3;
-
+   public static final int UC_AFL_RET_CALLED_TWICE = 3;
+   public static final int UC_AFL_RET_FINISHED = 4;
    public static final int UC_MEM_READ = 16;
    public static final int UC_MEM_WRITE = 17;
    public static final int UC_MEM_FETCH = 18;
