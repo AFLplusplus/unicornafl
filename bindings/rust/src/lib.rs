@@ -24,13 +24,9 @@ pub struct UnicornInner<D> {
     pub uc: uc_handle,
     pub code_hooks: HashMap<*mut libc::c_void, Box<ffi::CodeHook<D>>>,
     pub mem_hooks: HashMap<*mut libc::c_void, Box<ffi::MemHook<D>>>,
+    pub intr_hooks: HashMap<*mut libc::c_void, Box<ffi::InterruptHook<D>>>,
     pub data: D,
     _pin: PhantomPinned
-}
-
-#[derive(Debug)]
-pub enum UnicornError {
-    Internal
 }
 
 impl<D> Unicorn<D> {
@@ -43,6 +39,7 @@ impl<D> Unicorn<D> {
                 uc: handle,
                 code_hooks: HashMap::new(),
                 mem_hooks: HashMap::new(),
+                intr_hooks: HashMap::new(),
                 data: data,
                 _pin: std::marker::PhantomPinned
             })})
@@ -128,6 +125,16 @@ impl<'a, D> UnicornHandle<'a, D> {
         }
     }
 
+    pub fn mem_unmap(&mut self, address: u64, size: libc::size_t) -> Result<(), ucconst::uc_error> {
+        let err = unsafe { ffi::uc_mem_unmap(self.inner.uc, address, size) };
+        if err == ucconst::uc_error::OK {
+            Ok(())
+        } else {
+            Err(err)
+        }
+    }
+
+
     pub fn mem_protect(&mut self, address: u64, size: libc::size_t, perms: Protection) -> Result<(), ucconst::uc_error> {
         let err = unsafe { ffi::uc_mem_protect(self.inner.uc, address, size, perms.bits()) };
         if err == ucconst::uc_error::OK {
@@ -168,7 +175,6 @@ impl<'a, D> UnicornHandle<'a, D> {
 
     pub fn add_code_hook<F: 'static>(
         &mut self,
-        hook_type: ucconst::HookType,
         begin: u64,
         end: u64,
         callback: F,
@@ -185,7 +191,7 @@ impl<'a, D> UnicornHandle<'a, D> {
             ffi::uc_hook_add(
                 self.inner.uc,
                 &mut hook_ptr,
-                hook_type,
+                ucconst::HookType::CODE,
                 ffi::code_hook_proxy::<D> as _,
                 user_data.as_mut() as *mut _ as _,
                 begin,
@@ -234,18 +240,53 @@ impl<'a, D> UnicornHandle<'a, D> {
         }
     }
 
-    pub fn remove_hook(&mut self, hook: ffi::uc_hook) -> Result<(), UnicornError> {
+    pub fn add_intr_hook<F: 'static>(
+        &mut self,
+        callback: F,
+    ) -> Result<ffi::uc_hook, ucconst::uc_error>
+    where F: FnMut(UnicornHandle<D>, u32)
+    { 
+        let mut hook_ptr = std::ptr::null_mut();
+        let mut user_data = Box::new(ffi::InterruptHook {
+            unicorn: unsafe { self.inner.as_mut().get_unchecked_mut() } as _,
+            callback: Box::new(callback),
+        });
+        
+        let err = unsafe {
+            ffi::uc_hook_add(
+                self.inner.uc,
+                &mut hook_ptr,
+                ucconst::HookType::INTR,
+                ffi::intr_hook_proxy::<D> as _,
+                user_data.as_mut() as *mut _ as _,
+                0,
+                0,
+            )
+        };
+        if err == ucconst::uc_error::OK {
+            unsafe { self.inner.as_mut().get_unchecked_mut() }.intr_hooks.insert(hook_ptr, user_data);
+            Ok(hook_ptr)
+        } else {
+            Err(err)
+        }
+    }
+
+    pub fn remove_hook(&mut self, hook: ffi::uc_hook) -> Result<(), ucconst::uc_error> {
         let handle = unsafe { self.inner.as_mut().get_unchecked_mut() };
-        if handle.code_hooks.contains_key(&hook) {
-            unsafe { ffi::uc_hook_del(handle.uc, hook) }.to_result()?;
-            handle.code_hooks.remove(&hook);
-            Ok(())
-        } else if handle.mem_hooks.contains_key(&hook) {
-            unsafe { ffi::uc_hook_del(handle.uc, hook) }.to_result()?;
+        let err: ucconst::uc_error;
+        if handle.code_hooks.contains_key(&hook) || 
+            handle.mem_hooks.contains_key(&hook) ||
+            handle.intr_hooks.contains_key(&hook) {
+            err = unsafe { ffi::uc_hook_del(handle.uc, hook) };
             handle.mem_hooks.remove(&hook);
+        } else {
+            err = ucconst::uc_error::HOOK;
+        }
+
+        if err == ucconst::uc_error::OK {
             Ok(())
         } else {
-            Err(UnicornError::Internal)
+            Err(err)
         }
     }
 

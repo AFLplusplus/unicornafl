@@ -7,7 +7,7 @@ use super::ucconst::{Protection, Mode, Arch, HookType, MemType, uc_error};
 use std::ptr;
 use std::cell::RefCell;
 use std::collections::HashMap;
-use libc::{mmap, munmap, c_void, size_t, MAP_ANON, MAP_PRIVATE,PROT_READ,PROT_WRITE};
+use libc::{mmap, c_void, size_t, MAP_ANON, MAP_PRIVATE,PROT_READ,PROT_WRITE};
 
 
 #[derive(Debug)]
@@ -78,7 +78,7 @@ pub fn add_debug_prints_ARM<D>(uc: &mut super::UnicornHandle<D>, code_start: u64
         println!("{}", ins);
     });
 
-    uc.add_code_hook(HookType::CODE, code_start, code_end, callback).expect("failed to set debug hook");
+    uc.add_code_hook(code_start, code_end, callback).expect("failed to set debug hook");
 }
 
 
@@ -156,7 +156,7 @@ pub fn uc_alloc(uc: &mut super::UnicornHandle<RefCell<Heap>>, mut size: u64) -> 
 
     // adjust oob hooks
     let old_h = uc.get_data().borrow_mut().unalloc_hook;
-    uc.remove_hook(old_h);
+    uc.remove_hook(old_h)?;
     let new_h = uc.add_mem_hook(HookType::MEM_VALID, new_top, uc_base + len as u64, Box::new(heap_unalloc))?;
     uc.get_data().borrow_mut().unalloc_hook = new_h;
 

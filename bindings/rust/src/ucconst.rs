@@ -36,15 +36,6 @@ pub enum uc_error {
     EXCEPTION = 21,
 }
 
-impl uc_error {
-    pub fn to_result(&self) -> Result<(), crate::UnicornError> {
-        match self {
-            uc_error::OK => Ok(()),
-            _ => Err(crate::UnicornError::Internal)
-        }
-    }
-}
-
 #[repr(C)]
 #[derive(PartialEq, Debug, Clone, Copy)]
 pub enum AflRet {
@@ -135,7 +126,6 @@ pub enum Arch {
     M68K = 7,
     MAX = 8,
 }
-
 
 #[repr(C)]
 #[derive(PartialEq, Debug, Clone, Copy)]
