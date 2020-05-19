@@ -1,4 +1,8 @@
 pub mod arm;
+pub mod arm64;
+pub mod x86;
+pub mod sparc;
+pub mod mips;
 pub mod ucconst;
 mod ffi;
 pub mod utils;
@@ -22,6 +26,7 @@ pub struct UnicornHandle<'a, D> {
 
 pub struct UnicornInner<D> {
     pub uc: uc_handle,
+    pub arch: ucconst::Arch,
     pub code_hooks: HashMap<*mut libc::c_void, Box<ffi::CodeHook<D>>>,
     pub mem_hooks: HashMap<*mut libc::c_void, Box<ffi::MemHook<D>>>,
     pub intr_hooks: HashMap<*mut libc::c_void, Box<ffi::InterruptHook<D>>>,
@@ -37,6 +42,7 @@ impl<D> Unicorn<D> {
             Ok(Unicorn {
                 inner: Box::pin(UnicornInner {
                 uc: handle,
+                arch: arch,
                 code_hooks: HashMap::new(),
                 mem_hooks: HashMap::new(),
                 intr_hooks: HashMap::new(),
@@ -71,6 +77,10 @@ impl<'a, D> UnicornHandle<'a, D> {
 
     pub fn get_data_mut(&mut self) -> &mut D {
         unsafe { &mut self.inner.as_mut().get_unchecked_mut().data }
+    }
+
+    pub fn get_arch(&self) -> ucconst::Arch {
+        self.inner.arch
     }
 
     pub fn mem_regions(&self) -> Result<Vec<MemRegion>, ucconst::uc_error> {

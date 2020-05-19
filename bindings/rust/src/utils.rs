@@ -2,7 +2,11 @@
 extern crate libc;
 
 use capstone::prelude::*;
-use super::arm::Register;
+use super::arm::RegisterARM;
+use super::arm64::RegisterARM64;
+use super::x86::RegisterX86;
+use super::sparc::RegisterSPARC;
+use super::mips::RegisterMIPS;
 use super::ucconst::{Protection, Mode, Arch, HookType, MemType, uc_error};
 use std::ptr;
 use std::cell::RefCell;
@@ -45,20 +49,20 @@ pub fn add_debug_prints_ARM<D>(uc: &mut super::UnicornHandle<D>, code_start: u64
         .build().expect("failed to create capstone for thumb");
 
     let callback = Box::new(move |uc: super::UnicornHandle<D>, addr: u64, size: u32| {        
-        let sp = uc.reg_read(Register::SP as i32).expect("failed to read SP");
-        let lr = uc.reg_read(Register::LR as i32).expect("failed to read LR");
-        let r0 = uc.reg_read(Register::R0 as i32).expect("failed to read r0");
-        let r1 = uc.reg_read(Register::R1 as i32).expect("failed to read r1");
-        let r2 = uc.reg_read(Register::R2 as i32).expect("failed to read r2");
-        let r3 = uc.reg_read(Register::R3 as i32).expect("failed to read r3");
-        let r4 = uc.reg_read(Register::R4 as i32).expect("failed to read r4");
-        let r5 = uc.reg_read(Register::R5 as i32).expect("failed to read r5");
-        let r6 = uc.reg_read(Register::R6 as i32).expect("failed to read r6");
-        let r7 = uc.reg_read(Register::R7 as i32).expect("failed to read r7");
-        let r8 = uc.reg_read(Register::R8 as i32).expect("failed to read r8");
-        let r9 = uc.reg_read(Register::R9 as i32).expect("failed to read r9");
-        let r10 = uc.reg_read(Register::R10 as i32).expect("failed to read r10");
-        let r11 = uc.reg_read(Register::R11 as i32).expect("failed to read r11");
+        let sp = uc.reg_read(RegisterARM::SP as i32).expect("failed to read SP");
+        let lr = uc.reg_read(RegisterARM::LR as i32).expect("failed to read LR");
+        let r0 = uc.reg_read(RegisterARM::R0 as i32).expect("failed to read r0");
+        let r1 = uc.reg_read(RegisterARM::R1 as i32).expect("failed to read r1");
+        let r2 = uc.reg_read(RegisterARM::R2 as i32).expect("failed to read r2");
+        let r3 = uc.reg_read(RegisterARM::R3 as i32).expect("failed to read r3");
+        let r4 = uc.reg_read(RegisterARM::R4 as i32).expect("failed to read r4");
+        let r5 = uc.reg_read(RegisterARM::R5 as i32).expect("failed to read r5");
+        let r6 = uc.reg_read(RegisterARM::R6 as i32).expect("failed to read r6");
+        let r7 = uc.reg_read(RegisterARM::R7 as i32).expect("failed to read r7");
+        let r8 = uc.reg_read(RegisterARM::R8 as i32).expect("failed to read r8");
+        let r9 = uc.reg_read(RegisterARM::R9 as i32).expect("failed to read r9");
+        let r10 = uc.reg_read(RegisterARM::R10 as i32).expect("failed to read r10");
+        let r11 = uc.reg_read(RegisterARM::R11 as i32).expect("failed to read r11");
         println!("________________________________________________________________________\n");
         println!("$r0: {:#010x}   $r1: {:#010x}    $r2: {:#010x}    $r3: {:#010x}", r0, r1, r2, r3);
         println!("$r4: {:#010x}   $r5: {:#010x}    $r6: {:#010x}    $r7: {:#010x}", r4, r5, r6, r7);
@@ -66,7 +70,7 @@ pub fn add_debug_prints_ARM<D>(uc: &mut super::UnicornHandle<D>, code_start: u64
         println!("$sp: {:#010x}   $lr: {:#010x}\n", sp, lr);
         
         // decide which mode (ARM/Thumb) to use for disasm
-        let cpsr = uc.reg_read(Register::CPSR as i32).expect("failed to read CPSR");
+        let cpsr = uc.reg_read(RegisterARM::CPSR as i32).expect("failed to read CPSR");
         let mut buf = vec![0; size as usize];
         uc.mem_read(addr, &mut buf).expect("failed to read opcode from memory");
         let ins = if cpsr & 0x20 != 0 {
@@ -83,9 +87,9 @@ pub fn add_debug_prints_ARM<D>(uc: &mut super::UnicornHandle<D>, code_start: u64
 
 
 // returns a new unicorn object with an initialized heap @addr and active sanitizer
-pub fn init_emu_with_heap(mut size: u32, base_addr: u64, grow: bool) -> Result<super::Unicorn<RefCell<Heap>>, uc_error> {
+pub fn init_emu_with_heap(arch: Arch, mut size: u32, base_addr: u64, grow: bool) -> Result<super::Unicorn<RefCell<Heap>>, uc_error> {
     let heap = RefCell::new(Heap {real_base: 0 as _, uc_base: 0, len: 0, grow_dynamically: false, chunk_map: HashMap::new(), top: 0, unalloc_hook: 0 as _ });
-    let mut unicorn = super::Unicorn::new(Arch::ARM, Mode::LITTLE_ENDIAN, heap)?;
+    let mut unicorn = super::Unicorn::new(arch, Mode::LITTLE_ENDIAN, heap)?;
     let mut uc = unicorn.borrow(); // get handle
 
     // uc memory regions have to be 8 byte aligned
@@ -183,25 +187,61 @@ pub fn uc_free(uc: &mut super::UnicornHandle<RefCell<Heap>>, ptr: u64) -> Result
 
 
 fn heap_unalloc(uc: super::UnicornHandle<RefCell<Heap>>, _mem_type: MemType, addr: u64, _size: usize, _val: i64) {
-    let pc = uc.reg_read(Register::PC as i32).expect("failed to read pc"); 
+    let arch = uc.get_arch();
+    let reg = match arch {
+        Arch::X86 => RegisterX86::RIP as i32,
+        Arch::ARM => RegisterARM::PC as i32,
+        Arch::ARM64 => RegisterARM64::PC as i32,
+        Arch::MIPS => RegisterMIPS::PC as i32,
+        Arch::SPARC => RegisterSPARC::PC as i32,
+        _ => panic!("Arch not yet supported by unicornafl::utils module")
+    };
+    let pc = uc.reg_read(reg).expect("failed to read pc"); 
     panic!("ERROR: unicornafl Sanitizer: Heap out-of-bounds access of unallocated memory on addr {:#0x}, $pc: {:#010x}", addr, pc);
 }
 
 
 fn heap_oob(uc: super::UnicornHandle<RefCell<Heap>>, _mem_type: MemType, addr: u64, _size: usize, _val: i64) {
-    let pc = uc.reg_read(Register::PC as i32).expect("failed to read pc"); 
+    let arch = uc.get_arch();
+    let reg = match arch {
+        Arch::X86 => RegisterX86::RIP as i32,
+        Arch::ARM => RegisterARM::PC as i32,
+        Arch::ARM64 => RegisterARM64::PC as i32,
+        Arch::MIPS => RegisterMIPS::PC as i32,
+        Arch::SPARC => RegisterSPARC::PC as i32,
+        _ => panic!("Arch not yet supported by unicornafl::utils module")
+    };
+    let pc = uc.reg_read(reg).expect("failed to read pc"); 
     panic!("ERROR: unicornafl Sanitizer: Heap out-of-bounds read on addr {:#0x}, $pc: {:#010x}", addr, pc);
 }
 
 
 fn heap_bo (uc: super::UnicornHandle<RefCell<Heap>>, _mem_type: MemType, addr: u64, _size: usize, _val: i64) {       
-    let pc = uc.reg_read(Register::PC as i32).expect("failed to read pc"); 
+    let arch = uc.get_arch();
+    let reg = match arch {
+        Arch::X86 => RegisterX86::RIP as i32,
+        Arch::ARM => RegisterARM::PC as i32,
+        Arch::ARM64 => RegisterARM64::PC as i32,
+        Arch::MIPS => RegisterMIPS::PC as i32,
+        Arch::SPARC => RegisterSPARC::PC as i32,
+        _ => panic!("Arch not yet supported by unicornafl::utils module")
+    };
+    let pc = uc.reg_read(reg).expect("failed to read pc"); 
     panic!("ERROR: unicornafl Sanitizer: Heap buffer-overflow on addr {:#0x}, $pc: {:#010x}", addr, pc);
 }
 
 
 fn heap_uaf (uc: super::UnicornHandle<RefCell<Heap>>, _mem_type: MemType, addr: u64, _size: usize, _val: i64) {       
-    let pc = uc.reg_read(Register::PC as i32).expect("failed to read pc"); 
+    let arch = uc.get_arch();
+    let reg = match arch {
+        Arch::X86 => RegisterX86::RIP as i32,
+        Arch::ARM => RegisterARM::PC as i32,
+        Arch::ARM64 => RegisterARM64::PC as i32,
+        Arch::MIPS => RegisterMIPS::PC as i32,
+        Arch::SPARC => RegisterSPARC::PC as i32,
+        _ => panic!("Arch not yet supported by unicornafl::utils module")
+    };
+    let pc = uc.reg_read(reg).expect("failed to read pc"); 
     panic!("ERROR: unicornafl Sanitizer: Heap use-after-free on addr {:#0x}, $pc: {:#010x}", addr, pc);
     
 }

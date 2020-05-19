@@ -3,7 +3,7 @@
 
 #[repr(C)]
 #[derive(PartialEq, Debug, Clone, Copy)]
-pub enum Register {
+pub enum RegisterARM {
     // ARM registers
     INVALID = 0,
     APSR = 1,
@@ -136,12 +136,12 @@ pub enum Register {
     // (assoc) IP = 78,
 }
 
-impl Register {
-    pub const R13: Register = Register::SP;
-    pub const R14: Register = Register::LR;
-    pub const R15: Register = Register::PC;
-    pub const SB: Register = Register::R9;
-    pub const SL: Register = Register::R10;
-    pub const FP: Register = Register::R11;
-    pub const IP: Register = Register::R12;
+impl RegisterARM {
+    pub const R13: RegisterARM = RegisterARM::SP;
+    pub const R14: RegisterARM = RegisterARM::LR;
+    pub const R15: RegisterARM = RegisterARM::PC;
+    pub const SB: RegisterARM = RegisterARM::R9;
+    pub const SL: RegisterARM = RegisterARM::R10;
+    pub const FP: RegisterARM = RegisterARM::R11;
+    pub const IP: RegisterARM = RegisterARM::R12;
 }
