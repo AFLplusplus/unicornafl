@@ -3,6 +3,7 @@ pub mod arm64;
 pub mod x86;
 pub mod sparc;
 pub mod mips;
+pub mod m68k;
 pub mod ucconst;
 mod ffi;
 pub mod utils;

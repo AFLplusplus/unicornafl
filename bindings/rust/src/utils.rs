@@ -7,6 +7,7 @@ use super::arm64::RegisterARM64;
 use super::x86::RegisterX86;
 use super::sparc::RegisterSPARC;
 use super::mips::RegisterMIPS;
+use super::m68k::RegisterM68K;
 use super::ucconst::{Protection, Mode, Arch, HookType, MemType, uc_error};
 use std::ptr;
 use std::cell::RefCell;
@@ -194,6 +195,7 @@ fn heap_unalloc(uc: super::UnicornHandle<RefCell<Heap>>, _mem_type: MemType, add
         Arch::ARM64 => RegisterARM64::PC as i32,
         Arch::MIPS => RegisterMIPS::PC as i32,
         Arch::SPARC => RegisterSPARC::PC as i32,
+        Arch::M68K => RegisterM68K::PC as i32,
         _ => panic!("Arch not yet supported by unicornafl::utils module")
     };
     let pc = uc.reg_read(reg).expect("failed to read pc"); 
@@ -209,6 +211,7 @@ fn heap_oob(uc: super::UnicornHandle<RefCell<Heap>>, _mem_type: MemType, addr: u
         Arch::ARM64 => RegisterARM64::PC as i32,
         Arch::MIPS => RegisterMIPS::PC as i32,
         Arch::SPARC => RegisterSPARC::PC as i32,
+        Arch::M68K => RegisterM68K::PC as i32,
         _ => panic!("Arch not yet supported by unicornafl::utils module")
     };
     let pc = uc.reg_read(reg).expect("failed to read pc"); 
@@ -224,6 +227,7 @@ fn heap_bo (uc: super::UnicornHandle<RefCell<Heap>>, _mem_type: MemType, addr: u
         Arch::ARM64 => RegisterARM64::PC as i32,
         Arch::MIPS => RegisterMIPS::PC as i32,
         Arch::SPARC => RegisterSPARC::PC as i32,
+        Arch::M68K => RegisterM68K::PC as i32,
         _ => panic!("Arch not yet supported by unicornafl::utils module")
     };
     let pc = uc.reg_read(reg).expect("failed to read pc"); 
@@ -239,6 +243,7 @@ fn heap_uaf (uc: super::UnicornHandle<RefCell<Heap>>, _mem_type: MemType, addr: 
         Arch::ARM64 => RegisterARM64::PC as i32,
         Arch::MIPS => RegisterMIPS::PC as i32,
         Arch::SPARC => RegisterSPARC::PC as i32,
+        Arch::M68K => RegisterM68K::PC as i32,
         _ => panic!("Arch not yet supported by unicornafl::utils module")
     };
     let pc = uc.reg_read(reg).expect("failed to read pc"); 
