@@ -105,6 +105,11 @@ pub struct InterruptHook<D> {
     pub callback: Box<dyn FnMut(crate::UnicornHandle<D>, u32)>
 }
 
+pub struct InstructionHook<D> {
+    pub unicorn: *mut crate::UnicornInner<D>,
+    pub callback: Box<dyn FnMut(crate::UnicornHandle<D>, u32, usize)>
+}
+
 pub struct AflFuzzCallback<D> {
     pub unicorn: *mut crate::UnicornInner<D>,
     pub input_callback: Box<dyn FnMut(crate::UnicornHandle<D>, &[u8], i32) -> bool>,
@@ -130,6 +135,13 @@ pub extern "C" fn intr_hook_proxy<D>(uc: uc_handle, value: u32, user_data: *mut 
     let callback = &mut unsafe { &mut *(*user_data).callback };
     assert_eq!(uc, unicorn.uc);
     callback(crate::UnicornHandle { inner: unsafe { Pin::new_unchecked(unicorn) } }, value);
+}
+
+pub extern "C" fn ins_hook_proxy<D>(uc: uc_handle, value: u32, size: usize, user_data: *mut InstructionHook<D>) {
+    let unicorn = unsafe { &mut *(*user_data).unicorn };
+    let callback = &mut unsafe { &mut *(*user_data).callback };
+    assert_eq!(uc, unicorn.uc);
+    callback(crate::UnicornHandle { inner: unsafe { Pin::new_unchecked(unicorn) } }, value, size);
 }
 
 pub extern "C" fn input_placement_callback_proxy<D>(uc: uc_handle,

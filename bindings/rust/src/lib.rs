@@ -31,6 +31,7 @@ pub struct UnicornInner<D> {
     pub code_hooks: HashMap<*mut libc::c_void, Box<ffi::CodeHook<D>>>,
     pub mem_hooks: HashMap<*mut libc::c_void, Box<ffi::MemHook<D>>>,
     pub intr_hooks: HashMap<*mut libc::c_void, Box<ffi::InterruptHook<D>>>,
+    pub ins_hooks: HashMap<*mut libc::c_void, Box<ffi::InstructionHook<D>>>,
     pub data: D,
     _pin: PhantomPinned
 }
@@ -47,6 +48,7 @@ impl<D> Unicorn<D> {
                 code_hooks: HashMap::new(),
                 mem_hooks: HashMap::new(),
                 intr_hooks: HashMap::new(),
+                ins_hooks: HashMap::new(),
                 data: data,
                 _pin: std::marker::PhantomPinned
             })})
@@ -282,12 +284,47 @@ impl<'a, D> UnicornHandle<'a, D> {
         }
     }
 
+    // only supports x86 subset
+    pub fn add_ins_hook<F: 'static>(
+        &mut self,
+        ins: x86::InsnX86,
+        callback: F,
+    ) -> Result<ffi::uc_hook, ucconst::uc_error>
+    where F: FnMut(UnicornHandle<D>, u32, usize)
+    { 
+        let mut hook_ptr = std::ptr::null_mut();
+        let mut user_data = Box::new(ffi::InstructionHook {
+            unicorn: unsafe { self.inner.as_mut().get_unchecked_mut() } as _,
+            callback: Box::new(callback),
+        });
+        
+        let err = unsafe {
+            ffi::uc_hook_add(
+                self.inner.uc,
+                &mut hook_ptr,
+                ucconst::HookType::INSN,
+                ffi::ins_hook_proxy::<D> as _,
+                user_data.as_mut() as *mut _ as _,
+                0,
+                0,
+                ins,
+            )
+        };
+        if err == ucconst::uc_error::OK {
+            unsafe { self.inner.as_mut().get_unchecked_mut() }.ins_hooks.insert(hook_ptr, user_data);
+            Ok(hook_ptr)
+        } else {
+            Err(err)
+        }
+    }
+
     pub fn remove_hook(&mut self, hook: ffi::uc_hook) -> Result<(), ucconst::uc_error> {
         let handle = unsafe { self.inner.as_mut().get_unchecked_mut() };
         let err: ucconst::uc_error;
         if handle.code_hooks.contains_key(&hook) || 
             handle.mem_hooks.contains_key(&hook) ||
-            handle.intr_hooks.contains_key(&hook) {
+            handle.intr_hooks.contains_key(&hook)||
+            handle.ins_hooks.contains_key(&hook) {
             err = unsafe { ffi::uc_hook_del(handle.uc, hook) };
             handle.mem_hooks.remove(&hook);
         } else {
