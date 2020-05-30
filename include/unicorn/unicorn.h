@@ -37,6 +37,7 @@ typedef size_t uc_hook;
 #include "arm64.h"
 #include "mips.h"
 #include "sparc.h"
+#include "ppc.h"
 
 #ifdef __GNUC__
 #define DEFAULT_VISIBILITY __attribute__((visibility("default")))
@@ -76,7 +77,7 @@ typedef size_t uc_hook;
 // Unicorn package version
 #define UC_VERSION_MAJOR UC_API_MAJOR
 #define UC_VERSION_MINOR UC_API_MINOR
-#define UC_VERSION_EXTRA 2
+#define UC_VERSION_EXTRA 3
 
 /*
   Macro to create combined version which can be compared to
@@ -96,7 +97,7 @@ typedef enum uc_arch {
     UC_ARCH_ARM64,      // ARM-64, also called AArch64
     UC_ARCH_MIPS,       // Mips architecture
     UC_ARCH_X86,        // X86 architecture (including x86 & x86-64)
-    UC_ARCH_PPC,        // PowerPC architecture (currently unsupported)
+    UC_ARCH_PPC,        // PowerPC architecture
     UC_ARCH_SPARC,      // Sparc architecture
     UC_ARCH_M68K,       // M68K architecture
     UC_ARCH_MAX,
@@ -131,7 +132,7 @@ typedef enum uc_mode {
     UC_MODE_64 = 1 << 3,          // 64-bit mode
 
     // ppc 
-    UC_MODE_PPC32 = 1 << 2,       // 32-bit mode (currently unsupported)
+    UC_MODE_PPC32 = 1 << 2,       // 32-bit mode
     UC_MODE_PPC64 = 1 << 3,       // 64-bit mode (currently unsupported)
     UC_MODE_QPX = 1 << 4,         // Quad Processing eXtensions mode (currently unsupported)
 
@@ -168,7 +169,6 @@ typedef enum uc_err {
     UC_ERR_HOOK_EXIST,  // hook for this event already existed
     UC_ERR_RESOURCE,    // Insufficient resource: uc_emu_start()
     UC_ERR_EXCEPTION, // Unhandled CPU exception
-    UC_ERR_TIMEOUT // Emulation timed out
 } uc_err;
 
 #ifdef UNICORN_AFL
@@ -344,8 +344,9 @@ typedef struct uc_mem_region {
 typedef enum uc_query_type {
     // Dynamically query current hardware mode.
     UC_QUERY_MODE = 1,
-    UC_QUERY_PAGE_SIZE,
-    UC_QUERY_ARCH,
+    UC_QUERY_PAGE_SIZE, // query pagesize of engine
+    UC_QUERY_ARCH,  // query architecture of engine (for ARM to query Thumb mode)
+    UC_QUERY_TIMEOUT,  // query if emulation stops due to timeout (indicated if result = True)
 } uc_query_type;
 
 // Opaque storage for CPU context, used with uc_context_*()
