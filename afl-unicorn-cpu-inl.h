@@ -172,19 +172,27 @@ static inline uc_afl_ret afl_forkserver(CPUArchState* env) {
   pid_t   child_pid;
   enum afl_child_ret child_ret = AFL_CHILD_EXITED;
   bool first_round = true;
+  u32 status = 0;
 
   if (!env->uc->afl_area_ptr) return UC_AFL_RET_NO_AFL;
 
   if (env->uc->afl_testcase_ptr) {
     /* Parent supports testcases via shared map - and the user wants to use it. Tell AFL. */
     u32 status = FS_OPT_ENABLED | FS_OPT_SHDMEM_FUZZ;
-    memcpy(tmp, &status, 4);
   }
 
   /* Phone home and tell the parent that we're OK. If parent isn't there,
      assume we're not running in forkserver mode and just execute program. */
 
-  if (write(FORKSRV_FD + 1, tmp, 4) != 4) return UC_AFL_RET_NO_AFL;
+  if (write(FORKSRV_FD + 1, &status, 4) != 4) return UC_AFL_RET_NO_AFL;
+
+  /* afl tells us in an extra message if it accepted this option or not */
+  if (env->uc->afl_testcase_ptr) {
+    if (read(FORKSRV_FD, &status, 4) != 4) return UC_AFL_RET_NO_AFL;
+    if (status (FS_OPT_ENABLED | FS_OPT_AUTODICT)) !=
+        (FS_OPT_ENABLED | FS_OPT_AUTODICT))
+      return UC_AFL_RET_NO_AFL;
+  }
 
   void (*old_sigchld_handler)(int) = signal(SIGCHLD, SIG_DFL);
 
