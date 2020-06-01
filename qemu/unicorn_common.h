@@ -97,6 +97,8 @@ static inline void uc_common_init(struct uc_struct* uc)
     uc->afl_parent_pipe[0] = 0;
     uc->afl_parent_pipe[1] = 0;
     uc->afl_child_request_next = NULL;  // This callback is only set if inside child.
+    uc->afl_testcase_ptr = NULL;
+    uc->afl_testcase_size = -1;
 #endif
 }
 

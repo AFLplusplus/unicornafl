@@ -14,7 +14,7 @@
 // These are masks of supported modes for each cpu/arch.
 // They should be updated when changes are made to the uc_mode enum typedef.
 #define UC_MODE_ARM_MASK    (UC_MODE_ARM|UC_MODE_THUMB|UC_MODE_LITTLE_ENDIAN|UC_MODE_MCLASS \
-				|UC_MODE_ARM926|UC_MODE_ARM946|UC_MODE_ARM1176|UC_MODE_BIG_ENDIAN)
+                |UC_MODE_ARM926|UC_MODE_ARM946|UC_MODE_ARM1176|UC_MODE_BIG_ENDIAN)
 #define UC_MODE_MIPS_MASK   (UC_MODE_MIPS32|UC_MODE_MIPS64|UC_MODE_LITTLE_ENDIAN|UC_MODE_BIG_ENDIAN)
 #define UC_MODE_X86_MASK    (UC_MODE_16|UC_MODE_32|UC_MODE_64|UC_MODE_LITTLE_ENDIAN)
 #define UC_MODE_PPC_MASK    (UC_MODE_PPC64|UC_MODE_BIG_ENDIAN)
@@ -268,6 +268,8 @@ struct uc_struct {
     unsigned int afl_inst_rms;
     size_t exit_count; // number of exits set in afl_fuzz or afl_forkserver
     uint64_t *exits; // pointer to the actual exits
+    char *afl_testcase_ptr; // map, shared with afl, to get testcases delivered from for each run
+    int32_t afl_testcase_size; // size of the current testcase, if using shared map fuzzing with afl.
 #endif
 };
 

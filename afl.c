@@ -13,6 +13,8 @@
 
 #include <sys/mman.h>
 #include <sys/stat.h>
+#include <sys/types.h>
+#include <sys/shm.h>
 
 #include "config.h"
 #include "uc_priv.h"
@@ -24,8 +26,8 @@ uc_afl_ret uc_afl_forkserver_start(uc_engine *uc, uint64_t *exits, size_t exit_c
     Why we need exits as parameter to forkserver:
     In the original unicorn-afl, Unicorn needed to flush the tb cache for every iteration.
     This is super slow.
-    Problem was, that the otiginal forked server doesn't know about possible future exits.
-    The cached blocks, in the next child, therefore whould have no exit set and run forever.
+    Problem was, that the original forked server doesn't know about possible future exits.
+    The cached blocks, in the next child, therefore would have no exit set and run forever.
     Also it's nice to have multiple exits, so let's just do it right.
     */
 
@@ -58,8 +60,41 @@ uc_afl_ret uc_afl_forkserver_start(uc_engine *uc, uint64_t *exits, size_t exit_c
 
 }
 
+/* AFL++ supports testcase forwarding via shared map.
+   If the env variable is set, get the shared map here.*/
+static void uc_afl_enable_shm_testcases(uc_engine *uc) {
+
+    char *id_str = getenv(SHM_FUZZ_ENV_VAR);
+    if (id_str) {
+        u32 shm_id = atoi(id_str);
+        uc->afl_testcase_ptr = shmat(shm_id, NULL, 0);
+#if defined(AFL_DEBUG)
+        if (uc->afl_testcase_ptr) {
+            printf("[d] successfully opened shared memory for testcases.\n");
+        }
+#endif
+        if (uc->afl_testcase_ptr == (void*)-1) {
+            fprintf(stderr, "[!] Couldn't get shared testcase map for id: %s\n", id_str);
+            exit(1);
+        }
+    } else {
+#if defined(AFL_DEBUG)
+    printf("[d] SHM_FUZZ_ENV_VAR not set - not using shared map fuzzing.\n");
+#endif
+    }
+
+}
+
+/* For shared map fuzzing, the forkserver internally sets the size in each testcase iteration. */
+static inline off_t uc_afl_get_shm_testcase(uc_engine *uc, char **buf_ptr) {
+
+    buf_ptr = &uc->afl_testcase_ptr;
+    return uc->afl_testcase_size;
+
+}
+
 /* returns the filesize in bytes, -1 or error. */
-static off_t uc_afl_mmap_file(char *filename, char **buf_ptr) {
+static inline off_t uc_afl_mmap_file(char *filename, char **buf_ptr) {
 
     off_t ret = -1;
 
@@ -166,6 +201,9 @@ uc_afl_ret uc_afl_fuzz(
     }
 
     char *in_buf = NULL;
+    off_t in_len = -1;
+
+    uc_afl_enable_shm_testcases(uc);
 
     uc_afl_ret afl_ret = uc_afl_forkserver_start(uc, exits, exit_count);
     switch(afl_ret) {
@@ -191,6 +229,10 @@ uc_afl_ret uc_afl_fuzz(
     bool first_round = true;
     bool crash_found = false;
 
+#if defined(AFL_DEBUG)
+    printf("[!] uc->afl_testcase_ptr = %p, len = %d\n", uc->afl_testcase_ptr, uc->afl_testcase_size);
+#endif
+
     // 0 means never stop child in persistence mode.
     uint32_t i;
     for (i = 0; persistent_iters == 0 || i < persistent_iters; i++) {
@@ -203,11 +245,20 @@ uc_afl_ret uc_afl_fuzz(
             crash_found = false;
         }
 
-        // map input, call place input callback, emulate, unmap input
-        off_t in_len = uc_afl_mmap_file(input_file, &in_buf);
+        // get input, call place input callback, emulate, unmap input (if needed)
+        if (likely(uc->afl_testcase_ptr)) {
+            in_len = uc_afl_get_shm_testcase(uc, &in_buf);
+        } else {
+            // Let's read a "normal" file.
+            in_len = uc_afl_mmap_file(input_file, &in_buf);
+        }
         if (unlikely(in_len < 0)) {
-            fprintf(stderr, "[!] Unable to mmap file: %s", input_file);
-            perror("mmap");
+            if (uc->afl_testcase_ptr) {
+                fprintf(stderr, "[!] Couldn't get testcase via shmem (return was %d)\n", in_len);
+            } else {
+                fprintf(stderr, "[!] Unable to mmap file: %s (return was %d)\n", input_file, in_len);
+                perror("mmap");
+            }
             fflush(stderr);
             return UC_AFL_RET_ERROR;
         }
@@ -253,6 +304,8 @@ next_iter:
         // Nothing should ever come after this but clean it up still.
         // shmdt(uc->afl_area_ptr);
         uc->afl_area_ptr = NULL;
+        uc->afl_testcase_ptr = NULL;
+
     }
 
     // UC_AFL_RET_NO_AFL -> Not fuzzing. We ran once.

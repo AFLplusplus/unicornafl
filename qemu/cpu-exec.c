@@ -455,10 +455,10 @@ not_found:
 #endif
     /* if no translated code available, then translate it now */
     tb = tb_gen_code(cpu, pc, cs_base, (int)flags, 0);   // qq
-    
+
     if (tb == NULL) {
 #if defined(AFL_DEBUG)
-        printf("[e] no TranslationBlock returned from gen_code");
+        printf("[!] no TranslationBlock returned from gen_code");
 #endif
         return NULL;
     }
