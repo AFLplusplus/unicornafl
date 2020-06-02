@@ -178,7 +178,7 @@ static inline uc_afl_ret afl_forkserver(CPUArchState* env) {
 
   if (env->uc->afl_testcase_ptr) {
     /* Parent supports testcases via shared map - and the user wants to use it. Tell AFL. */
-    u32 status = FS_OPT_ENABLED | FS_OPT_SHDMEM_FUZZ;
+    status = FS_OPT_ENABLED | FS_OPT_SHDMEM_FUZZ;
   }
 
   /* Phone home and tell the parent that we're OK. If parent isn't there,
