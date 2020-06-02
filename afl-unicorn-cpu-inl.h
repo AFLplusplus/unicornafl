@@ -187,14 +187,26 @@ static inline uc_afl_ret afl_forkserver(CPUArchState* env) {
   if (write(FORKSRV_FD + 1, &status, 4) != 4) return UC_AFL_RET_NO_AFL;
 
   /* afl tells us in an extra message if it accepted this option or not */
-  if (env->uc->afl_testcase_ptr) {
-    if (read(FORKSRV_FD, &status, 4) != 4) return UC_AFL_RET_NO_AFL;
-    if (status (FS_OPT_ENABLED | FS_OPT_AUTODICT)) !=
-        (FS_OPT_ENABLED | FS_OPT_AUTODICT))
-      return UC_AFL_RET_NO_AFL;
+  if (env->uc->afl_testcase_ptr && getenv(SHM_FUZZ_ENV_VAR)) {
+    if (read(FORKSRV_FD, &status, 4) != 4) {
+      fprintf(ferror, "[!] AFL parent exited before forkserver was up");
+      return UC_AFL_RET_ERROR;
+    }
+    if (status & (0xffffffff & (FS_OPT_ENABLED | FS_OPT_SHDMEM_FUZZ))) {
+      fprintf(ferror, "[!] Unexpected response from AFL++ on forkserver setup");
+      return UC_AFL_RET_ERROR;
+    }
+  } else {
+#if defined(AFL_DEBUG)
+    printf("[d] AFL++ sharedmap fuzzing not supported/SHM_FUZZ_ENV_VAR not set");
+#endif
   }
 
   void (*old_sigchld_handler)(int) = signal(SIGCHLD, SIG_DFL);
+
+#if defined(AFL_DEBUG)
+  printf("[d] Entering forkserver loop");
+#endif
 
   while (1) {
 
