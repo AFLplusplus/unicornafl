@@ -88,7 +88,7 @@ static void uc_afl_enable_shm_testcases(uc_engine *uc) {
 /* For shared map fuzzing, the forkserver internally sets the size in each testcase iteration. */
 static inline off_t uc_afl_get_shm_testcase(uc_engine *uc, char **buf_ptr) {
 
-    buf_ptr = &uc->afl_testcase_ptr;
+    *buf_ptr = uc->afl_testcase_ptr;
     return uc->afl_testcase_size;
 
 }
@@ -230,7 +230,7 @@ uc_afl_ret uc_afl_fuzz(
     bool crash_found = false;
 
 #if defined(AFL_DEBUG)
-    printf("[!] uc->afl_testcase_ptr = %p, len = %d\n", uc->afl_testcase_ptr, uc->afl_testcase_size);
+    printf("[d] uc->afl_testcase_ptr = %p, len = %d\n", uc->afl_testcase_ptr, uc->afl_testcase_size);
 #endif
 
     // 0 means never stop child in persistence mode.
@@ -254,9 +254,9 @@ uc_afl_ret uc_afl_fuzz(
         }
         if (unlikely(in_len < 0)) {
             if (uc->afl_testcase_ptr) {
-                fprintf(stderr, "[!] Couldn't get testcase via shmem (return was %d)\n", in_len);
+                fprintf(stderr, "[!] Couldn't get testcase via shmem (return was %ld)\n", (long int) in_len);
             } else {
-                fprintf(stderr, "[!] Unable to mmap file: %s (return was %d)\n", input_file, in_len);
+                fprintf(stderr, "[!] Unable to mmap file: %s (return was %ld)\n", input_file, (long int) in_len);
                 perror("mmap");
             }
             fflush(stderr);

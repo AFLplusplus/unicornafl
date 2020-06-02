@@ -178,7 +178,7 @@ static inline uc_afl_ret afl_forkserver(CPUArchState* env) {
 
   if (env->uc->afl_testcase_ptr) {
     /* Parent supports testcases via shared map - and the user wants to use it. Tell AFL. */
-    status = FS_OPT_ENABLED | FS_OPT_SHDMEM_FUZZ;
+    status = (FS_OPT_ENABLED | FS_OPT_SHDMEM_FUZZ);
   }
 
   /* Phone home and tell the parent that we're OK. If parent isn't there,
@@ -189,23 +189,23 @@ static inline uc_afl_ret afl_forkserver(CPUArchState* env) {
   /* afl tells us in an extra message if it accepted this option or not */
   if (env->uc->afl_testcase_ptr && getenv(SHM_FUZZ_ENV_VAR)) {
     if (read(FORKSRV_FD, &status, 4) != 4) {
-      fprintf(ferror, "[!] AFL parent exited before forkserver was up");
+      fprintf(stderr, "[!] AFL parent exited before forkserver was up\n");
       return UC_AFL_RET_ERROR;
     }
-    if (status & (0xffffffff & (FS_OPT_ENABLED | FS_OPT_SHDMEM_FUZZ))) {
-      fprintf(ferror, "[!] Unexpected response from AFL++ on forkserver setup");
+    if (status != (FS_OPT_ENABLED | FS_OPT_SHDMEM_FUZZ)) {
+      fprintf(stderr, "[!] Unexpected response from AFL++ on forkserver setup\n");
       return UC_AFL_RET_ERROR;
     }
   } else {
 #if defined(AFL_DEBUG)
-    printf("[d] AFL++ sharedmap fuzzing not supported/SHM_FUZZ_ENV_VAR not set");
+    printf("[d] AFL++ sharedmap fuzzing not supported/SHM_FUZZ_ENV_VAR not set\n");
 #endif
   }
 
   void (*old_sigchld_handler)(int) = signal(SIGCHLD, SIG_DFL);
 
 #if defined(AFL_DEBUG)
-  printf("[d] Entering forkserver loop");
+  printf("[d] Entering forkserver loop\n");
 #endif
 
   while (1) {
