@@ -21,6 +21,8 @@ set(UNICORN_VERSION_MAJOR 1)
 set(UNICORN_VERSION_MINOR 0)
 set(UNICORN_VERSION_PATCH 3)
 
+option(UNICORN_BUILD_SHARED "Build shared instead of static library" ON)
+
 if(NOT UNICORN_ARCH)
     # build all architectures
     set(UNICORN_ARCH "x86 arm aarch64 m68k mips sparc ppc")
@@ -308,7 +310,7 @@ add_library(x86_64-softmmu
 if(MSVC)
     target_compile_options(x86_64-softmmu PRIVATE
         -DNEED_CPU_H
-        /FI x86_64.h
+        /FIx86_64.h
         /I${CMAKE_CURRENT_SOURCE_DIR}/msvc/unicorn/x86_64-softmmu
         /I${CMAKE_CURRENT_SOURCE_DIR}/qemu/target-i386
     )
@@ -351,7 +353,7 @@ add_library(arm-softmmu
 if(MSVC)
     target_compile_options(arm-softmmu PRIVATE
         -DNEED_CPU_H
-        /FI arm.h
+        /FIarm.h
         /I${CMAKE_CURRENT_SOURCE_DIR}/msvc/unicorn/arm-softmmu
         /I${CMAKE_CURRENT_SOURCE_DIR}/qemu/target-arm
     )
@@ -392,7 +394,7 @@ add_library(armeb-softmmu
 if(MSVC)
     target_compile_options(armeb-softmmu PRIVATE
         -DNEED_CPU_H
-        /FI armeb.h
+        /FIarmeb.h
         /I${CMAKE_CURRENT_SOURCE_DIR}/msvc/unicorn/armeb-softmmu
         /I${CMAKE_CURRENT_SOURCE_DIR}/qemu/target-arm
     )
@@ -438,7 +440,7 @@ add_library(aarch64-softmmu
 if(MSVC)
     target_compile_options(aarch64-softmmu PRIVATE
         -DNEED_CPU_H
-        /FI aarch64.h
+        /FIaarch64.h
         /I${CMAKE_CURRENT_SOURCE_DIR}/msvc/unicorn/aarch64-softmmu
         /I${CMAKE_CURRENT_SOURCE_DIR}/qemu/target-arm
     )
@@ -482,7 +484,7 @@ add_library(aarch64eb-softmmu
 if(MSVC)
     target_compile_options(aarch64eb-softmmu PRIVATE
         -DNEED_CPU_H
-        /FI aarch64eb.h
+        /FIaarch64eb.h
         /I${CMAKE_CURRENT_SOURCE_DIR}/msvc/unicorn/aarch64eb-softmmu
         /I${CMAKE_CURRENT_SOURCE_DIR}/qemu/target-arm
     )
@@ -520,7 +522,7 @@ add_library(m68k-softmmu
 if(MSVC)
     target_compile_options(m68k-softmmu PRIVATE
         -DNEED_CPU_H
-        /FI m68k.h
+        /FIm68k.h
         /I${CMAKE_CURRENT_SOURCE_DIR}/msvc/unicorn/m68k-softmmu
         /I${CMAKE_CURRENT_SOURCE_DIR}/qemu/target-m68k
     )
@@ -563,7 +565,7 @@ add_library(mips-softmmu
 if(MSVC)
     target_compile_options(mips-softmmu PRIVATE
         -DNEED_CPU_H
-        /FI mips.h
+        /FImips.h
         /I${CMAKE_CURRENT_SOURCE_DIR}/msvc/unicorn/mips-softmmu
         /I${CMAKE_CURRENT_SOURCE_DIR}/qemu/target-mips
     )
@@ -604,7 +606,7 @@ add_library(mipsel-softmmu
 if(MSVC)
     target_compile_options(mipsel-softmmu PRIVATE
         -DNEED_CPU_H
-        /FI mipsel.h
+        /FImipsel.h
         /I${CMAKE_CURRENT_SOURCE_DIR}/msvc/unicorn/mipsel-softmmu
         /I${CMAKE_CURRENT_SOURCE_DIR}/qemu/target-mips
     )
@@ -645,7 +647,7 @@ add_library(mips64-softmmu
 if(MSVC)
     target_compile_options(mips64-softmmu PRIVATE
         -DNEED_CPU_H
-        /FI mips64.h
+        /FImips64.h
         /I${CMAKE_CURRENT_SOURCE_DIR}/msvc/unicorn/mips64-softmmu
         /I${CMAKE_CURRENT_SOURCE_DIR}/qemu/target-mips
     )
@@ -686,7 +688,7 @@ add_library(mips64el-softmmu
 if(MSVC)
     target_compile_options(mips64el-softmmu PRIVATE
         -DNEED_CPU_H
-        /FI mips64el.h
+        /FImips64el.h
         /I${CMAKE_CURRENT_SOURCE_DIR}/msvc/unicorn/mips64el-softmmu
         /I${CMAKE_CURRENT_SOURCE_DIR}/qemu/target-mips
     )
@@ -729,7 +731,7 @@ add_library(sparc-softmmu
 if(MSVC)
     target_compile_options(sparc-softmmu PRIVATE
         -DNEED_CPU_H
-        /FI sparc.h
+        /FIsparc.h
         /I${CMAKE_CURRENT_SOURCE_DIR}/msvc/unicorn/sparc-softmmu
         /I${CMAKE_CURRENT_SOURCE_DIR}/qemu/target-sparc
     )
@@ -771,7 +773,7 @@ add_library(sparc64-softmmu
 if(MSVC)
     target_compile_options(sparc64-softmmu PRIVATE
         -DNEED_CPU_H
-        /FI sparc64.h
+        /FIsparc64.h
         /I${CMAKE_CURRENT_SOURCE_DIR}/msvc/unicorn/sparc64-softmmu
         /I${CMAKE_CURRENT_SOURCE_DIR}/qemu/target-sparc
     )
@@ -823,7 +825,7 @@ add_library(ppc-softmmu
 if(MSVC)
     target_compile_options(ppc-softmmu PRIVATE
         -DNEED_CPU_H
-        /FI ppc.h
+        /FIppc.h
         /I${CMAKE_CURRENT_SOURCE_DIR}/msvc/unicorn/ppc-softmmu
         /I${CMAKE_CURRENT_SOURCE_DIR}/qemu/target-ppc
     )
@@ -897,9 +899,15 @@ else()
     )
 endif()
 
-add_library(unicorn SHARED
-    ${UNICORN_SRCS}
-)
+if (UNICORN_BUILD_SHARED)
+    add_library(unicorn SHARED
+        ${UNICORN_SRCS}
+    )
+else()
+    add_library(unicorn STATIC
+        ${UNICORN_SRCS}
+    )
+endif()
 
 if (UNICORN_HAS_X86)
     set(UNICRON_COMPILE_OPTIONS ${UNICRON_COMPILE_OPTIONS} -DUNICORN_HAS_X86)
@@ -937,19 +945,21 @@ if (UNICORN_HAS_PPC)
     set(UNICRON_SAMPLE_FILE ${UNICRON_SAMPLE_FILE} sample_ppc)
 endif()
 
+target_compile_options(unicorn PRIVATE
+    ${UNICRON_COMPILE_OPTIONS}
+)
 
 if(MSVC)
-    target_compile_options(unicorn PRIVATE
-        ${UNICRON_COMPILE_OPTIONS}
-        -DUNICORN_SHARED
-    )
+    if (UNICORN_BUILD_SHARED)
+        target_compile_options(unicorn PRIVATE
+            -DUNICORN_SHARED
+        )
+    endif()
+
     target_link_libraries(unicorn
         ${UNICRON_LINK_LIBRARIES}
     )
 else()
-    target_compile_options(unicorn PRIVATE
-        ${UNICRON_COMPILE_OPTIONS}
-    )
     target_link_libraries(unicorn
         ${UNICRON_LINK_LIBRARIES}
         m
