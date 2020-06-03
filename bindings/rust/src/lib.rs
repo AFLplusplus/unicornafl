@@ -16,6 +16,26 @@ use std::pin::Pin;
 use std::marker::PhantomPinned;
 
 #[derive(Debug)]
+pub struct Context {
+    context: ffi::uc_context,
+}
+
+impl Context {
+    pub fn new() -> Self {
+        Context { context: 0 }
+    }
+    pub fn is_initialized(&self) -> bool {
+        self.context != 0
+    }
+}
+
+impl Drop for Context {
+    fn drop(&mut self) {
+        unsafe { ffi::uc_free(self.context) };
+    }
+}
+
+#[derive(Debug)]
 pub struct Unicorn<D> {
     inner: Pin<Box<UnicornInner<D>>>
 }
@@ -395,6 +415,63 @@ impl<'a, D> UnicornHandle<'a, D> {
             err = ucconst::uc_error::HOOK;
         }
 
+        if err == ucconst::uc_error::OK {
+            Ok(())
+        } else {
+            Err(err)
+        }
+    }
+
+    // Allocate and return an empty Unicorn context
+    // 
+    // To be populated via context_save.
+    pub fn context_alloc(&self) -> Result<Context, ucconst::uc_error> {
+        let mut empty_context: ffi::uc_context = Default::default();
+        let err = unsafe { ffi::uc_context_alloc(self.inner.uc, &mut empty_context) };
+        if err == ucconst::uc_error::OK {
+            Ok(Context { context: empty_context })
+        } else {
+            Err(err)
+        }
+    }
+
+    // Save current Unicorn context to previously allocated Context struct
+    pub fn context_save(&self, context: &mut Context) -> Result<(), ucconst::uc_error> {
+        let err = unsafe { ffi::uc_context_save(self.inner.uc, context.context) };
+        if err == ucconst::uc_error::OK {
+            Ok(())
+        } else {
+            Err(err)
+        }
+    }
+
+    // Allocate and return a Context struct initialized with the current CPU context
+    // 
+    // This can be used for fast rollbacks with context_restore.
+    // In case of many non-concurrent context saves, use context_alloc and *_save 
+    // individually to avoid unnecessary allocations.
+    pub fn context_init(&self) -> Result<Context, ucconst::uc_error> {
+        let mut new_context: ffi::uc_context = Default::default();
+        let err = unsafe { ffi::uc_context_alloc(self.inner.uc, &mut new_context) };
+        if err != ucconst::uc_error::OK {
+            return Err(err);
+        }
+        let err = unsafe { ffi::uc_context_save(self.inner.uc, new_context) };
+        if err == ucconst::uc_error::OK {
+            Ok(Context { context: new_context })
+        } else {
+            unsafe { ffi::uc_free(new_context) };
+            Err(err)
+        }
+    }
+
+    // Restore a previously saved Unicorn context
+    // 
+    // Perform a quick rollback of the CPU context, including registers and some
+    // internal metadata. Contexts may not be shared across engine instances with
+    // differing arches or modes.
+    pub fn context_restore(&self, context: &Context) -> Result<(), ucconst::uc_error> {
+        let err = unsafe { ffi::uc_context_restore(self.inner.uc, context.context) };
         if err == ucconst::uc_error::OK {
             Ok(())
         } else {

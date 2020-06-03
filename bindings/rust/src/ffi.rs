@@ -8,14 +8,14 @@ use super::ucconst::*;
 
 pub type uc_handle = *mut c_void;
 pub type uc_hook = *mut c_void;
-pub type uc_context = *mut c_void;
+pub type uc_context = libc::size_t;
 
 extern "C" {
     pub fn uc_version(major: *mut u32, minor: *mut u32) -> u32;
     pub fn uc_arch_supported(arch: Arch) -> bool;
     pub fn uc_open(arch: Arch, mode: Mode, engine: *mut uc_handle) -> uc_error;
     pub fn uc_close(engine: uc_handle) -> uc_error;
-    pub fn uc_free(mem: libc::size_t) -> uc_error;
+    pub fn uc_free(mem: uc_context) -> uc_error;
     pub fn uc_errno(engine: uc_handle) -> uc_error;
     pub fn uc_strerror(error_code: uc_error) -> *const c_char;
     pub fn uc_reg_write(engine: uc_handle, regid: c_int, value: *const c_void) -> uc_error;
