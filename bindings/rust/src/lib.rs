@@ -157,6 +157,9 @@ impl<'a, D> UnicornHandle<'a, D> {
         }
     }
 
+    // Write an unsigned value from a register.
+    // 
+    // Not to be used with registers larger than 64 bit.
     pub fn reg_write<T: Into<i32>>(&mut self, regid: T, value: u64) -> Result<(), ucconst::uc_error> {
         let err = unsafe { ffi::uc_reg_write(self.inner.uc, regid.into(), &value as *const _ as _) };
         if err == ucconst::uc_error::OK {
@@ -166,6 +169,22 @@ impl<'a, D> UnicornHandle<'a, D> {
         }
     }
 
+    // Write variable sized values into registers.
+    // 
+    // The user has to make sure that the buffer length matches the register size.
+    // This adds support for registers >64 bit (GDTR/IDTR, XMM, YMM, ZMM (x86); Q, V (arm64)).
+    pub fn reg_write_long<T: Into<i32>>(&self, regid: T, value: Box<[u8]>) -> Result<(), ucconst::uc_error> {
+        let err = unsafe { ffi::uc_reg_write(self.inner.uc, regid.into(), value.as_ptr() as _) };
+        if err == ucconst::uc_error::OK {
+            Ok(())
+        } else {
+            Err(err)
+        }
+    }
+
+    // Read an unsigned value from a register.
+    // 
+    // Not to be used with registers larger than 64 bit.
     pub fn reg_read<T: Into<i32>>(&self, regid: T) -> Result<u64, ucconst::uc_error> {
         let mut value: u64 = 0;
         let err = unsafe { ffi::uc_reg_read(self.inner.uc, regid.into(), &mut value as *mut u64 as _) };
@@ -176,6 +195,51 @@ impl<'a, D> UnicornHandle<'a, D> {
         }
     }
 
+    // Read 128, 256 or 512 bit register value into heap allocated byte array.
+    // 
+    // This adds safe support for registers >64 bit (GDTR/IDTR, XMM, YMM, ZMM (x86); Q, V (arm64)).
+    pub fn reg_read_long<T: Into<i32>>(&self, regid: T) -> Result<Box<[u8]>, ucconst::uc_error> {
+        let err: ucconst::uc_error;
+        let boxed: Box<[u8]>;
+        let mut value: Vec<u8>;
+        let curr_reg_id = regid.into();
+        let curr_arch = self.get_arch();
+
+        if curr_arch == ucconst::Arch::X86 {
+            if curr_reg_id >= x86::RegisterX86::XMM0 as i32 && curr_reg_id <= x86::RegisterX86::XMM31 as i32 {
+                value = vec![0; 16 as usize];                
+            } else if curr_reg_id >= x86::RegisterX86::YMM0 as i32 && curr_reg_id <= x86::RegisterX86::YMM31 as i32 {
+                value = vec![0; 32 as usize];
+            } else if curr_reg_id >= x86::RegisterX86::ZMM0 as i32 && curr_reg_id <= x86::RegisterX86::ZMM31 as i32 {
+                value = vec![0; 64 as usize];
+            } else if curr_reg_id == x86::RegisterX86::GDTR as i32 ||
+                      curr_reg_id == x86::RegisterX86::IDTR as i32 {
+                value = vec![0; 10 as usize]; // 64 bit base address in IA-32e mode
+            } else {
+                return Err(ucconst::uc_error::ARG)
+            }
+        } else if curr_arch == ucconst::Arch::ARM64 {
+            if (curr_reg_id >= arm64::RegisterARM64::Q0 as i32 && curr_reg_id <= arm64::RegisterARM64::Q31 as i32) ||
+               (curr_reg_id >= arm64::RegisterARM64::V0 as i32 && curr_reg_id <= arm64::RegisterARM64::V31 as i32) {
+                value = vec![0; 16 as usize];
+            } else {
+                return Err(ucconst::uc_error::ARG)
+            }
+        } else {
+            return Err(ucconst::uc_error::ARCH)
+        }
+        
+        err = unsafe { ffi::uc_reg_read(self.inner.uc, curr_reg_id, value.as_mut_ptr() as _) };
+
+        if err == ucconst::uc_error::OK {
+            boxed = value.into_boxed_slice();
+            Ok(boxed)
+        } else {
+            Err(err)
+        }
+    }
+
+    // Read a signed 32-bit value from a register.
     pub fn reg_read_i32<T: Into<i32>>(&self, regid: T) -> Result<i32, ucconst::uc_error> {
         let mut value: i32 = 0;
         let err = unsafe { ffi::uc_reg_read(self.inner.uc, regid.into(), &mut value as *mut i32 as _) };
