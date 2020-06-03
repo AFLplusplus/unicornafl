@@ -269,7 +269,7 @@ struct uc_struct {
     size_t exit_count; // number of exits set in afl_fuzz or afl_forkserver
     uint64_t *exits; // pointer to the actual exits
     char *afl_testcase_ptr; // map, shared with afl, to get testcases delivered from for each run
-    uint32_t *afl_testcase_size; // size of the current testcase, if using shared map fuzzing with afl.
+    uint32_t *afl_testcase_size_p; // size of the current testcase, if using shared map fuzzing with afl.
 #endif
 };
 

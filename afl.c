@@ -67,11 +67,12 @@ static void uc_afl_enable_shm_testcases(uc_engine *uc) {
     char *id_str = getenv(SHM_FUZZ_ENV_VAR);
     if (id_str) {
         u32 shm_id = atoi(id_str);
-        uc->afl_testcase_size = (u32 *)shmat(shm_id, NULL, 0);
-        uc->afl_testcase_ptr = (u8 *)(uc->afl_testcase_ptr + sizeof(int))
+        void *map = shmat(shm_id, NULL, 0);
+        uc->afl_testcase_size_p = (u32 *)map;
+        uc->afl_testcase_ptr = (char *)(map + sizeof(u32));
 #if defined(AFL_DEBUG)
         if (uc->afl_testcase_ptr) {
-            printf("[d] successfully opened shared memory for testcases.\n");
+            printf("[d] successfully opened shared memory for testcases. size_p: %x ptr: %x\n", uc->afl_testcase_size_p, uc->afl_testcase_ptr);
         }
 #endif
         if (uc->afl_testcase_ptr == (void*)-1) {
@@ -83,14 +84,6 @@ static void uc_afl_enable_shm_testcases(uc_engine *uc) {
     printf("[d] SHM_FUZZ_ENV_VAR not set - not using shared map fuzzing.\n");
 #endif
     }
-
-}
-
-/* For shared map fuzzing, the forkserver internally sets the size in each testcase iteration. */
-static inline off_t uc_afl_get_shm_testcase(uc_engine *uc, char **buf_ptr) {
-
-    *buf_ptr = uc->afl_testcase_ptr;
-    return *uc->afl_testcase_size;
 
 }
 
@@ -146,16 +139,13 @@ int uc_afl_emu_start(uc_engine *uc) {
 
 /* afl_next that expects you know what you're doing
    Specifically, it won't check for afl_area_ptr and next to be set. */
-inline uc_afl_ret uc_afl_next_inl(uc_engine *uc, bool crash_found)
+static inline uc_afl_ret uc_afl_next_inl(uc_engine *uc, bool crash_found)
 {
     // Tell the parent we need a new testcase, then stop until testcase is available.
     if (uc->afl_child_request_next(uc, crash_found) == UC_AFL_RET_ERROR) return UC_AFL_RET_ERROR;
     return UC_AFL_RET_CHILD;
 
 }
-
-
-
 
 
 /* similar to __afl_persistent loop */
@@ -217,7 +207,8 @@ uc_afl_ret uc_afl_fuzz(
 
     /* For shared map fuzzing, the ptr stays the same */
     char *in_buf = uc->afl_testcase_ptr;
-    off_t in_len = -1;
+    uint32_t *in_len_p = uc->afl_testcase_size_p;
+
 
     uc_afl_ret afl_ret = uc_afl_forkserver_start(uc, exits, exit_count);
     switch(afl_ret) {
@@ -244,7 +235,7 @@ uc_afl_ret uc_afl_fuzz(
     bool crash_found = false;
 
 #if defined(AFL_DEBUG)
-    printf("[d] uc->afl_testcase_ptr = %p, len = %d\n", uc->afl_testcase_ptr, *uc->afl_testcase_size);
+    printf("[d] uc->afl_testcase_ptr = %p, len = %d\n", uc->afl_testcase_ptr, *uc->afl_testcase_size_p);
 #endif
 
     // 0 means never stop child in persistence mode.
@@ -263,24 +254,19 @@ uc_afl_ret uc_afl_fuzz(
         }
 
         /* get input, call place input callback, emulate, unmap input (if needed) */
-        if (likely(uc->afl_testcase_ptr)) {
-            /* in_buf doesn't change, we just need to get the current size, set by the forkserver */
-            in_len = *uc->afl_testcase_size;
-        } else {
-            /* No shmap fuzzing involved - Let's read a "normal" file. */
-            in_len = uc_afl_mmap_file(input_file, &in_buf);
-        }
-        if (unlikely(in_len < 0)) {
-            if (uc->afl_testcase_ptr) {
-                fprintf(stderr, "[!] Couldn't get testcase via shmem (return was %ld)\n", (long int) in_len);
-            } else {
+        if (unlikely(!uc->afl_testcase_ptr)) {
+            /* in_buf and the len are not in a shared map (as it would be for sharedmem fuzzing
+               No shmap fuzzing involved - Let's read a "normal" file. */
+            off_t in_len = uc_afl_mmap_file(input_file, &in_buf);
+            if (unlikely(in_len < 0)) {
                 fprintf(stderr, "[!] Unable to mmap file: %s (return was %ld)\n", input_file, (long int) in_len);
                 perror("mmap");
+                fflush(stderr);
+                return UC_AFL_RET_ERROR;
             }
-            fflush(stderr);
-            return UC_AFL_RET_ERROR;
+            *in_len_p = in_len;
         }
-        bool input_accepted = place_input_callback(uc, in_buf, in_len, i, data);
+        bool input_accepted = place_input_callback(uc, in_buf, *in_len_p, i, data);
 
         if (unlikely(!input_accepted)) {
             // Apparently the input was not to the users' liking. Let's continue.
@@ -292,7 +278,7 @@ uc_afl_ret uc_afl_fuzz(
         if (unlikely((uc_emu_ret != UC_ERR_OK) || (always_validate && validate_crash_callback))) {
 
             if (validate_crash_callback != NULL && validate_crash_callback(
-                    uc, uc_emu_ret, in_buf, in_len, i, data) != true) {
+                    uc, uc_emu_ret, in_buf, *in_len_p, i, data) != true) {
                 // The callback thinks this is not a valid crash. Ignore.
                 goto next_iter;
             }
@@ -309,7 +295,7 @@ uc_afl_ret uc_afl_fuzz(
 
         }
 next_iter:
-        if (!uc->afl_testcase_ptr) munmap(in_buf, in_len);
+        if (!uc->afl_testcase_ptr) munmap(in_buf, *in_len_p);
     }
     // UC_AFL_RET_CHILD -> We looped through all iters.
     // We are still in the child, nothing good will come after this.

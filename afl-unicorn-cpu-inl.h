@@ -219,8 +219,8 @@ static inline uc_afl_ret afl_forkserver(CPUArchState* env) {
 
     /* For fuzz input via shared mem, AFL++ encodes the size in the was_killed var. Unpack. */
 #if defined(AFL_DEBUG)
-      printf("[d] AFL++ reported: afl_shm_testcase_size %d was_killed %d.\n",
-              *env->uc->afl_shm_testcase_size, was_killed);
+      printf("[d] AFL++ reported: afl_testcase_size_p %d was_killed %d.\n",
+              *env->uc->afl_testcase_size_p, was_killed);
 #endif
 
     /* If we stopped the child in persistent mode, but there was a race
@@ -413,7 +413,7 @@ static inline void afl_request_tsl(struct uc_struct* uc, target_ulong pc, target
 static uc_afl_ret afl_request_next(struct uc_struct* uc, bool crash_found) {
 
   enum afl_child_ret msg = crash_found? AFL_CHILD_FOUND_CRASH : AFL_CHILD_NEXT;
-  s32 afl_shm_testcase_size = 0;
+  char tmp[4];
 
 #if defined(AFL_DEBUG)
   printf("[d] request next. crash found: %s\n", crash_found ? "true": "false");
@@ -430,9 +430,8 @@ static uc_afl_ret afl_request_next(struct uc_struct* uc, bool crash_found) {
 
   // Once the parent has written something, the next persistent loop starts.
   // The parent itself will wait for AFL to signal the new testcases is available.
-// TODO BUG : pointless now
-s32 afl_shm_testcase_size
-  if (read(_R(uc->afl_parent_pipe), afl_shm_testcase_size, 4) != 4) {
+  // This blocks until the next testcase is ready.
+  if (read(_R(uc->afl_parent_pipe), tmp, 4) != 4) {
 
     fprintf(stderr, "[!] Error reading from parent pipe. Parent dead?\n");
     return UC_AFL_RET_ERROR;
