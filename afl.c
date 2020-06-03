@@ -67,8 +67,8 @@ static void uc_afl_enable_shm_testcases(uc_engine *uc) {
     char *id_str = getenv(SHM_FUZZ_ENV_VAR);
     if (id_str) {
         u32 shm_id = atoi(id_str);
-        uc->afl_testcase_ptr = shmat(shm_id, NULL, 0);
-        uc->afl_testcase_size = (u32 *)(uc->afl_testcase_ptr + MAX_FILE)
+        uc->afl_testcase_size = (u32 *)shmat(shm_id, NULL, 0);
+        uc->afl_testcase_ptr = (u8 *)(uc->afl_testcase_ptr + sizeof(int))
 #if defined(AFL_DEBUG)
         if (uc->afl_testcase_ptr) {
             printf("[d] successfully opened shared memory for testcases.\n");
