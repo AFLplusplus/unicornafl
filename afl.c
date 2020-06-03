@@ -143,6 +143,20 @@ int uc_afl_emu_start(uc_engine *uc) {
 
 }
 
+/* afl_next that expects you know what you're doing
+   Specifically, it won't check for afl_area_ptr and next to be set. */
+inline uc_afl_ret uc_afl_next_inl(uc_engine *uc, bool crash_found)
+{
+    // Tell the parent we need a new testcase, then stop until testcase is available.
+    if (uc->afl_child_request_next(uc, crash_found) == UC_AFL_RET_ERROR) return UC_AFL_RET_ERROR;
+    return UC_AFL_RET_CHILD;
+
+}
+
+
+
+
+
 /* similar to __afl_persistent loop */
 UNICORN_EXPORT
 uc_afl_ret uc_afl_next(uc_engine *uc, bool crash_found)
@@ -156,9 +170,7 @@ uc_afl_ret uc_afl_next(uc_engine *uc, bool crash_found)
     // Tell the parent we need a new testcase, then stop until testcase is available.
     if (uc->afl_child_request_next) {
 
-        if (uc->afl_child_request_next(uc, crash_found) == UC_AFL_RET_ERROR) return UC_AFL_RET_ERROR;
-
-        return UC_AFL_RET_CHILD;
+        return uc_afl_next_inl(uc, crash_found);
 
     }
 
@@ -200,10 +212,11 @@ uc_afl_ret uc_afl_fuzz(
         return UC_AFL_RET_ERROR;
     }
 
-    char *in_buf = NULL;
-    off_t in_len = -1;
-
     uc_afl_enable_shm_testcases(uc);
+
+    /* For shared map fuzzing, the ptr stays the same */
+    char *in_buf = uc->afl_testcase_ptr;
+    off_t in_len = -1;
 
     uc_afl_ret afl_ret = uc_afl_forkserver_start(uc, exits, exit_count);
     switch(afl_ret) {
@@ -241,15 +254,16 @@ uc_afl_ret uc_afl_fuzz(
         if (first_round) {
             first_round = false;
         } else {
-            uc_afl_next(uc, crash_found);
+            if (uc_afl_next_inl(uc, crash_found) == UC_AFL_RET_ERROR) break;
             crash_found = false;
         }
 
-        // get input, call place input callback, emulate, unmap input (if needed)
+        /* get input, call place input callback, emulate, unmap input (if needed) */
         if (likely(uc->afl_testcase_ptr)) {
-            in_len = uc_afl_get_shm_testcase(uc, &in_buf);
+            /* in_buf doesn't change, we just need to get the current size, set by the forkserver */
+            in_len = uc->afl_testcase_size;
         } else {
-            // Let's read a "normal" file.
+            /* No shmap fuzzing involved - Let's read a "normal" file. */
             in_len = uc_afl_mmap_file(input_file, &in_buf);
         }
         if (unlikely(in_len < 0)) {
