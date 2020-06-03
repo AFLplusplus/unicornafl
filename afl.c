@@ -68,6 +68,7 @@ static void uc_afl_enable_shm_testcases(uc_engine *uc) {
     if (id_str) {
         u32 shm_id = atoi(id_str);
         uc->afl_testcase_ptr = shmat(shm_id, NULL, 0);
+        uc->afl_testcase_size = (u32 *)(uc->afl_testcase_ptr + MAX_FILE)
 #if defined(AFL_DEBUG)
         if (uc->afl_testcase_ptr) {
             printf("[d] successfully opened shared memory for testcases.\n");
@@ -89,7 +90,7 @@ static void uc_afl_enable_shm_testcases(uc_engine *uc) {
 static inline off_t uc_afl_get_shm_testcase(uc_engine *uc, char **buf_ptr) {
 
     *buf_ptr = uc->afl_testcase_ptr;
-    return uc->afl_testcase_size;
+    return *uc->afl_testcase_size;
 
 }
 
@@ -243,7 +244,7 @@ uc_afl_ret uc_afl_fuzz(
     bool crash_found = false;
 
 #if defined(AFL_DEBUG)
-    printf("[d] uc->afl_testcase_ptr = %p, len = %d\n", uc->afl_testcase_ptr, uc->afl_testcase_size);
+    printf("[d] uc->afl_testcase_ptr = %p, len = %d\n", uc->afl_testcase_ptr, *uc->afl_testcase_size);
 #endif
 
     // 0 means never stop child in persistence mode.
@@ -264,7 +265,7 @@ uc_afl_ret uc_afl_fuzz(
         /* get input, call place input callback, emulate, unmap input (if needed) */
         if (likely(uc->afl_testcase_ptr)) {
             /* in_buf doesn't change, we just need to get the current size, set by the forkserver */
-            in_len = uc->afl_testcase_size;
+            in_len = *uc->afl_testcase_size;
         } else {
             /* No shmap fuzzing involved - Let's read a "normal" file. */
             in_len = uc_afl_mmap_file(input_file, &in_buf);
