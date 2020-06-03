@@ -254,7 +254,10 @@ uc_afl_ret uc_afl_fuzz(
         if (first_round) {
             first_round = false;
         } else {
-            if (uc_afl_next_inl(uc, crash_found) == UC_AFL_RET_ERROR) break;
+            if (uc_afl_next_inl(uc, crash_found) == UC_AFL_RET_ERROR) {
+                /* parent is probably gone */
+                exit(1);
+            }
             crash_found = false;
         }
 
@@ -305,7 +308,7 @@ uc_afl_ret uc_afl_fuzz(
 
         }
 next_iter:
-        munmap(in_buf, in_len);
+        if (!uc->afl_testcase_ptr) munmap(in_buf, in_len);
     }
     // UC_AFL_RET_CHILD -> We looped through all iters.
     // We are still in the child, nothing good will come after this.
