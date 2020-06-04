@@ -82,6 +82,12 @@ impl<D> Unicorn<D> {
     }
 }
 
+impl<D> Drop for Unicorn<D> {
+    fn drop(&mut self) {
+        unsafe { ffi::uc_close(self.inner.uc) };
+    }
+}
+
 impl<D> UnicornInner<D> {
     pub fn get_data(self: Pin<&mut Self>) -> &mut D {
         unsafe { &mut self.get_unchecked_mut().data }
