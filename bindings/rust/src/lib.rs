@@ -503,6 +503,19 @@ impl<'a, D> UnicornHandle<'a, D> {
         }
     }
 
+    // Query the internal status of the engine.
+    // 
+    // supported: MODE, PAGE_SIZE, ARCH
+    pub fn query(&self, query: ucconst::Query) -> Result<usize, ucconst::uc_error> {
+        let mut result: libc::size_t = Default::default();
+        let err = unsafe { ffi::uc_query(self.inner.uc, query, &mut result) };
+        if err == ucconst::uc_error::OK {
+            Ok(result)
+        } else {
+            Err(err)
+        }
+    }
+
     pub fn afl_forkserver_start(&mut self, exits: &[u64]) -> Result<(), ucconst::AflRet> {
         let err = unsafe { ffi::uc_afl_forkserver_start(self.inner.uc, exits.as_ptr(), exits.len()) };
         if err == ucconst::AflRet::ERROR {
