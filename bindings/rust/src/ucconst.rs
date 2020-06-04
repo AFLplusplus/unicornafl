@@ -85,6 +85,7 @@ pub enum HookType {
     MEM_FETCH_INVALID = 576,
     MEM_INVALID = 1008,
     MEM_VALID = 7168,
+    MEM_ALL = 8176,
 }
 
 #[repr(C)]
