@@ -137,6 +137,17 @@ impl<'a, D> UnicornHandle<'a, D> {
         }
     }
 
+    // Return a range of bytes from memory at the specified address as vector.
+    pub fn mem_read_as_vec(&self, address: u64, size: usize) -> Result<Vec<u8>, ucconst::uc_error> {
+        let mut buf = vec![0; size];
+        let err = unsafe { ffi::uc_mem_read(self.inner.uc, address, buf.as_mut_ptr(), size) };
+        if err == ucconst::uc_error::OK {
+            Ok(buf)
+        } else {
+            Err(err)
+        }
+    }
+
     pub fn mem_write(&mut self, address: u64, bytes: &[u8]) -> Result<(), ucconst::uc_error> {
         let err = unsafe { ffi::uc_mem_write(self.inner.uc, address, bytes.as_ptr(), bytes.len()) };
         if err == ucconst::uc_error::OK {
@@ -374,7 +385,7 @@ impl<'a, D> UnicornHandle<'a, D> {
         }
     }
 
-    // only supports x86 subset
+    // only supports x86 subset (IN/OUT, syscalls) [WIP]
     pub fn add_ins_hook<F: 'static>(
         &mut self,
         ins: x86::InsnX86,
