@@ -31,11 +31,11 @@ pub struct Heap {
     pub grow_dynamically: bool,
     pub chunk_map: HashMap<u64, Chunk>,
     pub top: u64,
-    pub unalloc_hook: super::ffi::uc_hook, //TODO make private
+    pub unalloc_hook: super::ffi::uc_hook,
 }
 
 
-// hooks (parts of the) code segment with a reginfo and current instruction overview
+/// Hooks (parts of the) code segment to display register info and the current instruction.
 pub fn add_debug_prints_ARM<D>(uc: &mut super::UnicornHandle<D>, code_start: u64, code_end: u64) {
     let cs_arm: Capstone = Capstone::new()
         .arm()
@@ -87,7 +87,12 @@ pub fn add_debug_prints_ARM<D>(uc: &mut super::UnicornHandle<D>, code_start: u64
 }
 
 
-// returns a new unicorn object with an initialized heap @addr and active sanitizer
+/// Returns a new Unicorn instance with an initialized heap and active sanitizer. 
+/// 
+/// Introduces an accessible way of dynamic memory allocation for emulation and helps
+/// detecting common memory corruption bugs. 
+/// The allocator makes heavy use of Unicorn hooks for sanitization/ crash amplification
+/// and thus introduces some overhead.
 pub fn init_emu_with_heap(arch: Arch, mut size: u32, base_addr: u64, grow: bool) -> Result<super::Unicorn<RefCell<Heap>>, uc_error> {
     let heap = RefCell::new(Heap {real_base: 0 as _, uc_base: 0, len: 0, grow_dynamically: false, chunk_map: HashMap::new(), top: 0, unalloc_hook: 0 as _ });
     let mut unicorn = super::Unicorn::new(arch, Mode::LITTLE_ENDIAN, heap)?;
@@ -119,7 +124,12 @@ pub fn init_emu_with_heap(arch: Arch, mut size: u32, base_addr: u64, grow: bool)
     return Ok(unicorn);
 }
 
-
+/// `malloc` for the utils allocator.
+/// 
+/// Returns a pointer into memory used as heap and applies
+/// canary hooks to detect out-of-bounds accesses. 
+/// Grows the heap if necessary and if it is configured to, otherwise
+/// return WRITE_UNMAPPED if there is no space left.
 pub fn uc_alloc(uc: &mut super::UnicornHandle<RefCell<Heap>>, mut size: u64) -> Result<u64, uc_error> {
     // 8 byte aligned
     if size % 8 != 0 {
@@ -168,12 +178,17 @@ pub fn uc_alloc(uc: &mut super::UnicornHandle<RefCell<Heap>>, mut size: u64) -> 
     return Ok(addr + 4);
 }
 
-
+/// `free` for the utils allocator.
+/// 
+/// Marks the chunk to be freed to detect double-frees later on
+/// and places sanitization hooks over the freed region to detect
+/// use-after-frees.
 pub fn uc_free(uc: &mut super::UnicornHandle<RefCell<Heap>>, ptr: u64) -> Result<(), uc_error> {
     #[cfg(debug_assertions)]
     println!("[-] Freeing {:#010x}", ptr);
 
     if ptr != 0x0 {
+        #[allow(unused_assignments)]
         let mut chunk_size = 0;
         {
             let mut heap = uc.get_data().borrow_mut();
