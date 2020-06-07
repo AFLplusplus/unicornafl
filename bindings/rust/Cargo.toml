@@ -1,8 +1,8 @@
 [package]
 name = "unicornafl"
-version = "0.9.0-afl"
-authors = ["Sébastien Duquette <ekse.0x@gmail.com>"]
-documentation = "https://docs.rs/unicorn/"
+version = "1.0.0"
+authors = ["Lukas Seidel"]
+documentation = ""
 edition = "2018"
 include = [
     "/.gitmodules",
@@ -13,8 +13,8 @@ include = [
 ]
 license = "GPL-2.0"
 readme = "README.md"
-repository = "https://github.com/ekse/unicorn-rs"
-description = "Rust bindings for the unicorn emulator"
+repository = "https://github.com/domenukk/unicornafl"
+description = "Rust bindings for the Unicorn emulator with AFL++ extensions and utility functions"
 build = "build.rs"
 links = "unicornafl"
 

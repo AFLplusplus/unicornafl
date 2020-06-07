@@ -1,7 +1,5 @@
 use std::{
     env,
-    ffi::{OsStr, OsString},
-    path::{Path, PathBuf},
     process::Command,
 };
 
@@ -23,6 +21,3 @@ fn main() {
     link_lib(Some(build_helper::LibKind::Static), "unicornafl");
 }
 
-fn fail(s: &str) -> ! {
-    panic!("\n{}\n\nbuild script failed, must exit now", s)
-}
