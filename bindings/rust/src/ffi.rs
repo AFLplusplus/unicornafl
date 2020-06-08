@@ -124,7 +124,13 @@ pub extern "C" fn code_hook_proxy<D>(uc: uc_handle, address: u64, size: u32, use
     callback(crate::UnicornHandle { inner: unsafe { Pin::new_unchecked(unicorn) } }, address, size);
 }
 
-pub extern "C" fn mem_hook_proxy<D>(uc: uc_handle, mem_type: MemType, address: u64, size: u32, value: i64, user_data: *mut MemHook<D>) {
+pub extern "C" fn mem_hook_proxy<D>(uc: uc_handle, 
+        mem_type: MemType, 
+        address: u64, 
+        size: u32, 
+        value: i64, 
+        user_data: *mut MemHook<D>) 
+{
     let unicorn = unsafe { &mut *(*user_data).unicorn };
     let callback = &mut unsafe { &mut *(*user_data).callback };
     assert_eq!(uc, unicorn.uc);
@@ -168,5 +174,6 @@ pub extern "C" fn crash_validation_callback_proxy<D>(uc: uc_handle,
     let callback = &mut unsafe { &mut *(*user_data).validate_callback };
     assert_eq!(uc, unicorn.uc);
     let safe_input = unsafe { std::slice::from_raw_parts(input, input_len as usize) };
-    callback(crate::UnicornHandle { inner: unsafe { Pin::new_unchecked(unicorn) } }, unicorn_result, safe_input, persistent_round) 
+    callback(crate::UnicornHandle { inner: unsafe { Pin::new_unchecked(unicorn) } }, 
+        unicorn_result, safe_input, persistent_round) 
 }

@@ -92,7 +92,9 @@ pub struct UnicornInner<D> {
 impl<D> Unicorn<D> {
     /// Create a new instance of the unicorn engine for the specified architecture
     /// and hardware mode.
-    pub fn new(arch: ucconst::Arch, mode: ucconst::Mode, data: D) -> Result<Unicorn<D>, ucconst::uc_error> {
+    pub fn new(arch: ucconst::Arch, mode: ucconst::Mode, data: D) 
+        -> Result<Unicorn<D>, ucconst::uc_error> {
+
         let mut handle = std::ptr::null_mut();
         let err = unsafe { ffi::uc_open(arch, mode, &mut handle) };
         if err == ucconst::uc_error::OK {
@@ -211,7 +213,12 @@ impl<'a, D> UnicornHandle<'a, D> {
     /// `size` must be a multiple of 4kb or this will return `Error::ARG`.
     ///
     /// `ptr` is a pointer to the provided memory region that will be used by the emulator.
-    pub fn mem_map_ptr(&mut self, address: u64, size: usize, perms: Protection, ptr: *mut c_void) -> Result<(), ucconst::uc_error> {
+    pub fn mem_map_ptr(&mut self, 
+            address: u64, 
+            size: usize, 
+            perms: Protection, 
+            ptr: *mut c_void
+    ) -> Result<(), ucconst::uc_error> {
         let err = unsafe { ffi::uc_mem_map_ptr(self.inner.uc, address, size, perms.bits(), ptr) };
         if err == ucconst::uc_error::OK {
             Ok(())
@@ -224,7 +231,11 @@ impl<'a, D> UnicornHandle<'a, D> {
     ///
     /// `address` must be aligned to 4kb or this will return `Error::ARG`.
     /// `size` must be a multiple of 4kb or this will return `Error::ARG`.
-    pub fn mem_map(&mut self, address: u64, size: libc::size_t, perms: Protection) -> Result<(), ucconst::uc_error> {
+    pub fn mem_map(&mut self, 
+            address: u64, 
+            size: libc::size_t, 
+            perms: Protection
+    ) -> Result<(), ucconst::uc_error> {
         let err = unsafe { ffi::uc_mem_map(self.inner.uc, address, size, perms.bits()) };
         if err == ucconst::uc_error::OK {
             Ok(())
@@ -237,7 +248,10 @@ impl<'a, D> UnicornHandle<'a, D> {
     ///
     /// `address` must be aligned to 4kb or this will return `Error::ARG`.
     /// `size` must be a multiple of 4kb or this will return `Error::ARG`.
-    pub fn mem_unmap(&mut self, address: u64, size: libc::size_t) -> Result<(), ucconst::uc_error> {
+    pub fn mem_unmap(&mut self, 
+            address: u64, 
+            size: libc::size_t
+    ) -> Result<(), ucconst::uc_error> {
         let err = unsafe { ffi::uc_mem_unmap(self.inner.uc, address, size) };
         if err == ucconst::uc_error::OK {
             Ok(())
@@ -250,7 +264,11 @@ impl<'a, D> UnicornHandle<'a, D> {
     ///
     /// `address` must be aligned to 4kb or this will return `Error::ARG`.
     /// `size` must be a multiple of 4kb or this will return `Error::ARG`.
-    pub fn mem_protect(&mut self, address: u64, size: libc::size_t, perms: Protection) -> Result<(), ucconst::uc_error> {
+    pub fn mem_protect(&mut self, 
+            address: u64, 
+            size: libc::size_t, 
+            perms: Protection
+    ) -> Result<(), ucconst::uc_error> {
         let err = unsafe { ffi::uc_mem_protect(self.inner.uc, address, size, perms.bits()) };
         if err == ucconst::uc_error::OK {
             Ok(())
@@ -573,7 +591,12 @@ impl<'a, D> UnicornHandle<'a, D> {
     /// is hit. `timeout` specifies a duration in microseconds after which the emulation is
     /// stopped (infinite execution if set to 0). `count` is the maximum number of instructions
     /// to emulate (emulate all the available instructions if set to 0).
-    pub fn emu_start(&mut self, begin: u64, until: u64, timeout: u64, count: usize) -> Result<(), ucconst::uc_error> {
+    pub fn emu_start(&mut self, 
+            begin: u64, 
+            until: u64, 
+            timeout: u64, 
+            count: usize
+    ) -> Result<(), ucconst::uc_error> {
         let err = unsafe { ffi::uc_emu_start(self.inner.uc, begin, until, timeout, count as _) };
         if err == ucconst::uc_error::OK {
             Ok(())

@@ -93,8 +93,19 @@ pub fn add_debug_prints_ARM<D>(uc: &mut super::UnicornHandle<D>, code_start: u64
 /// detecting common memory corruption bugs. 
 /// The allocator makes heavy use of Unicorn hooks for sanitization/ crash amplification
 /// and thus introduces some overhead.
-pub fn init_emu_with_heap(arch: Arch, mut size: u32, base_addr: u64, grow: bool) -> Result<super::Unicorn<RefCell<Heap>>, uc_error> {
-    let heap = RefCell::new(Heap {real_base: 0 as _, uc_base: 0, len: 0, grow_dynamically: false, chunk_map: HashMap::new(), top: 0, unalloc_hook: 0 as _ });
+pub fn init_emu_with_heap(arch: Arch, 
+        mut size: u32, 
+        base_addr: u64, 
+        grow: bool
+) -> Result<super::Unicorn<RefCell<Heap>>, uc_error> {
+    let heap = RefCell::new(Heap {real_base: 0 as _, 
+                                    uc_base: 0, 
+                                    len: 0, 
+                                    grow_dynamically: false, 
+                                    chunk_map: HashMap::new(), 
+                                    top: 0, 
+                                    unalloc_hook: 0 as _ });
+
     let mut unicorn = super::Unicorn::new(arch, Mode::LITTLE_ENDIAN, heap)?;
     let mut uc = unicorn.borrow(); // get handle
 
@@ -115,7 +126,11 @@ pub fn init_emu_with_heap(arch: Arch, mut size: u32, base_addr: u64, grow: bool)
         heap.real_base = arena_ptr; // heap pointer in process mem
         heap.uc_base = base_addr;
         heap.len = size as usize;
-        heap.grow_dynamically = grow; // let the heap grow dynamically (ATTENTION: There are no guarantees that the heap segment will be continuous in process mem any more)
+        /* 
+        let the heap grow dynamically 
+        (ATTENTION: There are no guarantees that the heap segment will be continuous in process mem any more)
+        */
+        heap.grow_dynamically = grow; 
         heap.chunk_map = chunks;
         heap.top = base_addr; // pointer to top of heap in unicorn mem, increases on allocations
         heap.unalloc_hook = h; // hook ID, needed to rearrange hooks on allocations
@@ -166,7 +181,8 @@ pub fn uc_alloc(uc: &mut super::UnicornHandle<RefCell<Heap>>, mut size: u64) -> 
     uc.get_data().borrow_mut().chunk_map.insert(addr + 4, curr_chunk);
     let new_top = uc.get_data().borrow_mut().top + size + 8; // canary*2
     #[cfg(debug_assertions)]
-    println!("[+] New Allocation from {:#010x} to {:#010x} (size: {})", uc.get_data().borrow().top, uc.get_data().borrow().top + size - 1 + 8, size);
+    println!("[+] New Allocation from {:#010x} to {:#010x} (size: {})", 
+        uc.get_data().borrow().top, uc.get_data().borrow().top + size - 1 + 8, size);
     uc.get_data().borrow_mut().top = new_top; 
 
     // adjust oob hooks
@@ -214,7 +230,8 @@ fn heap_unalloc(uc: super::UnicornHandle<RefCell<Heap>>, _mem_type: MemType, add
         _ => panic!("Arch not yet supported by unicornafl::utils module")
     };
     let pc = uc.reg_read(reg).expect("failed to read pc"); 
-    panic!("ERROR: unicornafl Sanitizer: Heap out-of-bounds access of unallocated memory on addr {:#0x}, $pc: {:#010x}", addr, pc);
+    panic!("ERROR: unicornafl Sanitizer: Heap out-of-bounds access of unallocated memory on addr {:#0x}, $pc: {:#010x}",
+        addr, pc);
 }
 
 
