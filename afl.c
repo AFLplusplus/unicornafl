@@ -61,8 +61,9 @@ uc_afl_ret uc_afl_forkserver_start(uc_engine *uc, uint64_t *exits, size_t exit_c
 }
 
 /* AFL++ supports testcase forwarding via shared map.
-   If the env variable is set, get the shared map here.*/
-static void uc_afl_enable_shm_testcases(uc_engine *uc) {
+   If the env variable is set, get the shared map here.
+   returns true if we enabled shmap fuzzing, false otherwise. */
+static bool uc_afl_enable_shm_testcases(uc_engine *uc) {
 
     char *id_str = getenv(SHM_FUZZ_ENV_VAR);
     if (id_str) {
@@ -75,14 +76,15 @@ static void uc_afl_enable_shm_testcases(uc_engine *uc) {
         uc->afl_testcase_size_p = (u32 *)map;
         uc->afl_testcase_ptr = (map + sizeof(u32));
 #if defined(AFL_DEBUG)
-        if (uc->afl_testcase_ptr) {
-            printf("[d] successfully opened shared memory for testcases with id %d\n", shm_id);
-        }
+        printf("[d] successfully opened shared memory for testcases with id %d\n", shm_id);
 #endif
+        return true;
+
     } else {
 #if defined(AFL_DEBUG)
-    printf("[d] SHM_FUZZ_ENV_VAR not set - not using shared map fuzzing.\n");
+        printf("[d] SHM_FUZZ_ENV_VAR not set - not using shared map fuzzing.\n");
 #endif
+        return false;
     }
 
 }
@@ -203,12 +205,18 @@ uc_afl_ret uc_afl_fuzz(
         return UC_AFL_RET_ERROR;
     }
 
-    uc_afl_enable_shm_testcases(uc);
+    uint32_t mmap_in_len = 0;
+    char *in_buf = NULL;
+    uint32_t *in_len_p = NULL;
 
-    /* For shared map fuzzing, the ptr stays the same */
-    char *in_buf = uc->afl_testcase_ptr;
-    uint32_t *in_len_p = uc->afl_testcase_size_p;
-
+    bool use_shmap_input = uc_afl_enable_shm_testcases(uc);
+    if (use_shmap_input) {
+        /* For shared map fuzzing, the ptr stays the same */
+        in_buf = uc->afl_testcase_ptr;
+        in_len_p = uc->afl_testcase_size_p;
+    } else {
+        in_len_p = &mmap_in_len;
+    }
 
     uc_afl_ret afl_ret = uc_afl_forkserver_start(uc, exits, exit_count);
     switch(afl_ret) {
@@ -256,7 +264,7 @@ uc_afl_ret uc_afl_fuzz(
         }
 
         /* get input, call place input callback, emulate, unmap input (if needed) */
-        if (unlikely(!uc->afl_testcase_ptr)) {
+        if (unlikely(!use_shmap_input)) {
             /* in_buf and the len are not in a shared map (as it would be for sharedmem fuzzing
                No shmap fuzzing involved - Let's read a "normal" file. */
             off_t in_len = uc_afl_mmap_file(input_file, &in_buf);
@@ -266,7 +274,7 @@ uc_afl_ret uc_afl_fuzz(
                 fflush(stderr);
                 return UC_AFL_RET_ERROR;
             }
-            in_len_p = &in_len;
+            mmap_in_len = in_len;
         }
         bool input_accepted = place_input_callback(uc, in_buf, *in_len_p, i, data);
 
@@ -297,7 +305,7 @@ uc_afl_ret uc_afl_fuzz(
 
         }
 next_iter:
-        if (!uc->afl_testcase_ptr) munmap(in_buf, *in_len_p);
+        if (!use_shmap_input) munmap(in_buf, mmap_in_len);
     }
     // UC_AFL_RET_CHILD -> We looped through all iters.
     // We are still in the child, nothing good will come after this.
