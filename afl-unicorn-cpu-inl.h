@@ -144,6 +144,11 @@ static void afl_setup(struct uc_struct* uc) {
     uc->afl_compcov_level = atoi(getenv("AFL_COMPCOV_LEVEL"));
 
   }
+#if defined(AFL_DEBUG)
+  if (uc->afl_compcov_level) {
+    printf("[d] USING AFL_COMPCOV_LEVEL %d\n", uc->afl_compcov_level);
+  }
+#endif
 
 }
 

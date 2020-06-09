@@ -66,19 +66,19 @@ static void uc_afl_enable_shm_testcases(uc_engine *uc) {
 
     char *id_str = getenv(SHM_FUZZ_ENV_VAR);
     if (id_str) {
-        u32 shm_id = atoi(id_str);
-        void *map = shmat(shm_id, NULL, 0);
-        uc->afl_testcase_size_p = (u32 *)map;
-        uc->afl_testcase_ptr = (char *)(map + sizeof(u32));
-#if defined(AFL_DEBUG)
-        if (uc->afl_testcase_ptr) {
-            printf("[d] successfully opened shared memory for testcases. size_p: %x ptr: %x\n", uc->afl_testcase_size_p, uc->afl_testcase_ptr);
-        }
-#endif
-        if (uc->afl_testcase_ptr == (void*)-1) {
-            fprintf(stderr, "[!] Couldn't get shared testcase map for id: %s\n", id_str);
+        int shm_id = atoi(id_str);
+        char *map = (char *)shmat(shm_id, NULL, 0);
+        if (!map || map == (void *)-1) {
+            perror("[!] could not access fuzzing shared memory");
             exit(1);
         }
+        uc->afl_testcase_size_p = (u32 *)map;
+        uc->afl_testcase_ptr = (map + sizeof(u32));
+#if defined(AFL_DEBUG)
+        if (uc->afl_testcase_ptr) {
+            printf("[d] successfully opened shared memory for testcases with id %d\n", shm_id);
+        }
+#endif
     } else {
 #if defined(AFL_DEBUG)
     printf("[d] SHM_FUZZ_ENV_VAR not set - not using shared map fuzzing.\n");
@@ -235,7 +235,9 @@ uc_afl_ret uc_afl_fuzz(
     bool crash_found = false;
 
 #if defined(AFL_DEBUG)
-    printf("[d] uc->afl_testcase_ptr = %p, len = %d\n", uc->afl_testcase_ptr, *uc->afl_testcase_size_p);
+    if (uc->afl_testcase_ptr) {
+        printf("[d] uc->afl_testcase_ptr = %p, len = %d\n", uc->afl_testcase_ptr, *uc->afl_testcase_size_p);
+    }
 #endif
 
     // 0 means never stop child in persistence mode.
