@@ -266,7 +266,7 @@ uc_afl_ret uc_afl_fuzz(
                 fflush(stderr);
                 return UC_AFL_RET_ERROR;
             }
-            *in_len_p = in_len;
+            in_len_p = &in_len;
         }
         bool input_accepted = place_input_callback(uc, in_buf, *in_len_p, i, data);
 

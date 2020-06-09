@@ -222,12 +222,6 @@ static inline uc_afl_ret afl_forkserver(CPUArchState* env) {
 
     if (read(FORKSRV_FD, &was_killed, 4) != 4) return UC_AFL_RET_FINISHED;
 
-    /* For fuzz input via shared mem, AFL++ encodes the size in the was_killed var. Unpack. */
-#if defined(AFL_DEBUG)
-      printf("[d] AFL++ reported: afl_testcase_size_p %d was_killed %d.\n",
-              *env->uc->afl_testcase_size_p, was_killed);
-#endif
-
     /* If we stopped the child in persistent mode, but there was a race
     condition and afl-fuzz already issued SIGKILL, write off the old
     process. */
