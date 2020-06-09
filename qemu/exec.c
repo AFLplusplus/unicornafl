@@ -17,6 +17,8 @@
  * License along with this library; if not, see <http://www.gnu.org/licenses/>.
  */
 /* Modified for Unicorn Engine by Nguyen Anh Quynh, 2015 */
+/* Modified for Unicorn Engine by Chen Huitao<chenhuitao@hfmrit.com>, 2020 */
+
 
 #include "config.h"
 #ifndef _WIN32
@@ -27,8 +29,8 @@
 #include "qemu-common.h"
 #include "cpu.h"
 #include "tcg.h"
-#include "hw/hw.h"
-#include "hw/qdev.h"
+#include "qemu/bitops.h"
+#include "qemu/bitmap.h"
 #include "qemu/osdep.h"
 #include "sysemu/sysemu.h"
 #include "qemu/timer.h"
@@ -816,7 +818,6 @@ static void phys_section_destroy(MemoryRegion *mr)
 
     if (mr->subpage) {
         subpage_t *subpage = container_of(mr, subpage_t, iomem);
-        object_unref(mr->uc, OBJECT(&subpage->iomem));
         g_free(subpage);
     }
 }
@@ -991,7 +992,7 @@ static int memory_try_enable_merging(void *addr, size_t len)
     return 0;
 }
 
-static ram_addr_t ram_block_add(struct uc_struct *uc, RAMBlock *new_block, Error **errp)
+static ram_addr_t ram_block_add(struct uc_struct *uc, RAMBlock *new_block)
 {
     RAMBlock *block;
     ram_addr_t old_ram_size, new_ram_size;
@@ -1004,9 +1005,6 @@ static ram_addr_t ram_block_add(struct uc_struct *uc, RAMBlock *new_block, Error
         new_block->host = phys_mem_alloc(new_block->length,
                 &new_block->mr->align);
         if (!new_block->host) {
-            error_setg_errno(errp, errno,
-                    "cannot set up guest memory '%s'",
-                    memory_region_name(new_block->mr));
             return -1;
         }
         memory_try_enable_merging(new_block->host, new_block->length);
@@ -1048,11 +1046,10 @@ static ram_addr_t ram_block_add(struct uc_struct *uc, RAMBlock *new_block, Error
 
 // return -1 on error
 ram_addr_t qemu_ram_alloc_from_ptr(ram_addr_t size, void *host,
-        MemoryRegion *mr, Error **errp)
+        MemoryRegion *mr)
 {
     RAMBlock *new_block;
     ram_addr_t addr;
-    Error *local_err = NULL;
 
     size = TARGET_PAGE_ALIGN(size);
     new_block = g_malloc0(sizeof(*new_block));
@@ -1066,18 +1063,14 @@ ram_addr_t qemu_ram_alloc_from_ptr(ram_addr_t size, void *host,
     if (host) {
         new_block->flags |= RAM_PREALLOC;
     }
-    addr = ram_block_add(mr->uc, new_block, &local_err);
-    if (local_err) {
-        g_free(new_block);
-        error_propagate(errp, local_err);
-        return -1;
-    }
+    addr = ram_block_add(mr->uc, new_block);
+
     return addr;
 }
 
-ram_addr_t qemu_ram_alloc(ram_addr_t size, MemoryRegion *mr, Error **errp)
+ram_addr_t qemu_ram_alloc(ram_addr_t size, MemoryRegion *mr)
 {
-    return qemu_ram_alloc_from_ptr(size, NULL, mr, errp);
+    return qemu_ram_alloc_from_ptr(size, NULL, mr);
 }
 
 void qemu_ram_free_from_ptr(struct uc_struct *uc, ram_addr_t addr)
@@ -1384,12 +1377,12 @@ static const MemoryRegionOps notdirty_mem_ops = {
 
 static void io_mem_init(struct uc_struct* uc)
 {
-    memory_region_init_io(uc, &uc->io_mem_rom, NULL, &unassigned_mem_ops, NULL, NULL, UINT64_MAX);
-    memory_region_init_io(uc, &uc->io_mem_unassigned, NULL, &unassigned_mem_ops, NULL,
+    memory_region_init_io(uc, &uc->io_mem_rom, &unassigned_mem_ops, NULL, NULL, UINT64_MAX);
+    memory_region_init_io(uc, &uc->io_mem_unassigned, &unassigned_mem_ops, NULL,
                           NULL, UINT64_MAX);
-    memory_region_init_io(uc, &uc->io_mem_notdirty, NULL, &notdirty_mem_ops, NULL,
+    memory_region_init_io(uc, &uc->io_mem_notdirty, &notdirty_mem_ops, NULL,
                           NULL, UINT64_MAX);
-    //memory_region_init_io(uc, &uc->io_mem_watch, NULL, &watch_mem_ops, NULL,
+    //memory_region_init_io(uc, &uc->io_mem_watch, &watch_mem_ops, NULL,
     //                      NULL, UINT64_MAX);
 }
 
@@ -1401,7 +1394,7 @@ static subpage_t *subpage_init(AddressSpace *as, hwaddr base)
 
     mmio->as = as;
     mmio->base = base;
-    memory_region_init_io(as->uc, &mmio->iomem, NULL, &subpage_ops, mmio,
+    memory_region_init_io(as->uc, &mmio->iomem, &subpage_ops, mmio,
             NULL, TARGET_PAGE_SIZE);
     mmio->iomem.subpage = true;
 #if defined(DEBUG_SUBPAGE)
@@ -1528,8 +1521,7 @@ void address_space_destroy_dispatch(AddressSpace *as)
 static void memory_map_init(struct uc_struct *uc)
 {
     uc->system_memory = g_malloc(sizeof(*(uc->system_memory)));
-
-    memory_region_init(uc, uc->system_memory, NULL, "system", UINT64_MAX);
+    memory_region_init(uc, uc->system_memory, "system", UINT64_MAX);
     address_space_init(uc, &uc->as, uc->system_memory, "memory");
 }
 

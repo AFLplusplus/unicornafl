@@ -17,18 +17,12 @@
  * along with this program; if not, see
  * <http://www.gnu.org/licenses/gpl-2.0.html>
  */
+/* Modified for Unicorn Engine by Chen Huitao<chenhuitao@hfmrit.com>, 2020 */
+
 #ifndef QEMU_ARM_CPU_QOM_H
 #define QEMU_ARM_CPU_QOM_H
 
 #include "qom/cpu.h"
-
-#define TYPE_ARM_CPU "arm-cpu"
-
-#define ARM_CPU_CLASS(uc, klass) \
-    OBJECT_CLASS_CHECK(uc, ARMCPUClass, (klass), TYPE_ARM_CPU)
-#define ARM_CPU(uc, obj) ((ARMCPU *)obj)
-#define ARM_CPU_GET_CLASS(uc, obj) \
-    OBJECT_GET_CLASS(uc, ARMCPUClass, (obj), TYPE_ARM_CPU)
 
 /**
  * ARMCPUClass:
@@ -38,11 +32,8 @@
  * An ARM CPU model.
  */
 typedef struct ARMCPUClass {
-    /*< private >*/
-    CPUClass parent_class;
     /*< public >*/
 
-    DeviceRealize parent_realize;
     void (*parent_reset)(CPUState *cpu);
 } ARMCPUClass;
 
@@ -166,19 +157,13 @@ typedef struct ARMCPU {
     /* DCZ blocksize, in log_2(words), ie low 4 bits of DCZID_EL0 */
     uint32_t dcz_blocksize;
     uint64_t rvbar;
+
+    struct ARMCPUClass cc;
 } ARMCPU;
 
-#define TYPE_AARCH64_CPU "aarch64-cpu"
-#define AARCH64_CPU_CLASS(klass) \
-    OBJECT_CLASS_CHECK(AArch64CPUClass, (klass), TYPE_AARCH64_CPU)
-#define AARCH64_CPU_GET_CLASS(obj) \
-    OBJECT_GET_CLASS(AArch64CPUClass, (obj), TYPE_AArch64_CPU)
-
-typedef struct AArch64CPUClass {
-    /*< private >*/
-    ARMCPUClass parent_class;
-    /*< public >*/
-} AArch64CPUClass;
+#define ARM_CPU(uc, obj) ((ARMCPU *)obj)
+#define ARM_CPU_CLASS(uc, klass) ((ARMCPUClass *)klass)
+#define ARM_CPU_GET_CLASS(uc, obj) (&((ARMCPU *)obj)->cc)
 
 static inline ARMCPU *arm_env_get_cpu(CPUARMState *env)
 {

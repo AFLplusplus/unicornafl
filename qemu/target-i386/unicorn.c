@@ -1,8 +1,7 @@
 /* Unicorn Emulator Engine */
 /* By Nguyen Anh Quynh <aquynh@gmail.com>, 2015 */
+/* Modified for Unicorn Engine by Chen Huitao<chenhuitao@hfmrit.com>, 2020 */
 
-#include "hw/boards.h"
-#include "hw/i386/pc.h"
 #include "sysemu/cpus.h"
 #include "unicorn.h"
 #include "cpu.h"
@@ -30,9 +29,7 @@ static void x86_set_pc(struct uc_struct *uc, uint64_t address)
     ((CPUX86State *)uc->current_cpu->env_ptr)->eip = address;
 }
 
-void x86_release(void *ctx);
-
-void x86_release(void *ctx)
+static void x86_release(void *ctx)
 {
     int i;
     TCGContext *s = (TCGContext *) ctx;
@@ -1474,12 +1471,6 @@ int x86_reg_write(struct uc_struct *uc, unsigned int *regs, void *const *vals, i
     return 0;
 }
 
-DEFAULT_VISIBILITY
-int x86_uc_machine_init(struct uc_struct *uc)
-{
-    return machine_initialize(uc);
-}
-
 static bool x86_stop_interrupt(int intno)
 {
     switch(intno) {
@@ -1489,8 +1480,6 @@ static bool x86_stop_interrupt(int intno)
             return true;
     }
 }
-
-void pc_machine_init(struct uc_struct *uc);
 
 static bool x86_insn_hook_validate(uint32_t insn_enum)
 {
@@ -1504,15 +1493,22 @@ static bool x86_insn_hook_validate(uint32_t insn_enum)
     return true;
 }
 
+static int x86_cpus_init(struct uc_struct *uc, const char *cpu_model)
+{
+
+    X86CPU *cpu;
+
+    cpu = cpu_x86_init(uc, cpu_model);
+    if (cpu == NULL) {
+        return -1;
+    }
+
+    return 0;
+}
+
 DEFAULT_VISIBILITY
 void x86_uc_init(struct uc_struct* uc)
 {
-    apic_register_types(uc);
-    apic_common_register_types(uc);
-    register_accel_types(uc);
-    pc_machine_register_types(uc);
-    x86_cpu_register_types(uc);
-    pc_machine_init(uc); // pc_piix
     uc->reg_read = x86_reg_read;
     uc->reg_write = x86_reg_write;
     uc->reg_reset = x86_reg_reset;
@@ -1520,6 +1516,7 @@ void x86_uc_init(struct uc_struct* uc)
     uc->set_pc = x86_set_pc;
     uc->stop_interrupt = x86_stop_interrupt;
     uc->insn_hook_validate = x86_insn_hook_validate;
+    uc->cpus_init = x86_cpus_init;
     uc_common_init(uc);
 }
 

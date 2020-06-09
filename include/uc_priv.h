@@ -1,5 +1,7 @@
 /* Unicorn Emulator Engine */
 /* By Nguyen Anh Quynh <aquynh@gmail.com>, 2015 */
+/* Modified for Unicorn Engine by Chen Huitao<chenhuitao@hfmrit.com>, 2020 */
+
 
 #ifndef UC_PRIV_H
 #define UC_PRIV_H
@@ -73,6 +75,8 @@ typedef MemoryRegion* (*uc_args_uc_ram_size_ptr_t)(struct uc_struct*,  hwaddr be
 typedef void (*uc_mem_unmap_t)(struct uc_struct*, MemoryRegion *mr);
 
 typedef void (*uc_readonly_mem_t)(MemoryRegion *mr, bool readonly);
+
+typedef int (*uc_cpus_init)(struct uc_struct *, const char *);
 
 // which interrupt should make emulation stop?
 typedef bool (*uc_args_int_t)(int intno);
@@ -176,6 +180,7 @@ struct uc_struct {
     uc_mem_unmap_t memory_unmap;
     uc_readonly_mem_t readonly_mem;
     uc_mem_redirect_t mem_redirect;
+    uc_cpus_init cpus_init;
     // TODO: remove current_cpu, as it's a flag for something else ("cpu running"?)
     CPUState *cpu, *current_cpu;
 
@@ -202,20 +207,6 @@ struct uc_struct {
     bool ioeventfd_update_pending;
     QTAILQ_HEAD(memory_listeners, MemoryListener) memory_listeners;
     QTAILQ_HEAD(, AddressSpace) address_spaces;
-    MachineState *machine_state;
-    // qom/object.c
-    GHashTable *type_table;
-    Type type_interface;
-    Object *root;
-    Object *owner;
-    bool enumerating_types;
-    // util/module.c
-    ModuleTypeList init_type_list[MODULE_INIT_MAX];
-    // hw/intc/apic_common.c
-    DeviceState *vapic;
-    int apic_no;
-    bool mmio_registered;
-    bool apic_report_tpr_access;
 
     // linked lists containing hooks per type
     struct list hook[UC_HOOK_MAX];
@@ -274,9 +265,11 @@ struct uc_struct {
 };
 
 // Metadata stub for the variable-size cpu context used with uc_context_*()
+// We also save cpu->jmp_env, so emulation can be reentrant
 struct uc_context {
-   size_t size;
-   char data[0];
+   size_t context_size;	// size of the real internal context structure
+   unsigned int jmp_env_size; // size of cpu->jmp_env
+   char data[0]; // context + cpu->jmp_env
 };
 
 // check if this address is mapped in (via uc_mem_map())
