@@ -414,7 +414,11 @@ impl<'a, D> UnicornHandle<'a, D> {
         callback: F,
     ) -> Result<ffi::uc_hook, ucconst::uc_error>
     where F: FnMut(UnicornHandle<D>, ucconst::MemType, u64, usize, i64)
-    { 
+    {
+        if (hook_type as i32) < 16 || hook_type == ucconst::HookType::INSN_INVALID {
+            return Err(ucconst::uc_error::ARG);
+        }
+        
         let mut hook_ptr = std::ptr::null_mut();
         let mut user_data = Box::new(ffi::MemHook {
             unicorn: unsafe { self.inner.as_mut().get_unchecked_mut() } as _,
