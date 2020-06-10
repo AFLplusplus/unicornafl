@@ -6,16 +6,15 @@
 //! # Example use
 //!
 //! ```rust
-//! extern crate unicorn;
 //!
-//! use unicornafl::{ucconst, arm::RegisterARM}
+//! use unicornafl::{ucconst, arm::RegisterARM};
 //! 
 //! fn main() {
 //!     let arm_code32: Vec<u8> = vec![0x17, 0x00, 0x40, 0xe2]; // sub r0, #23
 //! 
-//!     let mut unicorn = unicornafl::Unicorn::new(Arch::ARM, Mode::LITTLE_ENDIAN, 0).expect("failed to initialize Unicorn instance");
+//!     let mut unicorn = unicornafl::Unicorn::new(ucconst::Arch::ARM, ucconst::Mode::LITTLE_ENDIAN, 0).expect("failed to initialize Unicorn instance");
 //!     let mut emu = unicorn.borrow();
-//!     emu.mem_map(0x1000, 0x4000, ucconst::Protection::ALL).expect("failed to map code page");;
+//!     emu.mem_map(0x1000, 0x4000, ucconst::Protection::ALL).expect("failed to map code page");
 //!     emu.mem_write(0x1000, &arm_code32).expect("failed to write instructions");
 //! 
 //!     emu.reg_write(RegisterARM::R0 as i32, 123).expect("failed write R0");
@@ -84,7 +83,9 @@ pub struct UnicornInner<D> {
     pub code_hooks: HashMap<*mut libc::c_void, Box<ffi::CodeHook<D>>>,
     pub mem_hooks: HashMap<*mut libc::c_void, Box<ffi::MemHook<D>>>,
     pub intr_hooks: HashMap<*mut libc::c_void, Box<ffi::InterruptHook<D>>>,
-    pub ins_hooks: HashMap<*mut libc::c_void, Box<ffi::InstructionHook<D>>>,
+    pub insn_in_hooks: HashMap<*mut libc::c_void, Box<ffi::InstructionInHook<D>>>,
+    pub insn_out_hooks: HashMap<*mut libc::c_void, Box<ffi::InstructionOutHook<D>>>,
+    pub insn_sys_hooks: HashMap<*mut libc::c_void, Box<ffi::InstructionSysHook<D>>>,
     pub data: D,
     _pin: PhantomPinned
 }
@@ -105,7 +106,9 @@ impl<D> Unicorn<D> {
                 code_hooks: HashMap::new(),
                 mem_hooks: HashMap::new(),
                 intr_hooks: HashMap::new(),
-                ins_hooks: HashMap::new(),
+                insn_in_hooks: HashMap::new(),
+                insn_out_hooks: HashMap::new(),
+                insn_sys_hooks: HashMap::new(),
                 data: data,
                 _pin: std::marker::PhantomPinned
             })})
@@ -469,18 +472,15 @@ impl<'a, D> UnicornHandle<'a, D> {
         }
     }
 
-    /// Add an instruction hook [WIP].
-    /// 
-    /// only supports x86 subset (IN/OUT, syscalls).
-    pub fn add_ins_hook<F: 'static>(
+    /// Add hook for x86 IN instruction.
+    pub fn add_insn_in_hook<F: 'static>(
         &mut self,
-        ins: x86::InsnX86,
         callback: F,
     ) -> Result<ffi::uc_hook, ucconst::uc_error>
     where F: FnMut(UnicornHandle<D>, u32, usize)
     { 
         let mut hook_ptr = std::ptr::null_mut();
-        let mut user_data = Box::new(ffi::InstructionHook {
+        let mut user_data = Box::new(ffi::InstructionInHook {
             unicorn: unsafe { self.inner.as_mut().get_unchecked_mut() } as _,
             callback: Box::new(callback),
         });
@@ -490,15 +490,84 @@ impl<'a, D> UnicornHandle<'a, D> {
                 self.inner.uc,
                 &mut hook_ptr,
                 ucconst::HookType::INSN,
-                ffi::ins_hook_proxy::<D> as _,
+                ffi::insn_in_hook_proxy::<D> as _,
                 user_data.as_mut() as *mut _ as _,
                 0,
                 0,
-                ins,
+                x86::InsnX86::IN,
             )
         };
         if err == ucconst::uc_error::OK {
-            unsafe { self.inner.as_mut().get_unchecked_mut() }.ins_hooks.insert(hook_ptr, user_data);
+            unsafe { self.inner.as_mut().get_unchecked_mut() }.insn_in_hooks.insert(hook_ptr, user_data);
+            Ok(hook_ptr)
+        } else {
+            Err(err)
+        }
+    }
+
+    /// Add hook for x86 OUT instruction.
+    pub fn add_insn_out_hook<F: 'static>(
+        &mut self,
+        callback: F,
+    ) -> Result<ffi::uc_hook, ucconst::uc_error>
+    where F: FnMut(UnicornHandle<D>, u32, usize, u32)
+    { 
+        let mut hook_ptr = std::ptr::null_mut();
+        let mut user_data = Box::new(ffi::InstructionOutHook {
+            unicorn: unsafe { self.inner.as_mut().get_unchecked_mut() } as _,
+            callback: Box::new(callback),
+        });
+        
+        let err = unsafe {
+            ffi::uc_hook_add(
+                self.inner.uc,
+                &mut hook_ptr,
+                ucconst::HookType::INSN,
+                ffi::insn_out_hook_proxy::<D> as _,
+                user_data.as_mut() as *mut _ as _,
+                0,
+                0,
+                x86::InsnX86::OUT,
+            )
+        };
+        if err == ucconst::uc_error::OK {
+            unsafe { self.inner.as_mut().get_unchecked_mut() }.insn_out_hooks.insert(hook_ptr, user_data);
+            Ok(hook_ptr)
+        } else {
+            Err(err)
+        }
+    }
+
+    /// Add hook for x86 SYSCALL or SYSENTER.
+    pub fn add_insn_sys_hook<F: 'static>(
+        &mut self,
+        insn_type: x86::InsnSysX86,
+        begin: u64,
+        end: u64,
+        callback: F,
+    ) -> Result<ffi::uc_hook, ucconst::uc_error>
+    where F: FnMut(UnicornHandle<D>)
+    { 
+        let mut hook_ptr = std::ptr::null_mut();
+        let mut user_data = Box::new(ffi::InstructionSysHook {
+            unicorn: unsafe { self.inner.as_mut().get_unchecked_mut() } as _,
+            callback: Box::new(callback),
+        });
+        
+        let err = unsafe {
+            ffi::uc_hook_add(
+                self.inner.uc,
+                &mut hook_ptr,
+                ucconst::HookType::INSN,
+                ffi::insn_sys_hook_proxy::<D> as _,
+                user_data.as_mut() as *mut _ as _,
+                begin,
+                end,
+                insn_type,
+            )
+        };
+        if err == ucconst::uc_error::OK {
+            unsafe { self.inner.as_mut().get_unchecked_mut() }.insn_sys_hooks.insert(hook_ptr, user_data);
             Ok(hook_ptr)
         } else {
             Err(err)
@@ -513,8 +582,10 @@ impl<'a, D> UnicornHandle<'a, D> {
         let err: ucconst::uc_error;
         if handle.code_hooks.contains_key(&hook) || 
             handle.mem_hooks.contains_key(&hook) ||
-            handle.intr_hooks.contains_key(&hook)||
-            handle.ins_hooks.contains_key(&hook) {
+            handle.intr_hooks.contains_key(&hook) ||
+            handle.insn_in_hooks.contains_key(&hook) ||
+            handle.insn_out_hooks.contains_key(&hook) ||
+            handle.insn_sys_hooks.contains_key(&hook) {
             err = unsafe { ffi::uc_hook_del(handle.uc, hook) };
             handle.mem_hooks.remove(&hook);
         } else {

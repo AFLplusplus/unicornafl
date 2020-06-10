@@ -106,9 +106,19 @@ pub struct InterruptHook<D> {
     pub callback: Box<dyn FnMut(crate::UnicornHandle<D>, u32)>
 }
 
-pub struct InstructionHook<D> {
+pub struct InstructionInHook<D> {
     pub unicorn: *mut crate::UnicornInner<D>,
     pub callback: Box<dyn FnMut(crate::UnicornHandle<D>, u32, usize)>
+}
+
+pub struct InstructionOutHook<D> {
+    pub unicorn: *mut crate::UnicornInner<D>,
+    pub callback: Box<dyn FnMut(crate::UnicornHandle<D>, u32, usize, u32)>
+}
+
+pub struct InstructionSysHook<D> {
+    pub unicorn: *mut crate::UnicornInner<D>,
+    pub callback: Box<dyn FnMut(crate::UnicornHandle<D>)>
 }
 
 pub struct AflFuzzCallback<D> {
@@ -144,11 +154,34 @@ pub extern "C" fn intr_hook_proxy<D>(uc: uc_handle, value: u32, user_data: *mut 
     callback(crate::UnicornHandle { inner: unsafe { Pin::new_unchecked(unicorn) } }, value);
 }
 
-pub extern "C" fn ins_hook_proxy<D>(uc: uc_handle, value: u32, size: usize, user_data: *mut InstructionHook<D>) {
+pub extern "C" fn insn_in_hook_proxy<D>(
+        uc: uc_handle, 
+        port: u32, 
+        size: usize, 
+        user_data: *mut InstructionInHook<D>) {
     let unicorn = unsafe { &mut *(*user_data).unicorn };
     let callback = &mut unsafe { &mut *(*user_data).callback };
     assert_eq!(uc, unicorn.uc);
-    callback(crate::UnicornHandle { inner: unsafe { Pin::new_unchecked(unicorn) } }, value, size);
+    callback(crate::UnicornHandle { inner: unsafe { Pin::new_unchecked(unicorn) } }, port, size);
+}
+
+pub extern "C" fn insn_out_hook_proxy<D>(
+        uc: uc_handle, 
+        port: u32, 
+        size: usize, 
+        value: u32,
+        user_data: *mut InstructionOutHook<D>) {
+    let unicorn = unsafe { &mut *(*user_data).unicorn };
+    let callback = &mut unsafe { &mut *(*user_data).callback };
+    assert_eq!(uc, unicorn.uc);
+    callback(crate::UnicornHandle { inner: unsafe { Pin::new_unchecked(unicorn) } }, port, size, value);
+}
+
+pub extern "C" fn insn_sys_hook_proxy<D>(uc: uc_handle, user_data: *mut InstructionSysHook<D>) {
+    let unicorn = unsafe { &mut *(*user_data).unicorn };
+    let callback = &mut unsafe { &mut *(*user_data).callback };
+    assert_eq!(uc, unicorn.uc);
+    callback(crate::UnicornHandle { inner: unsafe { Pin::new_unchecked(unicorn) } });
 }
 
 pub extern "C" fn input_placement_callback_proxy<D>(uc: uc_handle,

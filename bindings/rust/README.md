@@ -3,14 +3,15 @@
 Rust bindings for the [Unicorn](http://www.unicorn-engine.org/) emulator with AFL++ extensions and utility functions.
 
 ```rust
-use unicornafl::{ucconst, arm::RegisterARM}
+use unicornafl::{ucconst, arm::RegisterARM};
 
 fn main() {
     let arm_code32: Vec<u8> = vec![0x17, 0x00, 0x40, 0xe2]; // sub r0, #23
 
-    let mut unicorn = unicornafl::Unicorn::new(Arch::ARM, Mode::LITTLE_ENDIAN, 0).expect("failed to initialize Unicorn instance");
+    let mut unicorn = unicornafl::Unicorn::new(ucconst::Arch::ARM, ucconst::Mode::LITTLE_ENDIAN, 0)
+        .expect("failed to initialize Unicorn instance");
     let mut emu = unicorn.borrow();
-    emu.mem_map(0x1000, 0x4000, ucconst::Protection::ALL).expect("failed to map code page");;
+    emu.mem_map(0x1000, 0x4000, ucconst::Protection::ALL).expect("failed to map code page");
     emu.mem_write(0x1000, &arm_code32).expect("failed to write instructions");
 
     emu.reg_write(RegisterARM::R0 as i32, 123).expect("failed write R0");

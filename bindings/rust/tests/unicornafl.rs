@@ -3,7 +3,7 @@
 use std::cell::RefCell;
 use std::rc::Rc;
 use unicornafl::ucconst::{Mode, Arch, Protection, MemType, uc_error};
-use unicornafl::{ucconst, arm::RegisterARM, x86::RegisterX86, mips::RegisterMIPS};
+use unicornafl::{ucconst, arm::RegisterARM, x86::RegisterX86, x86::InsnSysX86, mips::RegisterMIPS};
 
 type Unicorn<'a> = unicornafl::UnicornHandle<'a, u32>;
 
@@ -346,9 +346,7 @@ fn x86_insn_in_callback() {
     );
     assert_eq!(emu.mem_write(0x1000, &x86_code32), Ok(()));
 
-    let hook = emu
-        .add_ins_hook(unicornafl::x86::InsnX86::IN, callback)
-        .expect("failed to add in hook");
+    let hook = emu.add_insn_in_hook(callback).expect("failed to add in hook");
 
     assert_eq!(
         emu.emu_start(
@@ -363,44 +361,42 @@ fn x86_insn_in_callback() {
     assert_eq!(emu.remove_hook(hook), Ok(()));
 }
 
-// #[test]
-// fn x86_insn_out_callback() {
-//     #[derive(PartialEq, Debug)]
-//     struct InsnOutExpectation(u32, usize, u32);
-//     let expect = InsnOutExpectation(0x46, 1, 0x32);
-//     let insn_cell = Rc::new(RefCell::new(InsnOutExpectation(0, 0, 0)));
+#[test]
+fn x86_insn_out_callback() {
+    #[derive(PartialEq, Debug)]
+    struct InsnOutExpectation(u32, usize, u32);
+    let expect = InsnOutExpectation(0x46, 1, 0x32);
+    let insn_cell = Rc::new(RefCell::new(InsnOutExpectation(0, 0, 0)));
 
-//     let callback_insn = insn_cell.clone();
-//     let callback = move |_: Unicorn<'_>, port: u32, size: usize, value: u32| {
-//         *callback_insn.borrow_mut() = InsnOutExpectation(port, size, value);
-//     };
+    let callback_insn = insn_cell.clone();
+    let callback = move |_: Unicorn<'_>, port: u32, size: usize, value: u32| {
+        *callback_insn.borrow_mut() = InsnOutExpectation(port, size, value);
+    };
 
-//     let x86_code32: Vec<u8> = vec![0xb0, 0x32, 0xe6, 0x46]; // MOV al, 0x32; OUT  0x46, al;
+    let x86_code32: Vec<u8> = vec![0xb0, 0x32, 0xe6, 0x46]; // MOV al, 0x32; OUT  0x46, al;
 
-//     let mut unicorn = unicornafl::Unicorn::new(Arch::X86, Mode::MODE_32, 0).expect("failed to initialize unicorn instance");
-//     let mut emu = unicorn.borrow();
-//     assert_eq!(
-//         emu.mem_map(0x1000, 0x4000, Protection::ALL),
-//         Ok(())
-//     );
-//     assert_eq!(emu.mem_write(0x1000, &x86_code32), Ok(()));
+    let mut unicorn = unicornafl::Unicorn::new(Arch::X86, Mode::MODE_32, 0).expect("failed to initialize unicorn instance");
+    let mut emu = unicorn.borrow();
+    assert_eq!(
+        emu.mem_map(0x1000, 0x4000, Protection::ALL),
+        Ok(())
+    );
+    assert_eq!(emu.mem_write(0x1000, &x86_code32), Ok(()));
 
-//     let hook = emu
-//         .add_ins_hook(unicornafl::x86::InsnX86::OUT, callback)
-//         .expect("failed to add in hook");
+    let hook = emu.add_insn_out_hook(callback).expect("failed to add out hook");
 
-//     assert_eq!(
-//         emu.emu_start(
-//             0x1000,
-//             0x1000 + x86_code32.len() as u64,
-//             10 * ucconst::SECOND_SCALE,
-//             1000
-//         ),
-//         Ok(())
-//     );
-//     assert_eq!(expect, *insn_cell.borrow());
-//     assert_eq!(emu.remove_hook(hook), Ok(()));
-// }
+    assert_eq!(
+        emu.emu_start(
+            0x1000,
+            0x1000 + x86_code32.len() as u64,
+            10 * ucconst::SECOND_SCALE,
+            1000
+        ),
+        Ok(())
+    );
+    assert_eq!(expect, *insn_cell.borrow());
+    assert_eq!(emu.remove_hook(hook), Ok(()));
+}
 
 #[test]
 fn x86_insn_sys_callback() {
@@ -410,7 +406,7 @@ fn x86_insn_sys_callback() {
     let insn_cell = Rc::new(RefCell::new(InsnSysExpectation(0)));
 
     let callback_insn = insn_cell.clone();
-    let callback = move |uc: Unicorn<'_>, _: u32, _: usize| {
+    let callback = move |uc: Unicorn<'_>| {
         println!("!!!!");
         let rax = uc.reg_read(RegisterX86::RAX as i32).unwrap();
         *callback_insn.borrow_mut() = InsnSysExpectation(rax);
@@ -429,9 +425,7 @@ fn x86_insn_sys_callback() {
     );
     assert_eq!(emu.mem_write(0x1000, &x86_code), Ok(()));
 
-    let hook = emu
-        .add_ins_hook(unicornafl::x86::InsnX86::SYSCALL, callback)
-        .expect("failed to add in hook");
+    let hook = emu.add_insn_sys_hook(InsnSysX86::SYSCALL, 1, 0, callback).expect("failed to add syscall hook");
 
     assert_eq!(
         emu.emu_start(
