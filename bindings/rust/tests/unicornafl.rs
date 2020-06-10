@@ -2,10 +2,8 @@
 
 use std::cell::RefCell;
 use std::rc::Rc;
-use unicornafl::ucconst::{Mode, Arch, Protection, MemType, uc_error};
-use unicornafl::{ucconst, arm::RegisterARM, x86::RegisterX86, x86::InsnSysX86, mips::RegisterMIPS};
-
-type Unicorn<'a> = unicornafl::UnicornHandle<'a, u32>;
+use unicornafl::{RegisterARM, RegisterX86, InsnSysX86, RegisterMIPS};
+use unicornafl::unicorn_const::{Mode, Arch, Protection, MemType, HookType, SECOND_SCALE, uc_error};
 
 pub static X86_REGISTERS: [RegisterX86; 145] = [
     RegisterX86::AH,
@@ -155,6 +153,8 @@ pub static X86_REGISTERS: [RegisterX86; 145] = [
     RegisterX86::R15W,
 ];
 
+type Unicorn<'a> = unicornafl::UnicornHandle<'a, u32>;
+
 #[test]
 fn emulate_x86() {
     let x86_code32: Vec<u8> = vec![0x41, 0x4a]; // INC ecx; DEC edx
@@ -187,7 +187,7 @@ fn emulate_x86() {
         emu.emu_start(
             0x1000,
             (0x1000 + x86_code32.len()) as u64,
-            10 * ucconst::SECOND_SCALE,
+            10 * SECOND_SCALE,
             1000
         ),
         Ok(())
@@ -224,7 +224,7 @@ fn x86_code_callback() {
         .add_code_hook(0x1000, 0x2000, callback)
         .expect("failed to add code hook");
     assert_eq!(
-        emu.emu_start(0x1000, 0x1002, 10 * ucconst::SECOND_SCALE, 1000),
+        emu.emu_start(0x1000, 0x1002, 10 * SECOND_SCALE, 1000),
         Ok(())
     );
     assert_eq!(expects, *codes_cell.borrow());
@@ -261,7 +261,7 @@ fn x86_intr_callback() {
         emu.emu_start(
             0x1000,
             0x1000 + x86_code32.len() as u64,
-            10 * ucconst::SECOND_SCALE,
+            10 * SECOND_SCALE,
             1000
         ),
         Ok(())
@@ -307,14 +307,14 @@ fn x86_mem_callback() {
     assert_eq!(emu.mem_write(0x1000, &x86_code32), Ok(()));
 
     let hook = emu
-        .add_mem_hook(ucconst::HookType::MEM_ALL, 0, std::u64::MAX, callback)
+        .add_mem_hook(HookType::MEM_ALL, 0, std::u64::MAX, callback)
         .expect("failed to add memory hook");
     assert_eq!(emu.reg_write(RegisterX86::EAX as i32, 0x123), Ok(()));
     assert_eq!(
         emu.emu_start(
             0x1000,
             0x1000 + x86_code32.len() as u64,
-            10 * ucconst::SECOND_SCALE,
+            10 * SECOND_SCALE,
             0x1000
         ),
         Err(uc_error::READ_UNMAPPED)
@@ -352,7 +352,7 @@ fn x86_insn_in_callback() {
         emu.emu_start(
             0x1000,
             0x1000 + x86_code32.len() as u64,
-            10 * ucconst::SECOND_SCALE,
+            10 * SECOND_SCALE,
             1000
         ),
         Ok(())
@@ -389,7 +389,7 @@ fn x86_insn_out_callback() {
         emu.emu_start(
             0x1000,
             0x1000 + x86_code32.len() as u64,
-            10 * ucconst::SECOND_SCALE,
+            10 * SECOND_SCALE,
             1000
         ),
         Ok(())
@@ -431,7 +431,7 @@ fn x86_insn_sys_callback() {
         emu.emu_start(
             0x1000,
             0x1000 + x86_code.len() as u64,
-            10 * ucconst::SECOND_SCALE,
+            10 * SECOND_SCALE,
             1000
         ),
         Ok(())
@@ -474,7 +474,7 @@ fn emulate_arm() {
         emu.emu_start(
             0x1000 | 0x01,
             (0x1000 | (0x01 + arm_code32.len())) as u64,
-            10 * ucconst::SECOND_SCALE,
+            10 * SECOND_SCALE,
             1000
         ),
         Ok(())
@@ -503,7 +503,7 @@ fn emulate_mips() {
         emu.emu_start(
             0x1000,
             (0x1000 + mips_code32.len()) as u64,
-            10 * ucconst::SECOND_SCALE,
+            10 * SECOND_SCALE,
             1000
         ),
         Ok(())
@@ -554,7 +554,7 @@ fn mem_map_ptr() {
         emu.emu_start(
             0x1000,
             (0x1000 + x86_code32.len()) as u64,
-            10 * ucconst::SECOND_SCALE,
+            10 * SECOND_SCALE,
             1000
         ),
         Ok(())
@@ -590,7 +590,7 @@ fn mem_map_ptr() {
         emu.emu_start(
             0x1000,
             (0x1000 + x86_code32.len()) as u64,
-            10 * ucconst::SECOND_SCALE,
+            10 * SECOND_SCALE,
             1000
         ),
         Ok(())
@@ -616,7 +616,7 @@ fn x86_context_save_and_restore() {
         let _ = emu.emu_start(
             0x1000,
             (0x1000 + x86_code.len()) as u64,
-            10 * ucconst::SECOND_SCALE,
+            10 * SECOND_SCALE,
             1000,
         );
 

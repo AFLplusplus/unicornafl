@@ -8,7 +8,7 @@ use super::x86::RegisterX86;
 use super::sparc::RegisterSPARC;
 use super::mips::RegisterMIPS;
 use super::m68k::RegisterM68K;
-use super::ucconst::{Protection, Mode, Arch, HookType, MemType, uc_error};
+use super::{Protection, Mode, Arch, HookType, MemType, uc_error};
 use std::ptr;
 use std::cell::RefCell;
 use std::collections::HashMap;

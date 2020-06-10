@@ -5,7 +5,7 @@
 use std::ffi::c_void;
 use std::pin::Pin;
 use libc::{c_char, c_int};
-use super::ucconst::*;
+use super::unicorn_const::*;
 
 pub type uc_handle = *mut c_void;
 pub type uc_hook = *mut c_void;

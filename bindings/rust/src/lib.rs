@@ -7,42 +7,52 @@
 //!
 //! ```rust
 //!
-//! use unicornafl::{ucconst, arm::RegisterARM};
+//! use unicornafl::RegisterARM;
+//! use unicornafl::unicorn_const::{Arch, Mode, Protection, SECOND_SCALE};
 //! 
 //! fn main() {
 //!     let arm_code32: Vec<u8> = vec![0x17, 0x00, 0x40, 0xe2]; // sub r0, #23
 //! 
-//!     let mut unicorn = unicornafl::Unicorn::new(ucconst::Arch::ARM, ucconst::Mode::LITTLE_ENDIAN, 0).expect("failed to initialize Unicorn instance");
+//!     let mut unicorn = unicornafl::Unicorn::new(Arch::ARM, Mode::LITTLE_ENDIAN, 0).expect("failed to initialize Unicorn instance");
 //!     let mut emu = unicorn.borrow();
-//!     emu.mem_map(0x1000, 0x4000, ucconst::Protection::ALL).expect("failed to map code page");
+//!     emu.mem_map(0x1000, 0x4000, Protection::ALL).expect("failed to map code page");
 //!     emu.mem_write(0x1000, &arm_code32).expect("failed to write instructions");
 //! 
 //!     emu.reg_write(RegisterARM::R0 as i32, 123).expect("failed write R0");
 //!     emu.reg_write(RegisterARM::R5 as i32, 1337).expect("failed write R5");
 //! 
-//!     let _ = emu.emu_start(0x1000, (0x1000 + arm_code32.len()) as u64, 10 * ucconst::SECOND_SCALE, 1000);
+//!     let _ = emu.emu_start(0x1000, (0x1000 + arm_code32.len()) as u64, 10 * SECOND_SCALE, 1000);
 //!     assert_eq!(emu.reg_read(RegisterARM::R0 as i32), Ok(100));
 //!     assert_eq!(emu.reg_read(RegisterARM::R5 as i32), Ok(1337));
 //! }
 //! ```
 //!
 
-pub mod arm;
-pub mod arm64;
-pub mod x86;
-pub mod sparc;
-pub mod mips;
-pub mod m68k;
-pub mod ucconst;
 mod ffi;
 pub mod utils;
+pub mod unicorn_const;
+
+mod arm;
+mod arm64;
+mod x86;
+mod sparc;
+mod mips;
+mod m68k;
+pub use crate::{
+    arm64::*,
+    arm::*,
+    m68k::*,
+    mips::*,
+    sparc::*,
+    x86::*,
+};
 
 use std::ffi::c_void;
 use std::collections::HashMap;
-use ucconst::{Protection, MemRegion};
 use ffi::uc_handle;
 use std::pin::Pin;
 use std::marker::PhantomPinned;
+use unicorn_const::*;
 
 #[derive(Debug)]
 pub struct Context {
@@ -79,7 +89,7 @@ pub struct UnicornHandle<'a, D> {
 /// Internal Management struct
 pub struct UnicornInner<D> {
     pub uc: uc_handle,
-    pub arch: ucconst::Arch,
+    pub arch: Arch,
     pub code_hooks: HashMap<*mut libc::c_void, Box<ffi::CodeHook<D>>>,
     pub mem_hooks: HashMap<*mut libc::c_void, Box<ffi::MemHook<D>>>,
     pub intr_hooks: HashMap<*mut libc::c_void, Box<ffi::InterruptHook<D>>>,
@@ -93,12 +103,12 @@ pub struct UnicornInner<D> {
 impl<D> Unicorn<D> {
     /// Create a new instance of the unicorn engine for the specified architecture
     /// and hardware mode.
-    pub fn new(arch: ucconst::Arch, mode: ucconst::Mode, data: D) 
-        -> Result<Unicorn<D>, ucconst::uc_error> {
+    pub fn new(arch: Arch, mode: Mode, data: D) 
+        -> Result<Unicorn<D>, uc_error> {
 
         let mut handle = std::ptr::null_mut();
         let err = unsafe { ffi::uc_open(arch, mode, &mut handle) };
-        if err == ucconst::uc_error::OK {
+        if err == uc_error::OK {
             Ok(Unicorn {
                 inner: Box::pin(UnicornInner {
                 uc: handle,
@@ -154,16 +164,16 @@ impl<'a, D> UnicornHandle<'a, D> {
     }
 
     /// Return the architecture of the current emulator.
-    pub fn get_arch(&self) -> ucconst::Arch {
+    pub fn get_arch(&self) -> Arch {
         self.inner.arch
     }
 
     /// Returns a vector with the memory regions that are mapped in the emulator.
-    pub fn mem_regions(&self) -> Result<Vec<MemRegion>, ucconst::uc_error> {
+    pub fn mem_regions(&self) -> Result<Vec<MemRegion>, uc_error> {
         let mut nb_regions: u32 = 0;
         let mut p_regions: *const MemRegion = std::ptr::null_mut();
         let err = unsafe { ffi::uc_mem_regions(self.inner.uc, &mut p_regions, &mut nb_regions) };
-        if err == ucconst::uc_error::OK {
+        if err == uc_error::OK {
             let mut regions = Vec::new();
             for i in 0..nb_regions {
                 regions.push(unsafe { std::mem::transmute_copy(&*p_regions.offset(i as isize)) });
@@ -176,9 +186,9 @@ impl<'a, D> UnicornHandle<'a, D> {
     }
 
     /// Read a range of bytes from memory at the specified address.
-    pub fn mem_read(&self, address: u64, buf: &mut [u8]) -> Result<(), ucconst::uc_error> {
+    pub fn mem_read(&self, address: u64, buf: &mut [u8]) -> Result<(), uc_error> {
         let err = unsafe { ffi::uc_mem_read(self.inner.uc, address, buf.as_mut_ptr(), buf.len()) };
-        if err == ucconst::uc_error::OK {
+        if err == uc_error::OK {
             Ok(())
         } else {
             Err(err)
@@ -186,19 +196,19 @@ impl<'a, D> UnicornHandle<'a, D> {
     }
 
     /// Return a range of bytes from memory at the specified address as vector.
-    pub fn mem_read_as_vec(&self, address: u64, size: usize) -> Result<Vec<u8>, ucconst::uc_error> {
+    pub fn mem_read_as_vec(&self, address: u64, size: usize) -> Result<Vec<u8>, uc_error> {
         let mut buf = vec![0; size];
         let err = unsafe { ffi::uc_mem_read(self.inner.uc, address, buf.as_mut_ptr(), size) };
-        if err == ucconst::uc_error::OK {
+        if err == uc_error::OK {
             Ok(buf)
         } else {
             Err(err)
         }
     }
 
-    pub fn mem_write(&mut self, address: u64, bytes: &[u8]) -> Result<(), ucconst::uc_error> {
+    pub fn mem_write(&mut self, address: u64, bytes: &[u8]) -> Result<(), uc_error> {
         let err = unsafe { ffi::uc_mem_write(self.inner.uc, address, bytes.as_ptr(), bytes.len()) };
-        if err == ucconst::uc_error::OK {
+        if err == uc_error::OK {
             Ok(())
         } else {
             Err(err)
@@ -221,9 +231,9 @@ impl<'a, D> UnicornHandle<'a, D> {
             size: usize, 
             perms: Protection, 
             ptr: *mut c_void
-    ) -> Result<(), ucconst::uc_error> {
+    ) -> Result<(), uc_error> {
         let err = unsafe { ffi::uc_mem_map_ptr(self.inner.uc, address, size, perms.bits(), ptr) };
-        if err == ucconst::uc_error::OK {
+        if err == uc_error::OK {
             Ok(())
         } else {
             Err(err)
@@ -238,9 +248,9 @@ impl<'a, D> UnicornHandle<'a, D> {
             address: u64, 
             size: libc::size_t, 
             perms: Protection
-    ) -> Result<(), ucconst::uc_error> {
+    ) -> Result<(), uc_error> {
         let err = unsafe { ffi::uc_mem_map(self.inner.uc, address, size, perms.bits()) };
-        if err == ucconst::uc_error::OK {
+        if err == uc_error::OK {
             Ok(())
         } else {
             Err(err)
@@ -254,9 +264,9 @@ impl<'a, D> UnicornHandle<'a, D> {
     pub fn mem_unmap(&mut self, 
             address: u64, 
             size: libc::size_t
-    ) -> Result<(), ucconst::uc_error> {
+    ) -> Result<(), uc_error> {
         let err = unsafe { ffi::uc_mem_unmap(self.inner.uc, address, size) };
-        if err == ucconst::uc_error::OK {
+        if err == uc_error::OK {
             Ok(())
         } else {
             Err(err)
@@ -271,9 +281,9 @@ impl<'a, D> UnicornHandle<'a, D> {
             address: u64, 
             size: libc::size_t, 
             perms: Protection
-    ) -> Result<(), ucconst::uc_error> {
+    ) -> Result<(), uc_error> {
         let err = unsafe { ffi::uc_mem_protect(self.inner.uc, address, size, perms.bits()) };
-        if err == ucconst::uc_error::OK {
+        if err == uc_error::OK {
             Ok(())
         } else {
             Err(err)
@@ -281,9 +291,9 @@ impl<'a, D> UnicornHandle<'a, D> {
     }
 
     /// Write an unsigned value from a register.
-    pub fn reg_write<T: Into<i32>>(&mut self, regid: T, value: u64) -> Result<(), ucconst::uc_error> {
+    pub fn reg_write<T: Into<i32>>(&mut self, regid: T, value: u64) -> Result<(), uc_error> {
         let err = unsafe { ffi::uc_reg_write(self.inner.uc, regid.into(), &value as *const _ as _) };
-        if err == ucconst::uc_error::OK {
+        if err == uc_error::OK {
             Ok(())
         } else {
             Err(err)
@@ -294,9 +304,9 @@ impl<'a, D> UnicornHandle<'a, D> {
     /// 
     /// The user has to make sure that the buffer length matches the register size.
     /// This adds support for registers >64 bit (GDTR/IDTR, XMM, YMM, ZMM (x86); Q, V (arm64)).
-    pub fn reg_write_long<T: Into<i32>>(&self, regid: T, value: Box<[u8]>) -> Result<(), ucconst::uc_error> {
+    pub fn reg_write_long<T: Into<i32>>(&self, regid: T, value: Box<[u8]>) -> Result<(), uc_error> {
         let err = unsafe { ffi::uc_reg_write(self.inner.uc, regid.into(), value.as_ptr() as _) };
-        if err == ucconst::uc_error::OK {
+        if err == uc_error::OK {
             Ok(())
         } else {
             Err(err)
@@ -306,10 +316,10 @@ impl<'a, D> UnicornHandle<'a, D> {
     /// Read an unsigned value from a register.
     /// 
     /// Not to be used with registers larger than 64 bit.
-    pub fn reg_read<T: Into<i32>>(&self, regid: T) -> Result<u64, ucconst::uc_error> {
+    pub fn reg_read<T: Into<i32>>(&self, regid: T) -> Result<u64, uc_error> {
         let mut value: u64 = 0;
         let err = unsafe { ffi::uc_reg_read(self.inner.uc, regid.into(), &mut value as *mut u64 as _) };
-        if err == ucconst::uc_error::OK {
+        if err == uc_error::OK {
             Ok(value)
         } else {
             Err(err)
@@ -319,14 +329,14 @@ impl<'a, D> UnicornHandle<'a, D> {
     /// Read 128, 256 or 512 bit register value into heap allocated byte array.
     /// 
     /// This adds safe support for registers >64 bit (GDTR/IDTR, XMM, YMM, ZMM (x86); Q, V (arm64)).
-    pub fn reg_read_long<T: Into<i32>>(&self, regid: T) -> Result<Box<[u8]>, ucconst::uc_error> {
-        let err: ucconst::uc_error;
+    pub fn reg_read_long<T: Into<i32>>(&self, regid: T) -> Result<Box<[u8]>, uc_error> {
+        let err: uc_error;
         let boxed: Box<[u8]>;
         let mut value: Vec<u8>;
         let curr_reg_id = regid.into();
         let curr_arch = self.get_arch();
 
-        if curr_arch == ucconst::Arch::X86 {
+        if curr_arch == Arch::X86 {
             if curr_reg_id >= x86::RegisterX86::XMM0 as i32 && curr_reg_id <= x86::RegisterX86::XMM31 as i32 {
                 value = vec![0; 16 as usize];                
             } else if curr_reg_id >= x86::RegisterX86::YMM0 as i32 && curr_reg_id <= x86::RegisterX86::YMM31 as i32 {
@@ -337,22 +347,22 @@ impl<'a, D> UnicornHandle<'a, D> {
                       curr_reg_id == x86::RegisterX86::IDTR as i32 {
                 value = vec![0; 10 as usize]; // 64 bit base address in IA-32e mode
             } else {
-                return Err(ucconst::uc_error::ARG)
+                return Err(uc_error::ARG)
             }
-        } else if curr_arch == ucconst::Arch::ARM64 {
+        } else if curr_arch == Arch::ARM64 {
             if (curr_reg_id >= arm64::RegisterARM64::Q0 as i32 && curr_reg_id <= arm64::RegisterARM64::Q31 as i32) ||
                (curr_reg_id >= arm64::RegisterARM64::V0 as i32 && curr_reg_id <= arm64::RegisterARM64::V31 as i32) {
                 value = vec![0; 16 as usize];
             } else {
-                return Err(ucconst::uc_error::ARG)
+                return Err(uc_error::ARG)
             }
         } else {
-            return Err(ucconst::uc_error::ARCH)
+            return Err(uc_error::ARCH)
         }
         
         err = unsafe { ffi::uc_reg_read(self.inner.uc, curr_reg_id, value.as_mut_ptr() as _) };
 
-        if err == ucconst::uc_error::OK {
+        if err == uc_error::OK {
             boxed = value.into_boxed_slice();
             Ok(boxed)
         } else {
@@ -361,10 +371,10 @@ impl<'a, D> UnicornHandle<'a, D> {
     }
 
     /// Read a signed 32-bit value from a register.
-    pub fn reg_read_i32<T: Into<i32>>(&self, regid: T) -> Result<i32, ucconst::uc_error> {
+    pub fn reg_read_i32<T: Into<i32>>(&self, regid: T) -> Result<i32, uc_error> {
         let mut value: i32 = 0;
         let err = unsafe { ffi::uc_reg_read(self.inner.uc, regid.into(), &mut value as *mut i32 as _) };
-        if err == ucconst::uc_error::OK {
+        if err == uc_error::OK {
             Ok(value)
         } else {
             Err(err)
@@ -377,7 +387,7 @@ impl<'a, D> UnicornHandle<'a, D> {
         begin: u64,
         end: u64,
         callback: F,
-    ) -> Result<ffi::uc_hook, ucconst::uc_error>
+    ) -> Result<ffi::uc_hook, uc_error>
     where F: FnMut(UnicornHandle<D>, u64, u32)
     {
         let mut hook_ptr = std::ptr::null_mut();
@@ -390,14 +400,14 @@ impl<'a, D> UnicornHandle<'a, D> {
             ffi::uc_hook_add(
                 self.inner.uc,
                 &mut hook_ptr,
-                ucconst::HookType::CODE,
+                HookType::CODE,
                 ffi::code_hook_proxy::<D> as _,
                 user_data.as_mut() as *mut _ as _,
                 begin,
                 end,
             )
         };
-        if err == ucconst::uc_error::OK {
+        if err == uc_error::OK {
             unsafe { self.inner.as_mut().get_unchecked_mut() }.code_hooks.insert(hook_ptr, user_data);
             Ok(hook_ptr)
         } else {
@@ -408,15 +418,15 @@ impl<'a, D> UnicornHandle<'a, D> {
     /// Add a memory hook.
     pub fn add_mem_hook<F: 'static>(
         &mut self,
-        hook_type: ucconst::HookType,
+        hook_type: HookType,
         begin: u64,
         end: u64,
         callback: F,
-    ) -> Result<ffi::uc_hook, ucconst::uc_error>
-    where F: FnMut(UnicornHandle<D>, ucconst::MemType, u64, usize, i64)
+    ) -> Result<ffi::uc_hook, uc_error>
+    where F: FnMut(UnicornHandle<D>, MemType, u64, usize, i64)
     {
-        if (hook_type as i32) < 16 || hook_type == ucconst::HookType::INSN_INVALID {
-            return Err(ucconst::uc_error::ARG);
+        if (hook_type as i32) < 16 || hook_type == HookType::INSN_INVALID {
+            return Err(uc_error::ARG);
         }
         
         let mut hook_ptr = std::ptr::null_mut();
@@ -436,7 +446,7 @@ impl<'a, D> UnicornHandle<'a, D> {
                 end,
             )
         };
-        if err == ucconst::uc_error::OK {
+        if err == uc_error::OK {
             unsafe { self.inner.as_mut().get_unchecked_mut() }.mem_hooks.insert(hook_ptr, user_data);
             Ok(hook_ptr)
         } else {
@@ -448,7 +458,7 @@ impl<'a, D> UnicornHandle<'a, D> {
     pub fn add_intr_hook<F: 'static>(
         &mut self,
         callback: F,
-    ) -> Result<ffi::uc_hook, ucconst::uc_error>
+    ) -> Result<ffi::uc_hook, uc_error>
     where F: FnMut(UnicornHandle<D>, u32)
     { 
         let mut hook_ptr = std::ptr::null_mut();
@@ -461,14 +471,14 @@ impl<'a, D> UnicornHandle<'a, D> {
             ffi::uc_hook_add(
                 self.inner.uc,
                 &mut hook_ptr,
-                ucconst::HookType::INTR,
+                HookType::INTR,
                 ffi::intr_hook_proxy::<D> as _,
                 user_data.as_mut() as *mut _ as _,
                 0,
                 0,
             )
         };
-        if err == ucconst::uc_error::OK {
+        if err == uc_error::OK {
             unsafe { self.inner.as_mut().get_unchecked_mut() }.intr_hooks.insert(hook_ptr, user_data);
             Ok(hook_ptr)
         } else {
@@ -480,7 +490,7 @@ impl<'a, D> UnicornHandle<'a, D> {
     pub fn add_insn_in_hook<F: 'static>(
         &mut self,
         callback: F,
-    ) -> Result<ffi::uc_hook, ucconst::uc_error>
+    ) -> Result<ffi::uc_hook, uc_error>
     where F: FnMut(UnicornHandle<D>, u32, usize)
     { 
         let mut hook_ptr = std::ptr::null_mut();
@@ -493,7 +503,7 @@ impl<'a, D> UnicornHandle<'a, D> {
             ffi::uc_hook_add(
                 self.inner.uc,
                 &mut hook_ptr,
-                ucconst::HookType::INSN,
+                HookType::INSN,
                 ffi::insn_in_hook_proxy::<D> as _,
                 user_data.as_mut() as *mut _ as _,
                 0,
@@ -501,7 +511,7 @@ impl<'a, D> UnicornHandle<'a, D> {
                 x86::InsnX86::IN,
             )
         };
-        if err == ucconst::uc_error::OK {
+        if err == uc_error::OK {
             unsafe { self.inner.as_mut().get_unchecked_mut() }.insn_in_hooks.insert(hook_ptr, user_data);
             Ok(hook_ptr)
         } else {
@@ -513,7 +523,7 @@ impl<'a, D> UnicornHandle<'a, D> {
     pub fn add_insn_out_hook<F: 'static>(
         &mut self,
         callback: F,
-    ) -> Result<ffi::uc_hook, ucconst::uc_error>
+    ) -> Result<ffi::uc_hook, uc_error>
     where F: FnMut(UnicornHandle<D>, u32, usize, u32)
     { 
         let mut hook_ptr = std::ptr::null_mut();
@@ -526,7 +536,7 @@ impl<'a, D> UnicornHandle<'a, D> {
             ffi::uc_hook_add(
                 self.inner.uc,
                 &mut hook_ptr,
-                ucconst::HookType::INSN,
+                HookType::INSN,
                 ffi::insn_out_hook_proxy::<D> as _,
                 user_data.as_mut() as *mut _ as _,
                 0,
@@ -534,7 +544,7 @@ impl<'a, D> UnicornHandle<'a, D> {
                 x86::InsnX86::OUT,
             )
         };
-        if err == ucconst::uc_error::OK {
+        if err == uc_error::OK {
             unsafe { self.inner.as_mut().get_unchecked_mut() }.insn_out_hooks.insert(hook_ptr, user_data);
             Ok(hook_ptr)
         } else {
@@ -549,7 +559,7 @@ impl<'a, D> UnicornHandle<'a, D> {
         begin: u64,
         end: u64,
         callback: F,
-    ) -> Result<ffi::uc_hook, ucconst::uc_error>
+    ) -> Result<ffi::uc_hook, uc_error>
     where F: FnMut(UnicornHandle<D>)
     { 
         let mut hook_ptr = std::ptr::null_mut();
@@ -562,7 +572,7 @@ impl<'a, D> UnicornHandle<'a, D> {
             ffi::uc_hook_add(
                 self.inner.uc,
                 &mut hook_ptr,
-                ucconst::HookType::INSN,
+                HookType::INSN,
                 ffi::insn_sys_hook_proxy::<D> as _,
                 user_data.as_mut() as *mut _ as _,
                 begin,
@@ -570,7 +580,7 @@ impl<'a, D> UnicornHandle<'a, D> {
                 insn_type,
             )
         };
-        if err == ucconst::uc_error::OK {
+        if err == uc_error::OK {
             unsafe { self.inner.as_mut().get_unchecked_mut() }.insn_sys_hooks.insert(hook_ptr, user_data);
             Ok(hook_ptr)
         } else {
@@ -581,9 +591,9 @@ impl<'a, D> UnicornHandle<'a, D> {
     /// Remove a hook.
     ///
     /// `hook` is the value returned by `add_*_hook` functions.
-    pub fn remove_hook(&mut self, hook: ffi::uc_hook) -> Result<(), ucconst::uc_error> {
+    pub fn remove_hook(&mut self, hook: ffi::uc_hook) -> Result<(), uc_error> {
         let handle = unsafe { self.inner.as_mut().get_unchecked_mut() };
-        let err: ucconst::uc_error;
+        let err: uc_error;
         if handle.code_hooks.contains_key(&hook) || 
             handle.mem_hooks.contains_key(&hook) ||
             handle.intr_hooks.contains_key(&hook) ||
@@ -593,10 +603,10 @@ impl<'a, D> UnicornHandle<'a, D> {
             err = unsafe { ffi::uc_hook_del(handle.uc, hook) };
             handle.mem_hooks.remove(&hook);
         } else {
-            err = ucconst::uc_error::HOOK;
+            err = uc_error::HOOK;
         }
 
-        if err == ucconst::uc_error::OK {
+        if err == uc_error::OK {
             Ok(())
         } else {
             Err(err)
@@ -606,10 +616,10 @@ impl<'a, D> UnicornHandle<'a, D> {
     /// Allocate and return an empty Unicorn context.
     /// 
     /// To be populated via context_save.
-    pub fn context_alloc(&self) -> Result<Context, ucconst::uc_error> {
+    pub fn context_alloc(&self) -> Result<Context, uc_error> {
         let mut empty_context: ffi::uc_context = Default::default();
         let err = unsafe { ffi::uc_context_alloc(self.inner.uc, &mut empty_context) };
-        if err == ucconst::uc_error::OK {
+        if err == uc_error::OK {
             Ok(Context { context: empty_context })
         } else {
             Err(err)
@@ -617,9 +627,9 @@ impl<'a, D> UnicornHandle<'a, D> {
     }
 
     /// Save current Unicorn context to previously allocated Context struct.
-    pub fn context_save(&self, context: &mut Context) -> Result<(), ucconst::uc_error> {
+    pub fn context_save(&self, context: &mut Context) -> Result<(), uc_error> {
         let err = unsafe { ffi::uc_context_save(self.inner.uc, context.context) };
-        if err == ucconst::uc_error::OK {
+        if err == uc_error::OK {
             Ok(())
         } else {
             Err(err)
@@ -631,14 +641,14 @@ impl<'a, D> UnicornHandle<'a, D> {
     /// This can be used for fast rollbacks with context_restore.
     /// In case of many non-concurrent context saves, use context_alloc and *_save 
     /// individually to avoid unnecessary allocations.
-    pub fn context_init(&self) -> Result<Context, ucconst::uc_error> {
+    pub fn context_init(&self) -> Result<Context, uc_error> {
         let mut new_context: ffi::uc_context = Default::default();
         let err = unsafe { ffi::uc_context_alloc(self.inner.uc, &mut new_context) };
-        if err != ucconst::uc_error::OK {
+        if err != uc_error::OK {
             return Err(err);
         }
         let err = unsafe { ffi::uc_context_save(self.inner.uc, new_context) };
-        if err == ucconst::uc_error::OK {
+        if err == uc_error::OK {
             Ok(Context { context: new_context })
         } else {
             unsafe { ffi::uc_free(new_context) };
@@ -651,9 +661,9 @@ impl<'a, D> UnicornHandle<'a, D> {
     /// Perform a quick rollback of the CPU context, including registers and some
     /// internal metadata. Contexts may not be shared across engine instances with
     /// differing arches or modes. Memory has to be restored manually, if needed.
-    pub fn context_restore(&self, context: &Context) -> Result<(), ucconst::uc_error> {
+    pub fn context_restore(&self, context: &Context) -> Result<(), uc_error> {
         let err = unsafe { ffi::uc_context_restore(self.inner.uc, context.context) };
-        if err == ucconst::uc_error::OK {
+        if err == uc_error::OK {
             Ok(())
         } else {
             Err(err)
@@ -671,9 +681,9 @@ impl<'a, D> UnicornHandle<'a, D> {
             until: u64, 
             timeout: u64, 
             count: usize
-    ) -> Result<(), ucconst::uc_error> {
+    ) -> Result<(), uc_error> {
         let err = unsafe { ffi::uc_emu_start(self.inner.uc, begin, until, timeout, count as _) };
-        if err == ucconst::uc_error::OK {
+        if err == uc_error::OK {
             Ok(())
         } else {
             Err(err)
@@ -684,9 +694,9 @@ impl<'a, D> UnicornHandle<'a, D> {
     ///
     /// This is usually called from callback function in hooks.
     /// NOTE: For now, this will stop the execution only after the current block.
-    pub fn emu_stop(&mut self) -> Result<(), ucconst::uc_error> {
+    pub fn emu_stop(&mut self) -> Result<(), uc_error> {
         let err = unsafe { ffi::uc_emu_stop(self.inner.uc) };
-        if err == ucconst::uc_error::OK {
+        if err == uc_error::OK {
             Ok(())
         } else {
             Err(err)
@@ -696,10 +706,10 @@ impl<'a, D> UnicornHandle<'a, D> {
     /// Query the internal status of the engine.
     /// 
     /// supported: MODE, PAGE_SIZE, ARCH
-    pub fn query(&self, query: ucconst::Query) -> Result<usize, ucconst::uc_error> {
+    pub fn query(&self, query: Query) -> Result<usize, uc_error> {
         let mut result: libc::size_t = Default::default();
         let err = unsafe { ffi::uc_query(self.inner.uc, query, &mut result) };
-        if err == ucconst::uc_error::OK {
+        if err == uc_error::OK {
             Ok(result)
         } else {
             Err(err)
@@ -710,9 +720,9 @@ impl<'a, D> UnicornHandle<'a, D> {
     /// 
     /// Multiple exit addresses can be specified. The Unicorn emulation has to be
     /// started manually before by using emu_start. 
-    pub fn afl_forkserver_start(&mut self, exits: &[u64]) -> Result<(), ucconst::AflRet> {
+    pub fn afl_forkserver_start(&mut self, exits: &[u64]) -> Result<(), AflRet> {
         let err = unsafe { ffi::uc_afl_forkserver_start(self.inner.uc, exits.as_ptr(), exits.len()) };
-        if err == ucconst::AflRet::ERROR {
+        if err == AflRet::ERROR {
             Err(err)
         } else {
             Ok(())
@@ -732,10 +742,10 @@ impl<'a, D> UnicornHandle<'a, D> {
             exits: &[u64],
             crash_validation_callback: G,
             always_validate: bool,
-            persistent_iters: u32) -> Result<(), ucconst::AflRet> 
+            persistent_iters: u32) -> Result<(), AflRet> 
         where
             F: FnMut(UnicornHandle<D>, &[u8], i32) -> bool,
-            G: FnMut(UnicornHandle<D>, ucconst::uc_error, &[u8], i32) -> bool {
+            G: FnMut(UnicornHandle<D>, uc_error, &[u8], i32) -> bool {
         let afl_fuzz_callback = Box::pin(ffi::AflFuzzCallback {
             unicorn: unsafe { self.inner.as_mut().get_unchecked_mut() }, 
             input_callback: Box::new(input_placement_callback),
@@ -751,7 +761,7 @@ impl<'a, D> UnicornHandle<'a, D> {
             always_validate,
             persistent_iters, 
             &*afl_fuzz_callback as *const _ as _) };
-        if err == ucconst::AflRet::ERROR {
+        if err == AflRet::ERROR {
             Err(err)
         } else {
             Ok(())
