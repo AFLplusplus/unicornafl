@@ -9,7 +9,7 @@ public interface UnicornConst {
    public static final int UC_VERSION_MAJOR = 1;
 
    public static final int UC_VERSION_MINOR = 0;
-   public static final int UC_VERSION_EXTRA = 2;
+   public static final int UC_VERSION_EXTRA = 3;
    public static final int UC_SECOND_SCALE = 1000000;
    public static final int UC_MILISECOND_SCALE = 1000;
    public static final int UC_ARCH_ARM = 1;
@@ -68,13 +68,12 @@ public interface UnicornConst {
    public static final int UC_ERR_HOOK_EXIST = 19;
    public static final int UC_ERR_RESOURCE = 20;
    public static final int UC_ERR_EXCEPTION = 21;
-   public static final int UC_ERR_TIMEOUT = 22;
 
    public static final int UC_AFL_RET_ERROR = 0;
    public static final int UC_AFL_RET_CHILD = 1;
    public static final int UC_AFL_RET_NO_AFL = 2;
-   public static final int UC_AFL_RET_FINISHED = 3;
-
+   public static final int UC_AFL_RET_CALLED_TWICE = 3;
+   public static final int UC_AFL_RET_FINISHED = 4;
    public static final int UC_MEM_READ = 16;
    public static final int UC_MEM_WRITE = 17;
    public static final int UC_MEM_FETCH = 18;
@@ -110,6 +109,7 @@ public interface UnicornConst {
    public static final int UC_QUERY_MODE = 1;
    public static final int UC_QUERY_PAGE_SIZE = 2;
    public static final int UC_QUERY_ARCH = 3;
+   public static final int UC_QUERY_TIMEOUT = 4;
 
    public static final int UC_PROT_NONE = 0;
    public static final int UC_PROT_READ = 1;

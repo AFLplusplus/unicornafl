@@ -174,7 +174,10 @@ def build_libraries():
 
         if SYSTEM == 'darwin':
             for file in glob.glob(MAC_LIBRARY_FILE):
-                shutil.copy(file, LIBS_DIR, follow_symlinks=False)
+                try:
+                    shutil.copy(file, LIBS_DIR, follow_symlinks=False)
+                except:
+                    shutil.copy(file, LIBS_DIR)
         else:
             shutil.copy(LIBRARY_FILE, LIBS_DIR)
         try:
@@ -251,21 +254,43 @@ except ImportError:
 def join_all(src, files):
     return tuple(os.path.join(src, f) for f in files)
 
+long_desc = '''
+Unicornafl for AFL++ (https://aflplus.plus).
+
+Unicorn is a lightweight, multi-platform, multi-architecture CPU emulator framework
+based on [QEMU](http://qemu.org).
+
+Unicorn offers some unparalleled features:
+
+- Multi-architecture: ARM, ARM64 (ARMv8), M68K, MIPS, PowerPC, SPARC and X86 (16, 32, 64-bit)
+- Clean/simple/lightweight/intuitive architecture-neutral API
+- Implemented in pure C language, with bindings for Crystal, Clojure, Visual Basic, Perl, Rust, Ruby, Python, Java, .NET, Go, Delphi/Free Pascal, Haskell, Pharo, and Lua.
+- Native support for Windows & *nix (with Mac OSX, Linux, *BSD & Solaris confirmed)
+- High performance via Just-In-Time compilation
+- Support for fine-grained instrumentation at various levels
+- Thread-safety by design
+- Distributed under free software license GPLv2
+
+Further information is available at http://www.unicorn-engine.org
+'''
+
 setup(
     provides=['unicornafl'],
     packages=['unicornafl'],
     name='unicornafl',
     version=VERSION,
-    author='Nguyen Anh Quynh',
+    author='AFLplusplus',
     author_email='aquynh@gmail.com',
-    description='Unicorn CPU emulator engine',
-    url='http://www.unicorn-engine.org',
+    description='Unicorn CPU emulator engine for AFL++ fuzzing',
+    long_description=long_desc,
+    long_description_content_type="text/markdown",
+    url='https://aflplus.plus',
     classifiers=[
         'License :: OSI Approved :: BSD License',
         'Programming Language :: Python :: 2',
         'Programming Language :: Python :: 3',
     ],
-    install_requires=['typing'],
+    install_requires=['typing'] if sys.version_info < (3,5) else [],
     cmdclass=cmdclass,
     zip_safe=True,
     include_package_data=True,

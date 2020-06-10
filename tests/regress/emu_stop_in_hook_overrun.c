@@ -28,6 +28,7 @@ Test for uc_emu_stop() in code hook not always stopping the emu at the current i
 
 // common includes
 #include <string.h>
+#include <inttypes.h>
 
 
 // Test MIPS little endian code.

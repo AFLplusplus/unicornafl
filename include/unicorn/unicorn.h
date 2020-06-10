@@ -37,6 +37,7 @@ typedef size_t uc_hook;
 #include "arm64.h"
 #include "mips.h"
 #include "sparc.h"
+#include "ppc.h"
 
 #ifdef __GNUC__
 #define DEFAULT_VISIBILITY __attribute__((visibility("default")))
@@ -76,7 +77,7 @@ typedef size_t uc_hook;
 // Unicorn package version
 #define UC_VERSION_MAJOR UC_API_MAJOR
 #define UC_VERSION_MINOR UC_API_MINOR
-#define UC_VERSION_EXTRA 2
+#define UC_VERSION_EXTRA 3
 
 /*
   Macro to create combined version which can be compared to
@@ -96,7 +97,7 @@ typedef enum uc_arch {
     UC_ARCH_ARM64,      // ARM-64, also called AArch64
     UC_ARCH_MIPS,       // Mips architecture
     UC_ARCH_X86,        // X86 architecture (including x86 & x86-64)
-    UC_ARCH_PPC,        // PowerPC architecture (currently unsupported)
+    UC_ARCH_PPC,        // PowerPC architecture
     UC_ARCH_SPARC,      // Sparc architecture
     UC_ARCH_M68K,       // M68K architecture
     UC_ARCH_MAX,
@@ -131,7 +132,7 @@ typedef enum uc_mode {
     UC_MODE_64 = 1 << 3,          // 64-bit mode
 
     // ppc 
-    UC_MODE_PPC32 = 1 << 2,       // 32-bit mode (currently unsupported)
+    UC_MODE_PPC32 = 1 << 2,       // 32-bit mode
     UC_MODE_PPC64 = 1 << 3,       // 64-bit mode (currently unsupported)
     UC_MODE_QPX = 1 << 4,         // Quad Processing eXtensions mode (currently unsupported)
 
@@ -168,7 +169,6 @@ typedef enum uc_err {
     UC_ERR_HOOK_EXIST,  // hook for this event already existed
     UC_ERR_RESOURCE,    // Insufficient resource: uc_emu_start()
     UC_ERR_EXCEPTION, // Unhandled CPU exception
-    UC_ERR_TIMEOUT // Emulation timed out
 } uc_err;
 
 #ifdef UNICORN_AFL
@@ -177,6 +177,7 @@ typedef enum uc_afl_ret {
   UC_AFL_RET_ERROR = 0, // Something went horribly wrong in the parent
   UC_AFL_RET_CHILD, // Fork worked. we are a child
   UC_AFL_RET_NO_AFL, // No AFL, no need to fork.
+  UC_AFL_RET_CALLED_TWICE, // AFL has already been started before.
   UC_AFL_RET_FINISHED, // We forked before but now AFL is gone (parent)
 } uc_afl_ret;
 #endif
@@ -343,8 +344,9 @@ typedef struct uc_mem_region {
 typedef enum uc_query_type {
     // Dynamically query current hardware mode.
     UC_QUERY_MODE = 1,
-    UC_QUERY_PAGE_SIZE,
-    UC_QUERY_ARCH,
+    UC_QUERY_PAGE_SIZE, // query pagesize of engine
+    UC_QUERY_ARCH,  // query architecture of engine (for ARM to query Thumb mode)
+    UC_QUERY_TIMEOUT,  // query if emulation stops due to timeout (indicated if result = True)
 } uc_query_type;
 
 // Opaque storage for CPU context, used with uc_context_*()
@@ -557,7 +559,7 @@ uc_err uc_emu_start(uc_engine *uc, uint64_t begin, uint64_t until, uint64_t time
  It's purpose is to place the input at the right place in unicorn.
 
  @uc: Unicorn instance
- @input: The current input we're workin on. Place this somewhere in unicorn's memory now.
+ @input: The current input we're working on. Place this somewhere in unicorn's memory now.
  @input_len: length of the input
  @persistent_round: which round we are currently crashing in, if using persistent mode.
  @data: Data pointer passed to uc_afl_fuzz(...).
@@ -568,7 +570,7 @@ uc_err uc_emu_start(uc_engine *uc, uint64_t begin, uint64_t until, uint64_t time
 */
 typedef bool (*uc_afl_cb_place_input_t)(uc_engine *uc, char *input, size_t input_len, uint32_t persistent_round, void *data);
 
-/* Callback function called after a non-UC_ERR_OK returncode was returned by Unicorn. 
+/* Callback function called after a non-UC_ERR_OK returncode was returned by Unicorn.
  This function is not mandatory (pass NULL).
  @uc: Unicorn instance
  @unicorn_result: The error state returned by the current testcase
@@ -579,7 +581,7 @@ typedef bool (*uc_afl_cb_place_input_t)(uc_engine *uc, char *input, size_t input
 
 @Return:
   If you return false, the crash is considered invalid and not reported to AFL.
-  If return is true, the crash is reported. 
+  If return is true, the crash is reported.
   -> The child will die and the forkserver will spawn a new child.
 */
 typedef bool (*uc_afl_cb_validate_crash_t)(uc_engine *uc, uc_err unicorn_result, char *input, int input_len, int persistent_round, void *data);
@@ -599,12 +601,12 @@ typedef bool (*uc_afl_cb_validate_crash_t)(uc_engine *uc, uc_err unicorn_result,
          This function needs to write the input from afl to the correct position on the unicorn object.
  @exits: address list of exits where fuzzing should stop (len == exit_count)
  @exit_count: number of exits where fuzzing should stop
- @validate_crash_callback: Optional callback (if not needed, pass NULL), that determines 
+ @validate_crash_callback: Optional callback (if not needed, pass NULL), that determines
          if a non-OK uc_err is an actual error. If false is returned, the test-case will not crash.
  @always_validate: If false, validate_crash_callback will only be called for crashes.
  @persistent_iters:
   The amount of loop iterations in persistent mode before restarteing with a new forked child.
-  If your target cannot be fuzzed using persistent mode (global state changes a lot), 
+  If your target cannot be fuzzed using persistent mode (global state changes a lot),
    set persistent_iters = 1 for the normal fork-server experience.
   Else, the default is usually around 1000.
   If your target is super stable (and unicorn is, too - not sure about that one),
@@ -621,12 +623,12 @@ typedef bool (*uc_afl_cb_validate_crash_t)(uc_engine *uc, uc_err unicorn_result,
 */
 UNICORN_EXPORT
 uc_afl_ret uc_afl_fuzz(
-    uc_engine *uc, 
-    char* input_file, 
-    uc_afl_cb_place_input_t place_input_callback, 
-    uint64_t *exits, 
-    size_t exit_count, 
-    uc_afl_cb_validate_crash_t validate_crash_callback, 
+    uc_engine *uc,
+    char* input_file,
+    uc_afl_cb_place_input_t place_input_callback,
+    uint64_t *exits,
+    size_t exit_count,
+    uc_afl_cb_validate_crash_t validate_crash_callback,
     bool always_validate,
     uint32_t persistent_iters,
     void *data
@@ -671,7 +673,7 @@ uc_afl_ret uc_afl_forkserver_start(uc_engine *uc, uint64_t *exits, size_t exit_c
    for detailed error).
 */
 UNICORN_EXPORT
-int uc_afl_emu_start(uc_engine *uc); 
+int uc_afl_emu_start(uc_engine *uc);
 
 /*
   If in child using persistent mode, signal you want a new testcase from AFL.

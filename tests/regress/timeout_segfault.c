@@ -9,6 +9,8 @@ call to uc_emu_start(). See issue #78 for more details:
 https://github.com/unicorn-engine/unicorn/issues/78
 */
 
+#include <inttypes.h>
+
 #include <unicorn/unicorn.h>
 
 

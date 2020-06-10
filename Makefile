@@ -17,39 +17,95 @@ UNAME_S := $(shell uname -s)
 # If you want to use 16 job threads, use "-j16".
 SMP_MFLAGS := -j4
 
-GENOBJ = $(shell find qemu/$(1) -name "*.o" 2>/dev/null) 
+UC_GET_OBJ = $(shell for i in \
+    $$(grep '$(1)' $(2) | sed '/^\#/d' | \
+    grep '\.o' | cut -d '=' -f 2); do \
+    echo $$i | grep '\.o' > /dev/null 2>&1; \
+    if [ $$? = 0 ]; then \
+    echo '$(3)'$$i; \
+    fi; done; echo)
+
+UC_TARGET_OBJ = $(filter-out qemu/../%,$(call UC_GET_OBJ,obj-,qemu/Makefile.objs, qemu/))
+UC_TARGET_OBJ += $(call UC_GET_OBJ,obj-,qemu/qom/Makefile.objs, qemu/qom/)
+UC_TARGET_OBJ += $(call UC_GET_OBJ,obj-y,qemu/util/Makefile.objs, qemu/util/)
+ifneq ($(filter MINGW%,$(UNAME_S)),)
+UC_TARGET_OBJ += $(call UC_GET_OBJ,obj-$$(CONFIG_WIN32),qemu/util/Makefile.objs, qemu/util/)
+else
+UC_TARGET_OBJ += $(call UC_GET_OBJ,obj-$$(CONFIG_POSIX),qemu/util/Makefile.objs, qemu/util/)
+endif
+
+UC_TARGET_OBJ_X86 = $(call UC_GET_OBJ,obj-,qemu/Makefile.target, qemu/x86_64-softmmu/)
+UC_TARGET_OBJ_X86 += $(call UC_GET_OBJ,obj-,qemu/hw/i386/Makefile.objs, qemu/x86_64-softmmu/hw/i386/)
+UC_TARGET_OBJ_X86 += $(call UC_GET_OBJ,obj-,qemu/target-i386/Makefile.objs, qemu/x86_64-softmmu/target-i386/)
+
+UC_TARGET_OBJ_M68K = $(call UC_GET_OBJ,obj-,qemu/Makefile.target, qemu/m68k-softmmu/)
+UC_TARGET_OBJ_M68K += $(call UC_GET_OBJ,obj-,qemu/target-m68k/Makefile.objs, qemu/m68k-softmmu/target-m68k/)
+
+UC_TARGET_OBJ_ARM = $(call UC_GET_OBJ,obj-,qemu/Makefile.target, qemu/arm-softmmu/)
+UC_TARGET_OBJ_ARM += $(call UC_GET_OBJ,obj-y,qemu/target-arm/Makefile.objs, qemu/arm-softmmu/target-arm/)
+UC_TARGET_OBJ_ARM += $(call UC_GET_OBJ,obj-$$(TARGET_ARM),qemu/target-arm/Makefile.objs, qemu/arm-softmmu/target-arm/)
+
+UC_TARGET_OBJ_ARMEB = $(subst /arm-softmmu/,/armeb-softmmu/,$(UC_TARGET_OBJ_ARM))
+
+UC_TARGET_OBJ_AARCH64 = $(call UC_GET_OBJ,obj-,qemu/Makefile.target, qemu/aarch64-softmmu/)
+UC_TARGET_OBJ_AARCH64 += $(call UC_GET_OBJ,obj-y,qemu/target-arm/Makefile.objs, qemu/aarch64-softmmu/target-arm/)
+UC_TARGET_OBJ_AARCH64 += $(call UC_GET_OBJ,obj-$$(TARGET_AARCH64),qemu/target-arm/Makefile.objs, qemu/aarch64-softmmu/target-arm/)
+
+UC_TARGET_OBJ_AARCH64EB = $(subst /aarch64-softmmu/,/aarch64eb-softmmu/,$(UC_TARGET_OBJ_AARCH64))
+
+UC_TARGET_OBJ_MIPS = $(call UC_GET_OBJ,obj-,qemu/Makefile.target, qemu/mips-softmmu/)
+UC_TARGET_OBJ_MIPS += $(call UC_GET_OBJ,obj-,qemu/hw/mips/Makefile.objs, qemu/mips-softmmu/hw/mips/)
+UC_TARGET_OBJ_MIPS += $(call UC_GET_OBJ,obj-,qemu/target-mips/Makefile.objs, qemu/mips-softmmu/target-mips/)
+
+UC_TARGET_OBJ_MIPSEL = $(subst /mips-softmmu/,/mipsel-softmmu/,$(UC_TARGET_OBJ_MIPS))
+
+UC_TARGET_OBJ_MIPS64 = $(subst /mips-softmmu/,/mips64-softmmu/,$(UC_TARGET_OBJ_MIPS))
+
+UC_TARGET_OBJ_MIPS64EL = $(subst /mips-softmmu/,/mips64el-softmmu/,$(UC_TARGET_OBJ_MIPS))
+
+UC_TARGET_OBJ_SPARC = $(call UC_GET_OBJ,obj-,qemu/Makefile.target, qemu/sparc-softmmu/)
+UC_TARGET_OBJ_SPARC += $(call UC_GET_OBJ,obj-y,qemu/target-sparc/Makefile.objs, qemu/sparc-softmmu/target-sparc/)
+UC_TARGET_OBJ_SPARC += $(call UC_GET_OBJ,obj-$$(TARGET_SPARC),qemu/target-sparc/Makefile.objs, qemu/sparc-softmmu/target-sparc/)
+
+UC_TARGET_OBJ_SPARC64 = $(call UC_GET_OBJ,obj-,qemu/Makefile.target, qemu/sparc64-softmmu/)
+UC_TARGET_OBJ_SPARC64 += $(call UC_GET_OBJ,obj-y,qemu/target-sparc/Makefile.objs, qemu/sparc64-softmmu/target-sparc/)
+UC_TARGET_OBJ_SPARC64 += $(call UC_GET_OBJ,obj-$$(TARGET_SPARC64),qemu/target-sparc/Makefile.objs, qemu/sparc64-softmmu/target-sparc/)
+
+UC_TARGET_OBJ_PPC = $(call UC_GET_OBJ,obj-,qemu/Makefile.target, qemu/ppc-softmmu/)
+UC_TARGET_OBJ_PPC += $(call UC_GET_OBJ,obj-,qemu/hw/ppc/Makefile.objs, qemu/ppc-softmmu/hw/ppc/)
+UC_TARGET_OBJ_PPC += $(call UC_GET_OBJ,obj-y,qemu/target-ppc/Makefile.objs, qemu/ppc-softmmu/target-ppc/)
 
 ifneq (,$(findstring x86,$(UNICORN_ARCHS)))
-	UC_TARGET_OBJ += $(call GENOBJ,x86_64-softmmu)
+	UC_TARGET_OBJ += $(UC_TARGET_OBJ_X86)
 	UNICORN_CFLAGS += -DUNICORN_HAS_X86
 	UNICORN_TARGETS += x86_64-softmmu,
 endif
 ifneq (,$(findstring arm,$(UNICORN_ARCHS)))
-	UC_TARGET_OBJ += $(call GENOBJ,arm-softmmu)
-	UC_TARGET_OBJ += $(call GENOBJ,armeb-softmmu)
+	UC_TARGET_OBJ += $(UC_TARGET_OBJ_ARM)
+	UC_TARGET_OBJ += $(UC_TARGET_OBJ_ARMEB)
 	UNICORN_CFLAGS += -DUNICORN_HAS_ARM
 	UNICORN_CFLAGS += -DUNICORN_HAS_ARMEB
 	UNICORN_TARGETS += arm-softmmu,
 	UNICORN_TARGETS += armeb-softmmu,
 endif
 ifneq (,$(findstring m68k,$(UNICORN_ARCHS)))
-	UC_TARGET_OBJ += $(call GENOBJ,m68k-softmmu)
+	UC_TARGET_OBJ += $(UC_TARGET_OBJ_M68K)
 	UNICORN_CFLAGS += -DUNICORN_HAS_M68K
 	UNICORN_TARGETS += m68k-softmmu,
 endif
 ifneq (,$(findstring aarch64,$(UNICORN_ARCHS)))
-	UC_TARGET_OBJ += $(call GENOBJ,aarch64-softmmu)
-	UC_TARGET_OBJ += $(call GENOBJ,aarch64eb-softmmu)
+	UC_TARGET_OBJ += $(UC_TARGET_OBJ_AARCH64)
+	UC_TARGET_OBJ += $(UC_TARGET_OBJ_AARCH64EB)
 	UNICORN_CFLAGS += -DUNICORN_HAS_ARM64
 	UNICORN_CFLAGS += -DUNICORN_HAS_ARM64EB
 	UNICORN_TARGETS += aarch64-softmmu,
 	UNICORN_TARGETS += aarch64eb-softmmu,
 endif
 ifneq (,$(findstring mips,$(UNICORN_ARCHS)))
-	UC_TARGET_OBJ += $(call GENOBJ,mips-softmmu)
-	UC_TARGET_OBJ += $(call GENOBJ,mipsel-softmmu)
-	UC_TARGET_OBJ += $(call GENOBJ,mips64-softmmu)
-	UC_TARGET_OBJ += $(call GENOBJ,mips64el-softmmu)
+	UC_TARGET_OBJ += $(UC_TARGET_OBJ_MIPS)
+	UC_TARGET_OBJ += $(UC_TARGET_OBJ_MIPSEL)
+	UC_TARGET_OBJ += $(UC_TARGET_OBJ_MIPS64)
+	UC_TARGET_OBJ += $(UC_TARGET_OBJ_MIPS64EL)
 	UNICORN_CFLAGS += -DUNICORN_HAS_MIPS
 	UNICORN_CFLAGS += -DUNICORN_HAS_MIPSEL
 	UNICORN_CFLAGS += -DUNICORN_HAS_MIPS64
@@ -59,12 +115,22 @@ ifneq (,$(findstring mips,$(UNICORN_ARCHS)))
 	UNICORN_TARGETS += mips64-softmmu,
 	UNICORN_TARGETS += mips64el-softmmu,
 endif
+ifneq (,$(findstring ppc,$(UNICORN_ARCHS)))
+	UC_TARGET_OBJ += $(UC_TARGET_OBJ_PPC)
+#	UC_TARGET_OBJ += $(call GENOBJ,ppc64-softmmu)
+	UNICORN_CFLAGS += -DUNICORN_HAS_PPC
+#	UNICORN_CFLAGS += -DUNICORN_HAS_PPC64
+	UNICORN_TARGETS += ppc-softmmu,
+#	UNICORN_TARGETS += ppc64-softmmu,
+endif
 ifneq (,$(findstring sparc,$(UNICORN_ARCHS)))
-	UC_TARGET_OBJ += $(call GENOBJ,sparc-softmmu)
-	UC_TARGET_OBJ += $(call GENOBJ,sparc64-softmmu)
+	UC_TARGET_OBJ += $(UC_TARGET_OBJ_SPARC)
+	UC_TARGET_OBJ += $(UC_TARGET_OBJ_SPARC64)
 	UNICORN_CFLAGS += -DUNICORN_HAS_SPARC
 	UNICORN_TARGETS += sparc-softmmu,sparc64-softmmu,
 endif
+
+UC_OBJ_ALL = $(UC_TARGET_OBJ) list.o uc.o afl.o
 
 UNICORN_CFLAGS += -fPIC
 
@@ -81,19 +147,19 @@ CFLAGS += -O3
 UNICORN_QEMU_FLAGS += --disable-debug-info
 endif
 
-ifeq ($(UNICORN_ASAN),yes)
-CC = clang -fsanitize=address -fno-omit-frame-pointer
-CXX = clang++ -fsanitize=address -fno-omit-frame-pointer
-AR = llvm-ar
-LDFLAGS := -fsanitize=address ${LDFLAGS}
-endif
-
 ifeq ($(UNICORN_AFL),yes)
 UNICORN_CFLAGS += -DUNICORN_AFL
 endif
 
 ifeq ($(AFL_DEBUG),yes)
 UNICORN_CFLAGS += -DAFL_DEBUG
+endif
+
+ifeq ($(UNICORN_ASAN),yes)
+CC = clang -fsanitize=address -fno-omit-frame-pointer
+CXX = clang++ -fsanitize=address -fno-omit-frame-pointer
+AR = llvm-ar
+LDFLAGS := -fsanitize=address ${LDFLAGS}
 endif
 
 ifeq ($(CROSS),)
@@ -180,8 +246,6 @@ LIBRARY_SYMLINK = lib$(LIBNAME).$(EXT)
 endif
 endif
 
-UNICORN_QEMU_FLAGS += --python=$(shell which /usr/bin/python || which python || which python2)
-
 ifeq ($(UNICORN_STATIC),yes)
 ifneq ($(filter MINGW%,$(UNAME_S)),)
 ARCHIVE = $(LIBNAME).$(AR_EXT)
@@ -228,27 +292,35 @@ endif
 
 $(LIBNAME)_LDFLAGS += -lm
 
-.PHONY: all
+.PHONY: test fuzz bindings clean FORCE
+
 all: unicorn
 	$(MAKE) -C samples
 
-qemu/config-host.h-timestamp:
+qemu/config-host.mak: qemu/configure
 	cd qemu && \
 	./configure --cc="${CC}" --extra-cflags="$(UNICORN_CFLAGS)" --target-list="$(UNICORN_TARGETS)" ${UNICORN_QEMU_FLAGS}
-	printf "$(UNICORN_ARCHS)" > config.log
+	@printf "$(UNICORN_ARCHS)" > config.log
+
+afl.o: qemu/config-host.mak FORCE
 	$(MAKE) -C qemu $(SMP_MFLAGS)
-	$(eval UC_TARGET_OBJ += $$(wildcard qemu/util/*.o) $$(wildcard qemu/*.o) $$(wildcard qemu/qom/*.o) $$(wildcard qemu/hw/core/*.o) $$(wildcard qemu/qapi/*.o) $$(wildcard qemu/qobject/*.o))
+
+uc.o: qemu/config-host.mak FORCE
+	$(MAKE) -C qemu $(SMP_MFLAGS)
+
+$(UC_TARGET_OBJ) list.o: uc.o afl.o
+	@echo "--- $^ $@" > /dev/null
 
 unicorn: $(LIBRARY) $(ARCHIVE)
 
-$(LIBRARY): qemu/config-host.h-timestamp
+$(LIBRARY): $(UC_OBJ_ALL)
 ifeq ($(UNICORN_SHARED),yes)
 ifeq ($(V),0)
 	$(call log,GEN,$(LIBRARY))
-	@$(CC) $(CFLAGS) -shared $(UC_TARGET_OBJ) uc.o afl.o list.o -o $(LIBRARY) $($(LIBNAME)_LDFLAGS)
+	@$(CC) $(CFLAGS) -shared $(UC_OBJ_ALL) -o $(LIBRARY) $($(LIBNAME)_LDFLAGS)
 	@-ln -sf $(LIBRARY) $(LIBRARY_SYMLINK)
 else
-	$(CC) $(CFLAGS) -shared $(UC_TARGET_OBJ) uc.o afl.o list.o -o $(LIBRARY) $($(LIBNAME)_LDFLAGS)
+	$(CC) $(CFLAGS) -shared $(UC_OBJ_ALL) -o $(LIBRARY) $($(LIBNAME)_LDFLAGS)
 	-ln -sf $(LIBRARY) $(LIBRARY_SYMLINK)
 endif
 ifeq ($(DO_WINDOWS_EXPORT),1)
@@ -260,14 +332,14 @@ endif
 endif
 endif
 
-$(ARCHIVE): qemu/config-host.h-timestamp
+$(ARCHIVE): $(UC_OBJ_ALL)
 ifeq ($(UNICORN_STATIC),yes)
 ifeq ($(V),0)
 	$(call log,GEN,$(ARCHIVE))
-	@$(AR) q $(ARCHIVE) $(UC_TARGET_OBJ) uc.o afl.o list.o
+	@$(AR) q $(ARCHIVE) $(UC_OBJ_ALL)
 	@$(RANLIB) $(ARCHIVE)
 else
-	$(AR) q $(ARCHIVE) $(UC_TARGET_OBJ) uc.o afl.o list.o
+	$(AR) q $(ARCHIVE) $(UC_OBJ_ALL)
 	$(RANLIB) $(ARCHIVE)
 endif
 endif
@@ -276,18 +348,16 @@ $(PKGCFGF):
 	$(generate-pkgcfg)
 
 
-.PHONY: fuzz
 fuzz: all
 	$(MAKE) -C tests/fuzz all
 
-.PHONY: test
 test: all
 	$(MAKE) -C tests/unit test
 	$(MAKE) -C tests/regress test
 	$(MAKE) -C bindings test
 
-install: qemu/config-host.h-timestamp $(PKGCFGF)
-	mkdir -p $(DESTDIR)$(LIBDIR)
+install: $(LIBRARY) $(ARCHIVE) $(PKGCFGF)
+	install -d $(DESTDIR)$(LIBDIR)
 ifeq ($(UNICORN_SHARED),yes)
 ifneq ($(filter CYGWIN%,$(UNAME_S)),)
 	$(INSTALL_LIB) $(LIBRARY) $(DESTDIR)$(BINDIR)
@@ -303,9 +373,9 @@ endif
 ifeq ($(UNICORN_STATIC),yes)
 	$(INSTALL_DATA) $(ARCHIVE) $(DESTDIR)$(LIBDIR)
 endif
-	mkdir -p $(DESTDIR)$(INCDIR)/$(LIBNAME)
+	install -d $(DESTDIR)$(INCDIR)/$(LIBNAME)
 	$(INSTALL_DATA) include/unicorn/*.h $(DESTDIR)$(INCDIR)/$(LIBNAME)
-	mkdir -p $(DESTDIR)$(PKGCFGDIR)
+	install -d $(DESTDIR)$(PKGCFGDIR)
 	$(INSTALL_DATA) $(PKGCFGF) $(DESTDIR)$(PKGCFGDIR)/
 
 
@@ -316,7 +386,7 @@ else
 DIST_VERSION = $(TAG)
 endif
 
-bindings: qemu/config-host.h-timestamp
+bindings: all
 	$(MAKE) -C bindings build
 	$(MAKE) -C bindings samples
 
@@ -328,7 +398,7 @@ dist:
 # run "make header" whenever qemu/header_gen.py is modified
 header:
 	$(eval TARGETS := m68k arm armeb aarch64 aarch64eb mips mipsel mips64 mips64el\
-		powerpc sparc sparc64 x86_64)
+		sparc sparc64 x86_64 ppc)
 	$(foreach var,$(TARGETS),\
 		$(shell python qemu/header_gen.py $(var) > qemu/$(var).h;))
 	@echo "Generated headers for $(TARGETS)."
@@ -342,7 +412,7 @@ uninstall:
 
 
 clean:
-	$(MAKE) -C qemu clean
+	$(MAKE) -C qemu distclean
 	rm -rf *.d *.o
 	rm -rf lib$(LIBNAME)* $(LIBNAME)*.lib $(LIBNAME)*.dll $(LIBNAME)*.a $(LIBNAME)*.def $(LIBNAME)*.exp cyg$(LIBNAME)*.dll
 	$(MAKE) -C samples clean
@@ -364,4 +434,3 @@ endef
 define log
 	@printf "  %-7s %s\n" "$(1)" "$(2)"
 endef
-

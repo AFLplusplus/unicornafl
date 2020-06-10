@@ -34,6 +34,7 @@
 #include <sys/types.h>
 #include <sys/wait.h>
 #include <unicorn.h>
+#include "config.h"
 #include "types.h"
 #include "afl-unicorn-common.h"
 
@@ -42,13 +43,16 @@
 
 #define FF16 (0xFFFFFFFFFFFFFFFF)
 
+/* Copied from aflpp/types.h to talk to forkserver */
+#define FS_OPT_ENABLED 0x80000001
+#define FS_OPT_SHDMEM_FUZZ 0x01000000
+
 /**
  * The correct fds for reading and writing pipes
  */
 
 #define _R(pipe) ((pipe)[0])
 #define _W(pipe) ((pipe)[1])
-
 
 /* Function declarations. */
 
@@ -72,11 +76,11 @@ struct afl_tsl {
 
 };
 
-/* Current state, as fowarded from forkserver child to parent */
+/* Current state, as forwarded from forkserver child to parent */
 
 enum afl_child_ret {
 
-  // Persistent 
+  // Persistent
   AFL_CHILD_NEXT,
   // Crash discovered but still alive in persistent mode
   AFL_CHILD_FOUND_CRASH,
@@ -99,7 +103,7 @@ static void afl_setup(struct uc_struct* uc) {
 
   char *id_str = getenv(SHM_ENV_VAR);
   char *inst_r = getenv("AFL_INST_RATIO");
- 
+
   // A value we can use to tell AFL our persistent mode found a crash
   wifsignaled = afl_find_wifsignaled_id();
 
@@ -130,7 +134,7 @@ static void afl_setup(struct uc_struct* uc) {
     uc->afl_area_ptr[0] = 1;
 
     if (uc->afl_area_ptr == (void*)-1) exit(1);
-    
+
   }
 
   /* Maintain for compatibility */
@@ -140,6 +144,11 @@ static void afl_setup(struct uc_struct* uc) {
     uc->afl_compcov_level = atoi(getenv("AFL_COMPCOV_LEVEL"));
 
   }
+#if defined(AFL_DEBUG)
+  if (uc->afl_compcov_level) {
+    printf("[d] USING AFL_COMPCOV_LEVEL %d\n", uc->afl_compcov_level);
+  }
+#endif
 
 }
 
@@ -159,24 +168,50 @@ static int afl_find_wifsignaled_id(void) {
 }
 
 /* Fork server logic, invoked by calling uc_afl_forkserver_start.
-   Roughly follows https://github.com/vanhauser-thc/AFLplusplus/blob/c83e8e1e6255374b085292ba8673efdca7388d76/llvm_mode/afl-llvm-rt.o.c#L130 
+   Roughly follows https://github.com/vanhauser-thc/AFLplusplus/blob/c83e8e1e6255374b085292ba8673efdca7388d76/llvm_mode/afl-llvm-rt.o.c#L130
    */
 
 static inline uc_afl_ret afl_forkserver(CPUArchState* env) {
 
-  static unsigned char tmp[4] = {0};
+  unsigned char tmp[4] = {0};
   pid_t   child_pid;
   enum afl_child_ret child_ret = AFL_CHILD_EXITED;
   bool first_round = true;
+  u32 status = 0;
 
   if (!env->uc->afl_area_ptr) return UC_AFL_RET_NO_AFL;
+
+  if (env->uc->afl_testcase_ptr) {
+    /* Parent supports testcases via shared map - and the user wants to use it. Tell AFL. */
+    status = (FS_OPT_ENABLED | FS_OPT_SHDMEM_FUZZ);
+  }
 
   /* Phone home and tell the parent that we're OK. If parent isn't there,
      assume we're not running in forkserver mode and just execute program. */
 
-  if (write(FORKSRV_FD + 1, tmp, 4) != 4) return UC_AFL_RET_NO_AFL;
+  if (write(FORKSRV_FD + 1, &status, 4) != 4) return UC_AFL_RET_NO_AFL;
+
+  /* afl tells us in an extra message if it accepted this option or not */
+  if (env->uc->afl_testcase_ptr && getenv(SHM_FUZZ_ENV_VAR)) {
+    if (read(FORKSRV_FD, &status, 4) != 4) {
+      fprintf(stderr, "[!] AFL parent exited before forkserver was up\n");
+      return UC_AFL_RET_ERROR;
+    }
+    if (status != (FS_OPT_ENABLED | FS_OPT_SHDMEM_FUZZ)) {
+      fprintf(stderr, "[!] Unexpected response from AFL++ on forkserver setup\n");
+      return UC_AFL_RET_ERROR;
+    }
+  } else {
+#if defined(AFL_DEBUG)
+    printf("[d] AFL++ sharedmap fuzzing not supported/SHM_FUZZ_ENV_VAR not set\n");
+#endif
+  }
 
   void (*old_sigchld_handler)(int) = signal(SIGCHLD, SIG_DFL);
+
+#if defined(AFL_DEBUG)
+  printf("[d] Entering forkserver loop\n");
+#endif
 
   while (1) {
 
@@ -192,7 +227,7 @@ static inline uc_afl_ret afl_forkserver(CPUArchState* env) {
     process. */
 
     if ((child_ret != AFL_CHILD_EXITED) && was_killed) {
-    
+
 #if defined(AFL_DEBUG)
       printf("[d] Child was killed by AFL in the meantime.\n");
 #endif
@@ -242,7 +277,7 @@ static inline uc_afl_ret afl_forkserver(CPUArchState* env) {
 
         signal(SIGCHLD, old_sigchld_handler);
         // FORKSRV_FD is for communication with AFL, we don't need it in the child.
-        close(FORKSRV_FD); 
+        close(FORKSRV_FD);
         close(FORKSRV_FD + 1);
         close(_R(env->uc->afl_child_pipe));
         close(_W(env->uc->afl_parent_pipe));
@@ -281,7 +316,9 @@ static inline uc_afl_ret afl_forkserver(CPUArchState* env) {
     } else { // parent, in persistent mode
 
       /* Special handling for persistent mode: if the child is alive but
-         currently stopped, simply restart it with a write to afl_parent_pipe. */
+         currently stopped, simply restart it with a write to afl_parent_pipe.
+         In case we fuzz using shared map, use this method to forward the size
+         of the current testcase to the child without cost. */
 
       if (write(_W(env->uc->afl_parent_pipe), tmp, 4) != 4) {
 
@@ -311,7 +348,7 @@ static inline uc_afl_ret afl_forkserver(CPUArchState* env) {
     } else if (child_ret == AFL_CHILD_FOUND_CRASH) {
 
       /* WIFSIGNALED(wifsignaled) == 1 -> tells AFL the child crashed (even though it's still alive for persistent mode) */
-      
+
       status = wifsignaled;
 
     } else if (child_ret == AFL_CHILD_EXITED) {
@@ -356,12 +393,12 @@ static inline void afl_request_tsl(struct uc_struct* uc, target_ulong pc, target
   };
 
 #if defined(AFL_DEBUG)
-  printf("Requesting tsl, pc=0x%lx, cb=0x%lx, flags=0x%lx\n", (uint64_t) pc, (uint64_t) cb, flags);
+  printf("Requesting tsl, pc=0x%llx, cb=0x%llx, flags=0x%llx\n", (unsigned long long) pc, (unsigned long long) cb, (unsigned long long) flags);
 #endif
 
   // We write tsl requests in two steps but that's fine since cache requests are not very common over the time of fuzzing.
 
-  if ((write(_W(uc->afl_child_pipe), &tsl_req, sizeof(enum afl_child_ret)) != sizeof(enum afl_child_ret)) 
+  if ((write(_W(uc->afl_child_pipe), &tsl_req, sizeof(enum afl_child_ret)) != sizeof(enum afl_child_ret))
       || write(_W(uc->afl_child_pipe), &t, sizeof(struct afl_tsl)) != sizeof(struct afl_tsl)) {
 
     fprintf(stderr, "Error writing to child pipe. Parent dead?\n");
@@ -375,7 +412,7 @@ static inline void afl_request_tsl(struct uc_struct* uc, target_ulong pc, target
 static uc_afl_ret afl_request_next(struct uc_struct* uc, bool crash_found) {
 
   enum afl_child_ret msg = crash_found? AFL_CHILD_FOUND_CRASH : AFL_CHILD_NEXT;
-  static unsigned char tmp[4] = {0};
+  char tmp[4];
 
 #if defined(AFL_DEBUG)
   printf("[d] request next. crash found: %s\n", crash_found ? "true": "false");
@@ -392,13 +429,15 @@ static uc_afl_ret afl_request_next(struct uc_struct* uc, bool crash_found) {
 
   // Once the parent has written something, the next persistent loop starts.
   // The parent itself will wait for AFL to signal the new testcases is available.
-  if (read(_R(uc->afl_parent_pipe), &tmp, 4) != 4) {
+  // This blocks until the next testcase is ready.
+  if (read(_R(uc->afl_parent_pipe), tmp, 4) != 4) {
 
     fprintf(stderr, "[!] Error reading from parent pipe. Parent dead?\n");
     return UC_AFL_RET_ERROR;
 
   }
 
+  /* For shared map fuzzing, the forkserver parent forwards the size of the current testcase. */
   memset(uc->afl_area_ptr, 0, MAP_SIZE);
   MEM_BARRIER(); // Also make sure nothing read before this point.
 
@@ -443,9 +482,9 @@ static enum afl_child_ret afl_handle_child_requests(CPUArchState* env) {
       tb_find_slow(env, t.pc, t.cs_base, t.flags);
 
     } else {
-      
+
       fprintf(stderr, "[!] Unexpected response by child! %d. Please report this as bug for unicornafl.\n"
-                      "    Expected one of {AFL_CHILD_NEXT: %d, AFL_CHILD_FOUND_CRASH: %d, AFL_CHILD_TSL_REQUEST: %d}.\n", 
+                      "    Expected one of {AFL_CHILD_NEXT: %d, AFL_CHILD_FOUND_CRASH: %d, AFL_CHILD_TSL_REQUEST: %d}.\n",
                       child_msg, AFL_CHILD_NEXT, AFL_CHILD_FOUND_CRASH, AFL_CHILD_TSL_REQUEST);
 
     }

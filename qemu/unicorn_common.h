@@ -1,3 +1,4 @@
+/* Modified for Unicorn Engine by Chen Huitao<chenhuitao@hfmrit.com>, 2020 */
 #ifndef UNICORN_COMMON_H_
 #define UNICORN_COMMON_H_
 
@@ -51,6 +52,8 @@ static void release_common(void *t)
     memory_free(s->uc);
     tb_cleanup(s->uc);
     free_code_gen_buffer(s->uc);
+    cpu_watchpoint_remove_all(CPU(s->uc->cpu), BP_CPU);
+    cpu_breakpoint_remove_all(CPU(s->uc->cpu), BP_CPU);
 
 #if TCG_TARGET_REG_BITS == 32
     for(i = 0; i < s->nb_globals; i++) {
@@ -67,7 +70,6 @@ static void release_common(void *t)
 
 static inline void uc_common_init(struct uc_struct* uc)
 {
-    memory_register_types(uc);
     uc->write_mem = cpu_physical_mem_write;
     uc->read_mem = cpu_physical_mem_read;
     uc->tcg_enabled = tcg_enabled;
@@ -95,6 +97,8 @@ static inline void uc_common_init(struct uc_struct* uc)
     uc->afl_parent_pipe[0] = 0;
     uc->afl_parent_pipe[1] = 0;
     uc->afl_child_request_next = NULL;  // This callback is only set if inside child.
+    uc->afl_testcase_ptr = NULL;
+    uc->afl_testcase_size_p = NULL;
 #endif
 }
 

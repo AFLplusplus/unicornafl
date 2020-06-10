@@ -28,6 +28,7 @@ but that the code hook is just not occurring.
 // posix specific
 #else // _MSC_VER
 #include <unicorn/unicorn.h>
+#include <inttypes.h>
 #endif // _MSC_VER
 
 // common includes

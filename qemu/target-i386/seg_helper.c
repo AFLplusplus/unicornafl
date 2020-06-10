@@ -949,6 +949,8 @@ void helper_syscall(CPUX86State *env, int next_eip_addend)
     struct hook *hook;
     HOOK_FOREACH_VAR_DECLARE;
     HOOK_FOREACH(env->uc, hook, UC_HOOK_INSN) {
+        if (hook->to_delete)
+            continue;
         if (!HOOK_BOUND_CHECK(hook, env->eip))
             continue;
         if (hook->insn == UC_X86_INS_SYSCALL)
@@ -1294,7 +1296,10 @@ bool x86_cpu_exec_interrupt(CPUState *cs, int interrupt_request)
 #if !defined(CONFIG_USER_ONLY)
     if (interrupt_request & CPU_INTERRUPT_POLL) {
         cs->interrupt_request &= ~CPU_INTERRUPT_POLL;
+#if 0
+        /* do nothing */
         apic_poll_irq(cpu->apic_state);
+#endif
     }
 #endif
     if (interrupt_request & CPU_INTERRUPT_SIPI) {
@@ -1326,7 +1331,10 @@ bool x86_cpu_exec_interrupt(CPUState *cs, int interrupt_request)
             cpu_svm_check_intercept_param(env, SVM_EXIT_INTR, 0);
             cs->interrupt_request &= ~(CPU_INTERRUPT_HARD |
                                        CPU_INTERRUPT_VIRQ);
-            intno = cpu_get_pic_interrupt(env);
+            /* intno = cpu_get_pic_interrupt(env);
+               cpu_get_pic_interrupt() always return 0
+                when apic_state is NULL.*/
+            intno = 0;
             qemu_log_mask(CPU_LOG_TB_IN_ASM,
                           "Servicing hardware INT=0x%02x\n", intno);
             do_interrupt_x86_hardirq(env, intno, 1);
@@ -2389,6 +2397,8 @@ void helper_sysenter(CPUX86State *env, int next_eip_addend)
     struct hook *hook;
     HOOK_FOREACH_VAR_DECLARE;
     HOOK_FOREACH(env->uc, hook, UC_HOOK_INSN) {
+        if (hook->to_delete)
+            continue;
         if (!HOOK_BOUND_CHECK(hook, env->eip))
             continue;
         if (hook->insn == UC_X86_INS_SYSENTER)

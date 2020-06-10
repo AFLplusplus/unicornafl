@@ -47,7 +47,7 @@ void HELPER(afl_maybe_log)(void* uc_ptr, uint64_t cur_loc) {
   INC_AFL_AREA(afl_idx);
 
 #if defined(AFL_DEBUG)
-  printf("[d] At loc 0x%lx: prev: 0x%lx, afl_idx: %lu, map[afl_idx]: %d\n", cur_loc, uc->afl_prev_loc, afl_idx, afl_area_ptr[afl_idx]);
+  printf("[d] At loc 0x%llx: prev: 0x%llx, afl_idx: %lu, map[afl_idx]: %d\n", (unsigned long long) cur_loc, (unsigned long long) uc->afl_prev_loc, (unsigned long) afl_idx, afl_area_ptr[afl_idx]);
 #endif
 
   uc->afl_prev_loc = cur_loc >> 1;

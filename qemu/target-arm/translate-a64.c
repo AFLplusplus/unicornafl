@@ -888,6 +888,7 @@ static void write_vec_element(DisasContext *s, TCGv_i64 tcg_src, int destidx,
 {
     TCGContext *tcg_ctx = s->uc->tcg_ctx;
     int vect_off = vec_reg_offset(s, destidx, element, memop & MO_SIZE);
+    CPUState *cs;
     switch (memop) {
     case MO_8:
         tcg_gen_st8_i64(tcg_ctx, tcg_src, tcg_ctx->cpu_env, vect_off);
@@ -902,7 +903,10 @@ static void write_vec_element(DisasContext *s, TCGv_i64 tcg_src, int destidx,
         tcg_gen_st_i64(tcg_ctx, tcg_src, tcg_ctx->cpu_env, vect_off);
         break;
     default:
-        g_assert_not_reached();
+        cs = CPU(s->uc->cpu);
+        cs->exception_index = EXCP_UDEF;
+        cpu_loop_exit(cs);
+        break;
     }
 }
 
@@ -5589,7 +5593,7 @@ static void handle_simd_dupe(DisasContext *s, int is_q, int rd, int rn,
 {
     TCGContext *tcg_ctx = s->uc->tcg_ctx;
     int size = ctz32(imm5);
-    int esize = 8 << size;
+    int esize = 8 << (size & 0x1f);
     int elements = (is_q ? 128 : 64) / esize;
     int index, i;
     TCGv_i64 tmp;

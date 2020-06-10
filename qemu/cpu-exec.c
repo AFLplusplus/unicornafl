@@ -43,13 +43,9 @@ void cpu_loop_exit(CPUState *cpu)
 /* exit the current TB from a signal handler. The host registers are
    restored in a state compatible with the CPU emulator
    */
-#if defined(CONFIG_SOFTMMU)
-
 void cpu_resume_from_signal(CPUState *cpu, void *puc)
 {
-#endif
     /* XXX: restore cpu registers saved in host registers */
-
     cpu->exception_index = -1;
     siglongjmp(cpu->jmp_env, 1);
 }
@@ -108,7 +104,6 @@ int cpu_exec(struct uc_struct *uc, CPUArchState *env)   // qq
     uintptr_t next_tb;
     struct hook *hook;
 
-
     if (cpu->halted) {
         if (!cpu_has_work(cpu)) {
             return EXCP_HALTED;
@@ -164,10 +159,21 @@ int cpu_exec(struct uc_struct *uc, CPUArchState *env)   // qq
                     ret = cpu->exception_index;
                     break;
 #else
+#if defined(TARGET_X86_64)
+                    if (env->exception_is_int) {
+                        // point EIP to the next instruction after INT
+                        env->eip = env->exception_next_eip;
+                    }
+#endif
+#if defined(TARGET_MIPS) || defined(TARGET_MIPS64)
+                    env->active_tc.PC = uc->next_pc;
+#endif
                     if (uc->stop_interrupt && uc->stop_interrupt(cpu->exception_index)) {
                         // Unicorn: call registered invalid instruction callbacks
                         HOOK_FOREACH_VAR_DECLARE;
                         HOOK_FOREACH(uc, hook, UC_HOOK_INSN_INVALID) {
+                            if (hook->to_delete)
+                                continue;
                             catched = ((uc_cb_hookinsn_invalid_t)hook->callback)(uc, hook->user_data);
                             if (catched)
                                 break;
@@ -178,6 +184,8 @@ int cpu_exec(struct uc_struct *uc, CPUArchState *env)   // qq
                         // Unicorn: call registered interrupt callbacks
                         HOOK_FOREACH_VAR_DECLARE;
                         HOOK_FOREACH(uc, hook, UC_HOOK_INTR) {
+                            if (hook->to_delete)
+                                continue;
                             ((uc_cb_hookintr_t)hook->callback)(uc, cpu->exception_index, hook->user_data);
                             catched = true;
                         }
@@ -193,15 +201,6 @@ int cpu_exec(struct uc_struct *uc, CPUArchState *env)   // qq
                     }
 
                     cpu->exception_index = -1;
-#if defined(TARGET_X86_64)
-                    if (env->exception_is_int) {
-                        // point EIP to the next instruction after INT
-                        env->eip = env->exception_next_eip;
-                    }
-#endif
-#if defined(TARGET_MIPS) || defined(TARGET_MIPS64)
-                    env->active_tc.PC = uc->next_pc;
-#endif
 #endif
                 }
             }
@@ -333,6 +332,9 @@ int cpu_exec(struct uc_struct *uc, CPUArchState *env)   // qq
         }
     } /* for(;;) */
 
+    // Unicorn: Clear any TCG exit flag that might have been left set by exit requests
+    uc->current_cpu->tcg_exit_req = 0;
+
     cc->cpu_exec_exit(cpu);
 
     // Unicorn: flush JIT cache to because emulation might stop in
@@ -349,7 +351,8 @@ int cpu_exec(struct uc_struct *uc, CPUArchState *env)   // qq
         tb_flush(env);
 
     /* fail safe : never use current_cpu outside cpu_exec() */
-    uc->current_cpu = NULL;
+    // uc->current_cpu = NULL;
+
     return ret;
 }
 
@@ -444,14 +447,14 @@ static TranslationBlock *tb_find_slow(CPUArchState *env, target_ulong pc,
     }
 not_found:
 #if defined(AFL_DEBUG)
-    printf("[d] translating 0x%lx...", (uint64_t) pc);
+    printf("[d] translating 0x%llx...\n", (unsigned long long) pc);
 #endif
     /* if no translated code available, then translate it now */
     tb = tb_gen_code(cpu, pc, cs_base, (int)flags, 0);   // qq
-    
+
     if (tb == NULL) {
 #if defined(AFL_DEBUG)
-        printf("[e] no TranslationBlock returned from gen_code");
+        printf("[!] no TranslationBlock returned from gen_code");
 #endif
         return NULL;
     }
@@ -462,7 +465,7 @@ not_found:
 
 found:
 #if defined(AFL_DEBUG)
-    printf("[d] got translated block 0x%lx\n", (uint64_t) pc);
+    printf("[d] got translated block 0x%llx\n", (unsigned long long) pc);
 #endif
     /* Move the last found TB to the head of the list */
     if (likely(*ptb1)) {

@@ -5,8 +5,9 @@
    Originally written by Michal Zalewski
 
    Now maintained by Marc Heuse <mh@mh-sec.de>,
-                        Heiko Eißfeldt <heiko.eissfeldt@hexco.de> and
-                        Andrea Fioraldi <andreafioraldi@gmail.com>
+                     Heiko Eißfeldt <heiko.eissfeldt@hexco.de>,
+                     Andrea Fioraldi <andreafioraldi@gmail.com>,
+                     Dominik Maier <mail@dmnk.co>
 
    Copyright 2016, 2017 Google Inc. All rights reserved.
    Copyright 2019-2020 AFLplusplus Project. All rights reserved.
@@ -26,8 +27,8 @@
 
 /* Version string: */
 
- // c = release, d = volatile github dev, e = experimental branch
-#define VERSION "++2.60d"
+// c = release, d = volatile github dev, e = experimental branch
+#define VERSION "++2.65d"
 
 /******************************************************
  *                                                    *
@@ -40,10 +41,15 @@
 
 #define USE_COLOR
 
+/* If you want to have the original afl internal memory corruption checks.
+   Disabled by default for speed. it is better to use "make ASAN_BUILD=1". */
+
+//#define _WANT_ORIGINAL_AFL_ALLOC
+
 /* Comment out to disable fancy ANSI boxes and use poor man's 7-bit UI: */
 
 #ifndef ANDROID_DISABLE_FANCY  // Fancy boxes are ugly from adb
-#define FANCY_BOXES
+  #define FANCY_BOXES
 #endif
 
 /* Default timeout for fuzzed code (milliseconds). This is the upper bound,
@@ -57,20 +63,20 @@
 
 /* 64bit arch MACRO */
 #if (defined(__x86_64__) || defined(__arm64__) || defined(__aarch64__))
-#define WORD_SIZE_64 1
+  #define WORD_SIZE_64 1
 #endif
 
 /* Default memory limit for child process (MB): */
 
 #ifndef __NetBSD__
-#ifndef WORD_SIZE_64
-#define MEM_LIMIT 25
-#else
-#define MEM_LIMIT 50
-#endif                                                    /* ^!WORD_SIZE_64 */
-#else  /* NetBSD's kernel needs more space for stack, see discussion for issue \
-          #165 */
-#define MEM_LIMIT 200
+  #ifndef WORD_SIZE_64
+    #define MEM_LIMIT 25
+  #else
+    #define MEM_LIMIT 50
+  #endif                                                  /* ^!WORD_SIZE_64 */
+#else /* NetBSD's kernel needs more space for stack, see discussion for issue \
+         #165 */
+  #define MEM_LIMIT 200
 #endif
 /* Default memory limit when running in QEMU mode (MB): */
 
@@ -195,8 +201,8 @@
    (first value), and to keep in memory as candidates. The latter should be much
    higher than the former. */
 
-#define USE_AUTO_EXTRAS 50
-#define MAX_AUTO_EXTRAS (USE_AUTO_EXTRAS * 10)
+#define USE_AUTO_EXTRAS 128
+#define MAX_AUTO_EXTRAS (USE_AUTO_EXTRAS * 64)
 
 /* Scaling factor for the effector map used to skip some of the more
    expensive deterministic steps. The actual divisor is set to
@@ -298,6 +304,10 @@
 
 #define SHM_ENV_VAR "__AFL_SHM_ID"
 
+/* Environment variable used to pass SHM FUZZ ID to the called program. */
+
+#define SHM_FUZZ_ENV_VAR "__AFL_SHM_FUZZ_ID"
+
 /* Other less interesting, internal-only variables. */
 
 #define CLANG_ENV_VAR "__AFL_CLANG_MODE"
@@ -389,9 +399,9 @@
 
 /* for *BSD: use ARC4RANDOM and save a file descriptor */
 #if defined(__APPLE__) || defined(__FreeBSD__) || defined(__OpenBSD__)
-#ifndef HAVE_ARC4RANDOM
-#define HAVE_ARC4RANDOM 1
-#endif
+  #ifndef HAVE_ARC4RANDOM
+    #define HAVE_ARC4RANDOM 1
+  #endif
 #endif                           /* __APPLE__ || __FreeBSD__ || __OpenBSD__ */
 
 #endif                                                  /* ! _HAVE_CONFIG_H */

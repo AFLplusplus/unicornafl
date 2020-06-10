@@ -17,12 +17,13 @@
  * along with this program; if not, see
  * <http://www.gnu.org/licenses/gpl-2.0.html>
  */
+/* Modified for Unicorn Engine by Chen Huitao<chenhuitao@hfmrit.com>, 2020 */
+
 #ifndef QEMU_CPU_H
 #define QEMU_CPU_H
 
 #include <signal.h>
 #include <setjmp.h>
-#include "hw/qdev-core.h"
 #include "exec/hwaddr.h"
 #include "qemu/queue.h"
 #include "qemu/thread.h"
@@ -57,9 +58,6 @@ typedef uint64_t vaddr;
  * an unchecked cast.
  */
 #define CPU(obj) ((CPUState *)(obj))
-
-#define CPU_CLASS(uc, class) OBJECT_CLASS_CHECK(uc, CPUClass, (class), TYPE_CPU)
-#define CPU_GET_CLASS(uc, obj) OBJECT_GET_CLASS(uc, CPUClass, (obj), TYPE_CPU)
 
 typedef struct CPUState CPUState;
 
@@ -101,12 +99,7 @@ struct TranslationBlock;
  * Represents a CPU family or model.
  */
 typedef struct CPUClass {
-    /*< private >*/
-    DeviceClass parent_class;
-    /*< public >*/
-
-    ObjectClass *(*class_by_name)(struct uc_struct *uc, const char *cpu_model);
-    void (*parse_features)(CPUState *cpu, char *str, Error **errp);
+    void (*parse_features)(CPUState *cpu, char *str);
 
     void (*reset)(CPUState *cpu);
     int reset_dump_flags;
@@ -123,8 +116,7 @@ typedef struct CPUClass {
                             fprintf_function cpu_fprintf, int flags);
     int64_t (*get_arch_id)(CPUState *cpu);
     bool (*get_paging_enabled)(const CPUState *cpu);
-    void (*get_memory_mapping)(CPUState *cpu, MemoryMappingList *list,
-                               Error **errp);
+    void (*get_memory_mapping)(CPUState *cpu, MemoryMappingList *list);
     void (*set_pc)(CPUState *cpu, vaddr value);
     void (*synchronize_from_tb)(CPUState *cpu, struct TranslationBlock *tb);
     int (*handle_mmu_fault)(CPUState *cpu, vaddr address, int rw,
@@ -203,10 +195,6 @@ struct kvm_run;
  * State of one CPU core or thread.
  */
 struct CPUState {
-    /*< private >*/
-    DeviceState parent_obj;
-    /*< public >*/
-
     int nr_cores;
     int nr_threads;
     int numa_node;
@@ -272,8 +260,13 @@ struct CPUState {
        size, especially for hosts without large memory offsets.  */
     volatile sig_atomic_t tcg_exit_req;
     struct uc_struct* uc;
+
+    /* pointer to CPUArchState.cc */
+    struct CPUClass *cc;
 };
 
+#define CPU_CLASS(uc, class) ((CPUClass *)class)
+#define CPU_GET_CLASS(uc, obj) (((CPUState *)obj)->cc)
 
 /**
  * cpu_paging_enabled:
@@ -289,48 +282,7 @@ bool cpu_paging_enabled(const CPUState *cpu);
  * @list: Where to write the memory mappings to.
  * @errp: Pointer for reporting an #Error.
  */
-void cpu_get_memory_mapping(CPUState *cpu, MemoryMappingList *list,
-                            Error **errp);
-
-/**
- * cpu_write_elf64_note:
- * @f: pointer to a function that writes memory to a file
- * @cpu: The CPU whose memory is to be dumped
- * @cpuid: ID number of the CPU
- * @opaque: pointer to the CPUState struct
- */
-int cpu_write_elf64_note(WriteCoreDumpFunction f, CPUState *cpu,
-                         int cpuid, void *opaque);
-
-/**
- * cpu_write_elf64_qemunote:
- * @f: pointer to a function that writes memory to a file
- * @cpu: The CPU whose memory is to be dumped
- * @cpuid: ID number of the CPU
- * @opaque: pointer to the CPUState struct
- */
-int cpu_write_elf64_qemunote(WriteCoreDumpFunction f, CPUState *cpu,
-                             void *opaque);
-
-/**
- * cpu_write_elf32_note:
- * @f: pointer to a function that writes memory to a file
- * @cpu: The CPU whose memory is to be dumped
- * @cpuid: ID number of the CPU
- * @opaque: pointer to the CPUState struct
- */
-int cpu_write_elf32_note(WriteCoreDumpFunction f, CPUState *cpu,
-                         int cpuid, void *opaque);
-
-/**
- * cpu_write_elf32_qemunote:
- * @f: pointer to a function that writes memory to a file
- * @cpu: The CPU whose memory is to be dumped
- * @cpuid: ID number of the CPU
- * @opaque: pointer to the CPUState struct
- */
-int cpu_write_elf32_qemunote(WriteCoreDumpFunction f, CPUState *cpu,
-                             void *opaque);
+void cpu_get_memory_mapping(CPUState *cpu, MemoryMappingList *list);
 
 /**
  * CPUDumpFlags:
@@ -392,28 +344,6 @@ static inline hwaddr cpu_get_phys_page_debug(CPUState *cpu, vaddr addr)
  * @cpu: The CPU whose state is to be reset.
  */
 void cpu_reset(CPUState *cpu);
-
-/**
- * cpu_class_by_name:
- * @typename: The CPU base type.
- * @cpu_model: The model string without any parameters.
- *
- * Looks up a CPU #ObjectClass matching name @cpu_model.
- *
- * Returns: A #CPUClass or %NULL if not matching class is found.
- */
-ObjectClass *cpu_class_by_name(struct uc_struct *uc, const char *typename_, const char *cpu_model);
-
-/**
- * cpu_generic_init:
- * @typename: The CPU base type.
- * @cpu_model: The model string including optional parameters.
- *
- * Instantiates a CPU, processes optional parameters and realizes the CPU.
- *
- * Returns: A #CPUState or %NULL if an error occurred.
- */
-CPUState *cpu_generic_init(struct uc_struct *uc, const char *typename_, const char *cpu_model);
 
 /**
  * cpu_has_work:
@@ -479,16 +409,6 @@ void async_run_on_cpu(CPUState *cpu, void (*func)(void *data), void *data);
  * Returns: The CPU or %NULL if there is no matching CPU.
  */
 CPUState *qemu_get_cpu(struct uc_struct *uc, int index);
-
-/**
- * cpu_exists:
- * @id: Guest-exposed CPU ID to lookup.
- *
- * Search for CPU with specified ID.
- *
- * Returns: %true - CPU is found, %false - CPU isn't found.
- */
-bool cpu_exists(struct uc_struct* uc, int64_t id);
 
 #ifndef CONFIG_USER_ONLY
 
@@ -612,18 +532,11 @@ void QEMU_NORETURN cpu_abort(CPUState *cpu, const char *fmt, ...)
 
 void cpu_register_types(struct uc_struct *uc);
 
-#ifdef CONFIG_SOFTMMU
-extern const struct VMStateDescription vmstate_cpu_common;
-#else
-#define vmstate_cpu_common vmstate_dummy
+void cpu_klass_init(struct uc_struct *uc, CPUClass *k);
+#ifdef NEED_CPU_INIT_REALIZE
+/* do nothing. */
+void cpu_object_init(struct uc_struct *uc, CPUState *cs);
+void cpu_object_realize(struct uc_struct *uc, CPUState *cs);
 #endif
-
-#define VMSTATE_CPU() {                                                     \
-    .name = "parent_obj",                                                   \
-    .size = sizeof(CPUState),                                               \
-    .vmsd = &vmstate_cpu_common,                                            \
-    .flags = VMS_STRUCT,                                                    \
-    .offset = 0,                                                            \
-}
 
 #endif
