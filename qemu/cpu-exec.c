@@ -90,7 +90,7 @@ int afl_forkserver_start(struct uc_struct *uc) {
 
 /* main execution loop */
 
-int cpu_exec(struct uc_struct *uc, CPUArchState *env)   // qq
+int cpu_exec(struct uc_struct *uc, CPUArchState *env)
 {
     CPUState *cpu = ENV_GET_CPU(env);
     TCGContext *tcg_ctx = env->uc->tcg_ctx;
@@ -139,7 +139,7 @@ int cpu_exec(struct uc_struct *uc, CPUArchState *env)   // qq
 
             /* if an exception is pending, we execute it here */
             if (cpu->exception_index >= 0) {
-                //printf(">>> GOT INTERRUPT. exception idx = %x\n", cpu->exception_index);	// qq
+                //printf(">>> GOT INTERRUPT. exception idx = %x\n", cpu->exception_index);
                 if (cpu->exception_index >= EXCP_INTERRUPT) {
                     /* exit request from the cpu execution loop */
                     ret = cpu->exception_index;
@@ -263,7 +263,7 @@ int cpu_exec(struct uc_struct *uc, CPUArchState *env)   // qq
                     cpu_loop_exit(cpu);
                 }
 
-                tb = tb_find_fast(env);	// qq
+                tb = tb_find_fast(env);
                 if (!tb) {   // invalid TB due to invalid code?
                     uc->invalid_error = UC_ERR_FETCH_UNMAPPED;
                     ret = EXCP_HLT;
@@ -297,7 +297,7 @@ int cpu_exec(struct uc_struct *uc, CPUArchState *env)   // qq
                 if (likely(!cpu->exit_request)) {
                     tc_ptr = tb->tc_ptr;
                     /* execute the generated code */
-                    next_tb = cpu_tb_exec(cpu, tc_ptr);	// qq
+                    next_tb = cpu_tb_exec(cpu, tc_ptr);
 
                     switch (next_tb & TB_EXIT_MASK) {
                         case TB_EXIT_REQUESTED:
@@ -403,7 +403,7 @@ static tcg_target_ulong cpu_tb_exec(CPUState *cpu, uint8_t *tb_ptr)
 }
 
 static TranslationBlock *tb_find_slow(CPUArchState *env, target_ulong pc,
-        target_ulong cs_base, uint64_t flags)   // qq
+        target_ulong cs_base, uint64_t flags)
 {
     CPUState *cpu = ENV_GET_CPU(env);
     TCGContext *tcg_ctx = env->uc->tcg_ctx;
@@ -415,7 +415,7 @@ static TranslationBlock *tb_find_slow(CPUArchState *env, target_ulong pc,
     tcg_ctx->tb_ctx.tb_invalidated_flag = 0;
 
     /* find translated block using physical mappings */
-    phys_pc = get_page_addr_code(env, pc);  // qq
+    phys_pc = get_page_addr_code(env, pc);
     if (phys_pc == -1) { // invalid code?
         return NULL;
     }
@@ -450,8 +450,7 @@ not_found:
     printf("[d] translating 0x%llx...\n", (unsigned long long) pc);
 #endif
     /* if no translated code available, then translate it now */
-    tb = tb_gen_code(cpu, pc, cs_base, (int)flags, 0);   // qq
-
+    tb = tb_gen_code(cpu, pc, cs_base, (int)flags, 0);
     if (tb == NULL) {
 #if defined(AFL_DEBUG)
         printf("[!] no TranslationBlock returned from gen_code");
@@ -478,7 +477,7 @@ found:
     return tb;
 }
 
-static TranslationBlock *tb_find_fast(CPUArchState *env)    // qq
+static TranslationBlock *tb_find_fast(CPUArchState *env)
 {
     CPUState *cpu = ENV_GET_CPU(env);
     TranslationBlock *tb;
@@ -492,7 +491,7 @@ static TranslationBlock *tb_find_fast(CPUArchState *env)    // qq
     tb = cpu->tb_jmp_cache[tb_jmp_cache_hash_func(pc)];
     if (unlikely(!tb || tb->pc != pc || tb->cs_base != cs_base ||
                 tb->flags != flags)) {
-        tb = tb_find_slow(env, pc, cs_base, flags); // qq
+        tb = tb_find_slow(env, pc, cs_base, flags);
     }
     return tb;
 }
