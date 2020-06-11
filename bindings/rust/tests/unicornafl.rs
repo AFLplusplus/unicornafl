@@ -2,7 +2,7 @@
 
 use std::cell::RefCell;
 use std::rc::Rc;
-use unicornafl::{RegisterARM, RegisterX86, InsnSysX86, RegisterMIPS};
+use unicornafl::{RegisterARM, RegisterX86, InsnSysX86, RegisterMIPS, RegisterPPC};
 use unicornafl::unicorn_const::{Mode, Arch, Protection, MemType, HookType, SECOND_SCALE, uc_error};
 
 pub static X86_REGISTERS: [RegisterX86; 145] = [
@@ -509,6 +509,35 @@ fn emulate_mips() {
         Ok(())
     );
     assert_eq!(emu.reg_read(RegisterMIPS::AT as i32), Ok(0x3456));
+}
+
+#[test]
+fn emulate_ppc() {
+    let ppc_code32 = vec![0x7F, 0x46, 0x1A, 0x14]; // add 26, 6, 3
+
+    let mut unicorn = unicornafl::Unicorn::new(Arch::PPC, Mode::PPC32, 0).expect("failed to initialize unicorn instance");
+    let mut emu = unicorn.borrow();
+    assert_eq!(
+        emu.mem_map(0x1000, 0x4000, Protection::ALL),
+        Ok(())
+    );
+    assert_eq!(emu.mem_write(0x1000, &ppc_code32), Ok(()));
+    assert_eq!(
+        emu.mem_read_as_vec(0x1000, ppc_code32.len()),
+        Ok(ppc_code32.clone())
+    );
+    assert_eq!(emu.reg_write(RegisterPPC::GPR3 as i32, 42), Ok(()));
+    assert_eq!(emu.reg_write(RegisterPPC::GPR6 as i32, 1337), Ok(()));
+    assert_eq!(
+        emu.emu_start(
+            0x1000,
+            (0x1000 + ppc_code32.len()) as u64,
+            10 * SECOND_SCALE,
+            1000
+        ),
+        Ok(())
+    );
+    assert_eq!(emu.reg_read(RegisterPPC::GPR26 as i32), Ok(1379));
 }
 
 #[test]

@@ -34,15 +34,17 @@ pub mod unicorn_const;
 
 mod arm;
 mod arm64;
-mod x86;
-mod sparc;
-mod mips;
 mod m68k;
+mod mips;
+mod ppc;
+mod sparc;
+mod x86;
 pub use crate::{
     arm64::*,
     arm::*,
     m68k::*,
     mips::*,
+    ppc::*,
     sparc::*,
     x86::*,
 };
