@@ -15,6 +15,7 @@ from distutils.util import get_platform
 from distutils.command.build import build
 from distutils.command.sdist import sdist
 from setuptools.command.bdist_egg import bdist_egg
+from setuptools.command.develop import develop
 
 SYSTEM = sys.platform
 
@@ -22,7 +23,7 @@ SYSTEM = sys.platform
 IS_64BITS = platform.architecture()[0] == '64bit'
 
 # are we building from the repository or from a source distribution?
-ROOT_DIR = os.path.dirname(os.path.realpath(__file__))
+ROOT_DIR = os.path.dirname(os.path.abspath(__file__))
 LIBS_DIR = os.path.join(ROOT_DIR, 'unicornafl', 'lib')
 HEADERS_DIR = os.path.join(ROOT_DIR, 'unicornafl', 'include')
 SRC_DIR = os.path.join(ROOT_DIR, 'src')
@@ -140,16 +141,22 @@ def build_libraries():
     os.chdir(BUILD_DIR)
 
     try:
-        subprocess.check_call(['msbuild', '/help'])
+        subprocess.check_call(['msbuild', '-ver'])
     except:
         has_msbuild = False
     else:
         has_msbuild = True
 
     if has_msbuild and SYSTEM == 'win32':
-        plat = 'Win32' if platform.architecture()[0] == '32bit' else 'x64'
+        if platform.architecture()[0] == '32bit':
+            plat = 'Win32'
+        elif 'win32' in sys.argv:
+            plat = 'Win32'
+        else:
+            plat = 'x64'
+
         conf = 'Debug' if os.getenv('DEBUG', '') else 'Release'
-        subprocess.call(['msbuild', '-m', '-p:Platform=' + plat, '-p:Configuration=' + conf], cwd=os.path.join(BUILD_DIR, 'msvc'))
+        subprocess.call(['msbuild', 'unicorn.sln', '-m', '-p:Platform=' + plat, '-p:Configuration=' + conf], cwd=os.path.join(BUILD_DIR, 'msvc'))
 
         obj_dir = os.path.join(BUILD_DIR, 'msvc', plat, conf)
         shutil.copy(os.path.join(obj_dir, LIBRARY_FILE), LIBS_DIR)
@@ -191,7 +198,6 @@ def build_libraries():
                 sys.exit(1)
     os.chdir(cwd)
 
-
 class custom_sdist(sdist):
     def run(self):
         clean_bins()
@@ -207,6 +213,12 @@ class custom_build(build):
             build_libraries()
         return build.run(self)
 
+class custom_develop(develop):
+    def run(self):
+        log.info("Building C extensions")
+        build_libraries()
+        return develop.run(self)
+
 class custom_bdist_egg(bdist_egg):
     def run(self):
         self.run_command('build')
@@ -215,10 +227,6 @@ class custom_bdist_egg(bdist_egg):
 def dummy_src():
     return []
 
-cmdclass = {}
-cmdclass['build'] = custom_build
-cmdclass['sdist'] = custom_sdist
-cmdclass['bdist_egg'] = custom_bdist_egg
 
 if 'bdist_wheel' in sys.argv and '--plat-name' not in sys.argv:
     idx = sys.argv.index('bdist_wheel') + 1
@@ -239,20 +247,24 @@ if 'bdist_wheel' in sys.argv and '--plat-name' not in sys.argv:
         # https://www.python.org/dev/peps/pep-0425/
         sys.argv.insert(idx + 1, name.replace('.', '_').replace('-', '_'))
 
-try:
-    from setuptools.command.develop import develop
-    class custom_develop(develop):
-        def run(self):
-            log.info("Building C extensions")
-            build_libraries()
-            return develop.run(self)
 
-    cmdclass['develop'] = custom_develop
-except ImportError:
-    print("Proper 'develop' support unavailable.")
+long_desc = '''
+Unicorn is a lightweight, multi-platform, multi-architecture CPU emulator framework
+based on [QEMU](https://qemu.org).
 
-def join_all(src, files):
-    return tuple(os.path.join(src, f) for f in files)
+Unicorn offers some unparalleled features:
+
+- Multi-architecture: ARM, ARM64 (ARMv8), M68K, MIPS, SPARC, and X86 (16, 32, 64-bit)
+- Clean/simple/lightweight/intuitive architecture-neutral API
+- Implemented in pure C language, with bindings for Crystal, Clojure, Visual Basic, Perl, Rust, Ruby, Python, Java, .NET, Go, Delphi/Free Pascal, Haskell, Pharo, and Lua.
+- Native support for Windows & *nix (with Mac OSX, Linux, *BSD & Solaris confirmed)
+- High performance via Just-In-Time compilation
+- Support for fine-grained instrumentation at various levels
+- Thread-safety by design
+- Distributed under free software license GPLv2
+
+Further information is available at https://www.unicorn-engine.org
+'''
 
 long_desc = '''
 Unicornafl for AFL++ (https://aflplus.plus).
@@ -291,10 +303,11 @@ setup(
         'Programming Language :: Python :: 3',
     ],
     install_requires=['typing'] if sys.version_info < (3,5) else [],
-    cmdclass=cmdclass,
+    requires=['ctypes'],
+    cmdclass={'build': custom_build, 'develop': custom_develop, 'sdist': custom_sdist, 'bdist_egg': custom_bdist_egg},
     zip_safe=True,
     include_package_data=True,
-    is_pure=True,
+    is_pure=False,
     package_data={
         'unicornafl': ['lib/*', 'include/unicornafl/*']
     }
