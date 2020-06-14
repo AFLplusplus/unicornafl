@@ -1,5 +1,5 @@
  
-//! Bindings for the Unicorn emulator.
+//! Bindings for the Unicorn emulator with extensions for the AFL++ API.
 //!
 //! 
 //!
@@ -7,13 +7,13 @@
 //!
 //! ```rust
 //!
-//! use unicorn::RegisterARM;
-//! use unicorn::unicorn_const::{Arch, Mode, Protection, SECOND_SCALE};
+//! use unicornafl::RegisterARM;
+//! use unicornafl::unicorn_const::{Arch, Mode, Protection, SECOND_SCALE};
 //! 
 //! fn main() {
 //!     let arm_code32: Vec<u8> = vec![0x17, 0x00, 0x40, 0xe2]; // sub r0, #23
 //! 
-//!     let mut unicorn = unicorn::Unicorn::new(Arch::ARM, Mode::LITTLE_ENDIAN, 0).expect("failed to initialize Unicorn instance");
+//!     let mut unicorn = unicornafl::Unicorn::new(Arch::ARM, Mode::LITTLE_ENDIAN, 0).expect("failed to initialize Unicorn instance");
 //!     let mut emu = unicorn.borrow();
 //!     emu.mem_map(0x1000, 0x4000, Protection::ALL).expect("failed to map code page");
 //!     emu.mem_write(0x1000, &arm_code32).expect("failed to write instructions");
@@ -718,5 +718,56 @@ impl<'a, D> UnicornHandle<'a, D> {
         }
     }
 
+    /// Starts the AFL forkserver on some Unicorn emulation.
+    /// 
+    /// Multiple exit addresses can be specified. The Unicorn emulation has to be
+    /// started manually before by using emu_start. 
+    pub fn afl_forkserver_start(&mut self, exits: &[u64]) -> Result<(), AflRet> {
+        let err = unsafe { ffi::uc_afl_forkserver_start(self.inner.uc, exits.as_ptr(), exits.len()) };
+        if err == AflRet::ERROR {
+            Err(err)
+        } else {
+            Ok(())
+        }
+    }
+
+    /// All-in-one fuzzing setup function.
+    /// 
+    /// This function can handle input reading and -placement within
+    /// emulation context, crash validation and persistent mode looping.
+    /// To use persistent mode, set persistent_iters > 0 and 
+    /// make sure to handle any necessary context restoration, e.g in the
+    /// input_placement callback.
+    pub fn afl_fuzz<F: 'static, G: 'static>(&mut self,
+            input_file: &str,
+            input_placement_callback: F,
+            exits: &[u64],
+            crash_validation_callback: G,
+            always_validate: bool,
+            persistent_iters: u32) -> Result<(), AflRet> 
+        where
+            F: FnMut(UnicornHandle<D>, &[u8], i32) -> bool,
+            G: FnMut(UnicornHandle<D>, uc_error, &[u8], i32) -> bool {
+        let afl_fuzz_callback = Box::pin(ffi::AflFuzzCallback {
+            unicorn: unsafe { self.inner.as_mut().get_unchecked_mut() }, 
+            input_callback: Box::new(input_placement_callback),
+            validate_callback: Box::new(crash_validation_callback)
+        });
+    
+        let cstyle_input_file = std::ffi::CString::new(input_file).unwrap();
+        let err = unsafe { ffi::uc_afl_fuzz(self.inner.uc,
+            cstyle_input_file.as_ptr(),
+            ffi::input_placement_callback_proxy::<D> as _,
+            exits.as_ptr(), exits.len(),
+            ffi::crash_validation_callback_proxy::<D> as _,
+            always_validate,
+            persistent_iters, 
+            &*afl_fuzz_callback as *const _ as _) };
+        if err == AflRet::ERROR {
+            Err(err)
+        } else {
+            Ok(())
+        }
+    }
 }
 

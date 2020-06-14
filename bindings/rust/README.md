@@ -1,17 +1,15 @@
-# unicorn-rs
+# unicornafl-rs
 
-Rust bindings for the [Unicorn](http://www.unicorn-engine.org/) emulator with utility functions.
-
-An extended version for fuzzing with AFL++ support can be found in https://github.com/aflplusplus/unicornafl.
+Rust bindings for the [Unicorn](http://www.unicorn-engine.org/) emulator with AFL++ extensions and utility functions.
 
 ```rust
-use unicorn::RegisterARM;
-use unicorn::unicorn_const::{Arch, Mode, Protection, SECOND_SCALE};
+use unicornafl::RegisterARM;
+use unicornafl::unicorn_const::{Arch, Mode, Protection, SECOND_SCALE};
 
 fn main() {
     let arm_code32: Vec<u8> = vec![0x17, 0x00, 0x40, 0xe2]; // sub r0, #23
 
-    let mut unicorn = unicorn::Unicorn::new(Arch::ARM, Mode::LITTLE_ENDIAN, 0).expect("failed to initialize Unicorn instance");
+    let mut unicorn = unicornafl::Unicorn::new(Arch::ARM, Mode::LITTLE_ENDIAN, 0).expect("failed to initialize Unicorn instance");
     let mut emu = unicorn.borrow();
     emu.mem_map(0x1000, 0x4000, Protection::ALL).expect("failed to map code page");
     emu.mem_write(0x1000, &arm_code32).expect("failed to write instructions");
@@ -24,21 +22,37 @@ fn main() {
     assert_eq!(emu.reg_read(RegisterARM::R5 as i32), Ok(1337));
 }
 ```
-Further sample code can be found in ```tests/unicorn.rs```.
 
-In addition, the bindings offer some basic utility functionalities, such as
+The bindings offer access to AFL++'s API:
+```rust
+emu.emu_start(0x1fe741, 0x001ff106, 0, 1).expect("failed to kick off emulation");
+
+let ret = emu.afl_fuzz(
+        input_file,
+        Box::new(place_input_callback),
+        &[0x001ff106, 0x001ff0aa],  // exit addresses
+        Box::new(crash_validation_callback),
+        true,                       // always validate
+        100                         // rounds in persistent mode
+    );
+```
+
+Moreover, they come with some basic utility functionalities, such as
 a simple heap allocator utilizing Unicorn hooks for sanitization or easily accessible debug prints. 
 These are WIP and only tested in ARM LITTLE_ENDIAN mode.
 
 ## Installation
 
 This project has been tested on Linux, OS X and Windows. 
+The bindings are built for version 1.0 of unicorn.
 
-To use unicorn-rs, simply add it as a dependency to the Cargo.toml of your program.
+First, build AFL++ and Unicorn mode.
+
+To use unicornafl-rs, simply add it as a dependency to the Cargo.toml of your program.
 
 ```
 [dependencies]
-unicorn = { path = "/path/to/bindings/rust", version="1.0.0" }
+unicornafl = { path = "/path/to/bindings/rust", version="1.0.0" }
 ```
 
 ## Acknowledgements
@@ -47,3 +61,9 @@ These bindings are based on Sébastien Duquette's (@ekse) [unicorn-rs](https://g
 We picked up the project, as it is no longer maintained.
 Thanks to all contributers.
 
+
+## Contributing
+
+Contributions to this project are appreciated. Pull requests, bug reports, code review, tests,
+documentation or feedback on your use of the bindings, everything is appreciated. 
+If you have any questions, please feel free to open an issue.

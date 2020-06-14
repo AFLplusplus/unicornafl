@@ -1,5 +1,5 @@
 [package]
-name = "unicorn"
+name = "unicornafl"
 version = "1.0.0"
 authors = ["Lukas Seidel"]
 documentation = ""
@@ -13,10 +13,10 @@ include = [
 ]
 license = "GPL-2.0"
 readme = "README.md"
-repository = "https://github.com/unicorn-engine/unicorn/"
-description = "Rust bindings for the Unicorn emulator with utility functions"
+repository = "https://github.com/aflplusplus/unicornafl"
+description = "Rust bindings for the Unicorn emulator with AFL++ extensions and utility functions"
 build = "build.rs"
-links = "unicorn"
+links = "unicornafl"
 
 [dependencies]
 bitflags = "1.0"

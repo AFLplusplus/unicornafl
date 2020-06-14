@@ -38,6 +38,15 @@ pub enum uc_error {
 
 #[repr(C)]
 #[derive(PartialEq, Debug, Clone, Copy)]
+pub enum AflRet {
+    ERROR = 0,
+    CHILD = 1,
+    NO_AFL = 2,
+    FINISHED = 3,
+}
+
+#[repr(C)]
+#[derive(PartialEq, Debug, Clone, Copy)]
 pub enum MemType {
     READ = 16,
     WRITE = 17,
