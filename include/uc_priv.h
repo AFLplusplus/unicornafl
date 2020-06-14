@@ -37,14 +37,6 @@
 #define WRITE_BYTE_L(x, b) (x = (x & ~0xff) | (b & 0xff))
 
 
-typedef struct ModuleEntry {
-    void (*init)(void);
-    QTAILQ_ENTRY(ModuleEntry) node;
-    module_init_type type;
-} ModuleEntry;
-
-typedef QTAILQ_HEAD(, ModuleEntry) ModuleTypeList;
-
 typedef uc_err (*query_t)(struct uc_struct *uc, uc_query_type type, size_t *result);
 
 // return 0 on success, -1 on failure
@@ -194,7 +186,6 @@ struct uc_struct {
     RAMList ram_list;   // qemu/exec.c
     BounceBuffer bounce;    // qemu/cpu-exec.c
     volatile sig_atomic_t exit_request; // qemu/cpu-exec.c
-    bool global_dirty_log;  // qemu/memory.c
     /* This is a multi-level map on the virtual address space.
        The bottom level has pointers to PageDesc.  */
     void **l1_map;  // qemu/translate-all.c
@@ -202,9 +193,6 @@ struct uc_struct {
     /* code generation context */
     TCGContext *tcg_ctx;
     /* memory.c */
-    unsigned memory_region_transaction_depth;
-    bool memory_region_update_pending;
-    bool ioeventfd_update_pending;
     QTAILQ_HEAD(memory_listeners, MemoryListener) memory_listeners;
     QTAILQ_HEAD(, AddressSpace) address_spaces;
 

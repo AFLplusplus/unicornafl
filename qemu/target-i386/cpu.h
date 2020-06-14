@@ -841,7 +841,6 @@ typedef struct CPUX86State {
     /* standard registers */
     target_ulong regs[CPU_NB_REGS];
     target_ulong eip;
-    target_ulong eflags0; // copy of eflags that does not change thru the BB
     target_ulong eflags; /* eflags register. During CPU emulation, CC
                         flags and DF are set to zero because they are
                         stored elsewhere */
@@ -1291,9 +1290,6 @@ static inline void cpu_get_tb_cpu_state(CPUX86State *env, target_ulong *pc,
 void do_cpu_init(X86CPU *cpu);
 void do_cpu_sipi(X86CPU *cpu);
 
-#define MCE_INJECT_BROADCAST    1
-#define MCE_INJECT_UNCOND_AO    2
-
 /* excp_helper.c */
 void QEMU_NORETURN raise_exception(CPUX86State *env, int exception_index);
 void QEMU_NORETURN raise_exception_err(CPUX86State *env, int exception_index,
@@ -1352,22 +1348,13 @@ void do_interrupt_x86_hardirq(CPUX86State *env, int intno, int is_hw);
 
 void do_smm_enter(X86CPU *cpu);
 
-void cpu_report_tpr_access(CPUX86State *env, TPRAccess access);
-
 void x86_cpu_compat_set_features(const char *cpu_model, FeatureWord w,
                                  uint32_t feat_add, uint32_t feat_remove);
-
-void x86_cpu_compat_kvm_no_autoenable(FeatureWord w, uint32_t features);
-void x86_cpu_compat_kvm_no_autodisable(FeatureWord w, uint32_t features);
-
 
 /* Return name of 32-bit register, from a R_* constant */
 const char *get_register_name_32(unsigned int reg);
 
 uint32_t x86_cpu_apic_id_from_index(unsigned int cpu_index);
 void enable_compat_apic_id_mode(void);
-
-#define APIC_DEFAULT_ADDRESS 0xfee00000
-#define APIC_SPACE_SIZE      0x100000
 
 #endif /* CPU_I386_H */

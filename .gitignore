@@ -68,6 +68,8 @@ bindings/python/unicornafl.egg-info/
 bindings/python/unicornafl/lib/
 bindings/python/unicornafl/include/
 bindings/python/MANIFEST
+bindings/rust/target/
+bindings/rust/Cargo.lock
 config.log
 
 

@@ -35,19 +35,18 @@ typedef struct X86CPUDefinition X86CPUDefinition;
 /**
  * X86CPUClass:
  * @cpu_def: CPU model definition
- * @kvm_required: Whether CPU model requires KVM to be enabled.
  * @parent_realize: The parent class' realize handler.
  * @parent_reset: The parent class' reset handler.
  *
  * An x86 CPU model or family.
  */
 typedef struct X86CPUClass {
+    /*< private >*/
+    CPUClass parent_class;
     /*< public >*/
 
     /* Should be eventually replaced by subclass-specific property defaults. */
     X86CPUDefinition *cpu_def;
-
-    bool kvm_required;
 
     void (*parent_reset)(CPUState *cpu);
 } X86CPUClass;
@@ -68,14 +67,8 @@ typedef struct X86CPU {
 
     CPUX86State env;
 
-    bool hyperv_vapic;
-    bool hyperv_relaxed_timing;
-    int hyperv_spinlock_attempts;
-    bool hyperv_time;
     bool check_cpuid;
     bool enforce_cpuid;
-    bool expose_kvm;
-    bool migratable;
     bool host_features;
 
     /* if true the CPUID code directly forward host cache leaves to the guest */
@@ -90,11 +83,6 @@ typedef struct X86CPU {
      * capabilities) directly to the guest.
      */
     bool enable_pmu;
-
-    /* in order to simplify APIC support, we leave this pointer to the
-       user */
-    /* APICCommonState *apic_state; */
-    void *apic_state;
 
     struct X86CPUClass cc;
 } X86CPU;
@@ -112,10 +100,6 @@ static inline X86CPU *x86_env_get_cpu(CPUX86State *env)
 
 #define ENV_OFFSET offsetof(X86CPU, env)
 
-#ifndef CONFIG_USER_ONLY
-extern struct VMStateDescription vmstate_x86_cpu;
-#endif
-
 /**
  * x86_cpu_do_interrupt:
  * @cpu: vCPU the interrupt is to be handled by.
@@ -125,13 +109,7 @@ bool x86_cpu_exec_interrupt(CPUState *cpu, int int_req);
 
 void x86_cpu_get_memory_mapping(CPUState *cpu, MemoryMappingList *list);
 
-void x86_cpu_dump_state(CPUState *cs, FILE *f, fprintf_function cpu_fprintf,
-                        int flags);
-
 hwaddr x86_cpu_get_phys_page_debug(CPUState *cpu, vaddr addr);
-
-int x86_cpu_gdb_read_register(CPUState *cpu, uint8_t *buf, int reg);
-int x86_cpu_gdb_write_register(CPUState *cpu, uint8_t *buf, int reg);
 
 void x86_cpu_exec_enter(CPUState *cpu);
 void x86_cpu_exec_exit(CPUState *cpu);

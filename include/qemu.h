@@ -26,12 +26,10 @@ typedef struct RAMBlock {
     ram_addr_t offset;
     ram_addr_t length;
     uint32_t flags;
-    char idstr[256];
     /* Reads can take either the iothread or the ramlist lock.
      * Writes must take both locks.
      */
     QTAILQ_ENTRY(RAMBlock) next;
-    int fd;
 } RAMBlock;
 
 typedef struct {
@@ -42,11 +40,8 @@ typedef struct {
 } BounceBuffer;
 
 typedef struct RAMList {
-    /* Protected by the iothread lock.  */
-    unsigned long *dirty_memory[DIRTY_MEMORY_NUM];
     RAMBlock *mru_block;
     QTAILQ_HEAD(, RAMBlock) blocks;
-    uint32_t version;
 } RAMList;
 
 #endif
