@@ -182,7 +182,6 @@ struct uc_struct {
     MemoryRegion io_mem_rom;    // qemu/exec.c
     MemoryRegion io_mem_notdirty;   // qemu/exec.c
     MemoryRegion io_mem_unassigned; // qemu/exec.c
-    MemoryRegion io_mem_watch;  // qemu/exec.c
     RAMList ram_list;   // qemu/exec.c
     BounceBuffer bounce;    // qemu/cpu-exec.c
     volatile sig_atomic_t exit_request; // qemu/cpu-exec.c
@@ -205,8 +204,6 @@ struct uc_struct {
 
     size_t emu_counter; // current counter of uc_emu_start()
     size_t emu_count; // save counter of uc_emu_start()
-
-    uint64_t block_addr;    // save the last block address we hooked
 
     int size_recur_mem; // size for mem access when in a recursive call
 
