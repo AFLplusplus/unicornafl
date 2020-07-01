@@ -112,7 +112,7 @@ int cpu_exec(struct uc_struct *uc, CPUArchState *env)
         cpu->halted = 0;
     }
 
-    uc->current_cpu = cpu;
+    uc->cpu = cpu;
 
     /* As long as current_cpu is null, up to the assignment just above,
      * requests by other threads to exit the execution loop are expected to
@@ -323,7 +323,7 @@ int cpu_exec(struct uc_struct *uc, CPUArchState *env)
         } else {
             /* Reload env after longjmp - the compiler may have smashed all
              * local variables as longjmp is marked 'noreturn'. */
-            cpu = uc->current_cpu;
+            cpu = uc->cpu;
             env = cpu->env_ptr;
             cc = CPU_GET_CLASS(uc, cpu);
 #ifdef TARGET_I386
@@ -333,7 +333,7 @@ int cpu_exec(struct uc_struct *uc, CPUArchState *env)
     } /* for(;;) */
 
     // Unicorn: Clear any TCG exit flag that might have been left set by exit requests
-    uc->current_cpu->tcg_exit_req = 0;
+    uc->cpu->tcg_exit_req = 0;
 
     cc->cpu_exec_exit(cpu);
 
@@ -350,8 +350,8 @@ int cpu_exec(struct uc_struct *uc, CPUArchState *env)
 #endif
         tb_flush(env);
 
-    /* fail safe : never use current_cpu outside cpu_exec() */
-    // uc->current_cpu = NULL;
+    /* fail safe : never use cpu outside cpu_exec() */
+    // uc->cpu = NULL;
 
     return ret;
 }
