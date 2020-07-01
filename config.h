@@ -28,7 +28,7 @@
 /* Version string: */
 
 // c = release, d = volatile github dev, e = experimental branch
-#define VERSION "++2.65d"
+#define VERSION "++2.66c"
 
 /******************************************************
  *                                                    *
@@ -234,7 +234,7 @@
 
 /* Sync interval (every n havoc cycles): */
 
-#define SYNC_INTERVAL 5
+#define SYNC_INTERVAL 8
 
 /* Output directory reuse grace period (minutes): */
 
@@ -396,13 +396,6 @@
    measuring coverage that could be attained by a "dumb" fuzzing algorithm: */
 
 // #define IGNORE_FINDS
-
-/* for *BSD: use ARC4RANDOM and save a file descriptor */
-#if defined(__APPLE__) || defined(__FreeBSD__) || defined(__OpenBSD__)
-  #ifndef HAVE_ARC4RANDOM
-    #define HAVE_ARC4RANDOM 1
-  #endif
-#endif                           /* __APPLE__ || __FreeBSD__ || __OpenBSD__ */
 
 #endif                                                  /* ! _HAVE_CONFIG_H */
 
