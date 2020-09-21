@@ -8,7 +8,7 @@
 # Compile with debug info when you want to debug code.
 # Change this to 'no' for release edition.
 
-UNICORN_DEBUG ?= yes
+UNICORN_DEBUG ?= no
 
 
 ################################################################################
