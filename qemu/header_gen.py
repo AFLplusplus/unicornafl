@@ -3034,6 +3034,7 @@ symbols = (
 
 arm_symbols = (
     'ARM_REGS_STORAGE_SIZE',
+    'arm_cpu_class_init',
 )
 
 aarch64_symbols = (
@@ -3042,6 +3043,7 @@ aarch64_symbols = (
     'arm64_reg_reset',
     'arm64_reg_read',
     'arm64_reg_write',
+    'arm_cpu_class_init',
     'gen_a64_set_pc_im',
     'aarch64_cpu_register_types',
     'helper_udiv64',
