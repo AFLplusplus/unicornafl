@@ -74,7 +74,7 @@ int afl_forkserver_start(struct uc_struct *uc)
     }
 
     uc->quit_request = false;
-    uc->current_cpu = cpu;
+    uc->cpu = cpu;
     smp_mb(); 
     CPUArchState *env = cpu->env_ptr;
     // Would love to not have the extra step in cpus.c, but it doesn't work otherwise(?)
