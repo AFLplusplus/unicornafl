@@ -28,7 +28,7 @@
 /* Version string: */
 
 // c = release, d = volatile github dev, e = experimental branch
-#define VERSION "++2.66c"
+#define VERSION "++3.00a"
 
 /******************************************************
  *                                                    *
@@ -40,6 +40,14 @@
    a lot less nice): */
 
 #define USE_COLOR
+
+/* StatsD config
+   Config can be adjusted via AFL_STATSD_HOST and AFL_STATSD_PORT environment
+   variable.
+*/
+#define STATSD_UPDATE_SEC 1
+#define STATSD_DEFAULT_PORT 8125
+#define STATSD_DEFAULT_HOST "127.0.0.1"
 
 /* If you want to have the original afl internal memory corruption checks.
    Disabled by default for speed. it is better to use "make ASAN_BUILD=1". */
@@ -66,25 +74,17 @@
   #define WORD_SIZE_64 1
 #endif
 
-/* Default memory limit for child process (MB): */
+/* Default memory limit for child process (MB) 0 = disabled : */
 
-#ifndef __NetBSD__
-  #ifndef WORD_SIZE_64
-    #define MEM_LIMIT 25
-  #else
-    #define MEM_LIMIT 50
-  #endif                                                  /* ^!WORD_SIZE_64 */
-#else /* NetBSD's kernel needs more space for stack, see discussion for issue \
-         #165 */
-  #define MEM_LIMIT 200
-#endif
-/* Default memory limit when running in QEMU mode (MB): */
+#define MEM_LIMIT 0
 
-#define MEM_LIMIT_QEMU 200
+/* Default memory limit when running in QEMU mode (MB) 0 = disabled : */
 
-/* Default memory limit when running in Unicorn mode (MB): */
+#define MEM_LIMIT_QEMU 0
 
-#define MEM_LIMIT_UNICORN 200
+/* Default memory limit when running in Unicorn mode (MB) 0 = disabled : */
+
+#define MEM_LIMIT_UNICORN 0
 
 /* Number of calibration cycles per every new test case (and for test
    cases that show variable behavior): */
@@ -109,12 +109,12 @@
 /* Maximum multiplier for the above (should be a power of two, beware
    of 32-bit int overflows): */
 
-#define HAVOC_MAX_MULT 16
-#define HAVOC_MAX_MULT_MOPT 32
+#define HAVOC_MAX_MULT 64
+#define HAVOC_MAX_MULT_MOPT 64
 
 /* Absolute minimum number of havoc cycles (after all adjustments): */
 
-#define HAVOC_MIN 16
+#define HAVOC_MIN 12
 
 /* Power Schedule Divisor */
 #define POWER_BETA 1
@@ -126,10 +126,10 @@
    n = random between 1 and HAVOC_STACK_POW2
    stacking = 2^n
 
-   In other words, the default (n = 7) produces 2, 4, 8, 16, 32, 64, or
-   128 stacked tweaks: */
+   In other words, the default (n = 4) produces 2, 4, 8, 16
+   stacked tweaks: */
 
-#define HAVOC_STACK_POW2 7
+#define HAVOC_STACK_POW2 4
 
 /* Caps on block sizes for cloning and deletion operations. Each of these
    ranges has a 33% probability of getting picked, except for the first
@@ -195,7 +195,7 @@
    steps; past this point, the "extras/user" step will be still carried out,
    but with proportionally lower odds: */
 
-#define MAX_DET_EXTRAS 200
+#define MAX_DET_EXTRAS 256
 
 /* Maximum number of auto-extracted dictionary tokens to actually use in fuzzing
    (first value), and to keep in memory as candidates. The latter should be much
@@ -295,6 +295,13 @@
 
 #define RESEED_RNG 100000
 
+/* The default maximum testcase cache size in MB, 0 = disable.
+   A value between 50 and 250 is a good default value. Note that the
+   number of entries will be auto assigned if not specified via the
+   AFL_TESTCACHE_ENTRIES env variable */
+
+#define TESTCASE_CACHE_SIZE 50
+
 /* Maximum line length passed from GCC to 'as' and used for parsing
    configuration files: */
 
@@ -380,6 +387,10 @@
 
 #define CMPLOG_SHM_ENV_VAR "__AFL_CMPLOG_SHM_ID"
 
+/* CPU Affinity lockfile env var */
+
+#define CPU_AFFINITY_ENV_VAR "__AFL_LOCKFILE"
+
 /* Uncomment this to use inferior block-coverage-based instrumentation. Note
    that you need to recompile the target binary for this to have any effect: */
 
@@ -396,6 +407,29 @@
    measuring coverage that could be attained by a "dumb" fuzzing algorithm: */
 
 // #define IGNORE_FINDS
+
+/* Text mutations */
+
+/* Minimum length of a queue input to be evaluated for "is_ascii"? */
+
+#define AFL_TXT_MIN_LEN 12
+
+/* What is the minimum percentage of ascii characters present to be classifed
+   as "is_ascii"? */
+
+#define AFL_TXT_MIN_PERCENT 94
+
+/* How often to perform ASCII mutations 0 = disable, 1-8 are good values */
+
+#define AFL_TXT_BIAS 6
+
+/* Maximum length of a string to tamper with */
+
+#define AFL_TXT_STRING_MAX_LEN 1024
+
+/* Maximum mutations on a string */
+
+#define AFL_TXT_STRING_MAX_MUTATIONS 6
 
 #endif                                                  /* ! _HAVE_CONFIG_H */
 
