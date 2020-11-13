@@ -51,6 +51,7 @@ char * read_file(const char *filename, struct stat *info) {
         return NULL;
     }
     fread(code, info->st_size, 1, fp);
+    fclose(fp);
     return code;
 }
 
