@@ -37,6 +37,7 @@ int main(int argc, char** argv)
         return 2;
     }
     if (fread(Data, Size, 1, fp) != 1) {
+        free(Data);
         fclose(fp);
         return 2;
     }
