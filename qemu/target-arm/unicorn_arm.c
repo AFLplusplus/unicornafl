@@ -72,6 +72,9 @@ int arm_reg_read(struct uc_struct *uc, unsigned int *regs, void **vals, int coun
                     *(int32_t *)value = xpsr_read(&ARM_CPU(uc, mycpu)->env);
                     break;
                 case UC_ARM_REG_APSR:
+                    *(int32_t *)value = cpsr_read(&ARM_CPU(uc, mycpu)->env) & (CPSR_NZCV | CPSR_Q | CPSR_GE);
+                    break;
+                case UC_ARM_REG_APSR_NZCV:
                     *(int32_t *)value = cpsr_read(&ARM_CPU(uc, mycpu)->env) & CPSR_NZCV;
                     break;
                 case UC_ARM_REG_CPSR:
@@ -138,6 +141,9 @@ int arm_reg_write(struct uc_struct *uc, unsigned int *regs, void* const* vals, i
                     xpsr_write(&ARM_CPU(uc, mycpu)->env, *(uint32_t *)value, 0xffffffffu);
                     break;
                 case UC_ARM_REG_APSR:
+                    cpsr_write(&ARM_CPU(uc, mycpu)->env, *(uint32_t *)value, (CPSR_NZCV | CPSR_Q | CPSR_GE));
+                    break;
+                case UC_ARM_REG_APSR_NZCV:
                     cpsr_write(&ARM_CPU(uc, mycpu)->env, *(uint32_t *)value, CPSR_NZCV);
                     break;
                 case UC_ARM_REG_CPSR:

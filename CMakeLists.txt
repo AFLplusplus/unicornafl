@@ -883,6 +883,10 @@ if (MSVC)
         qemu/util/oslib-win32.c
         qemu/util/qemu-thread-win32.c
     )
+    if(CMAKE_SIZEOF_VOID_P EQUAL 8)
+        enable_language(ASM_MASM)
+        set(UNICORN_SRCS ${UNICORN_SRCS} qemu/util/setjmp-wrapper-win32.asm)
+    endif()
 else()
     set(UNICORN_SRCS
         ${UNICORN_SRCS_COMMON}
@@ -907,7 +911,7 @@ if (UNICORN_HAS_X86)
     set(UNICORN_SAMPLE_FILE ${UNICORN_SAMPLE_FILE} sample_x86 sample_x86_32_gdt_and_seg_regs sample_batch_reg mem_apis shellcode)
 endif()
 if (UNICORN_HAS_ARM)
-    set(UNICORN_COMPILE_OPTIONS ${UNICORN_COMPILE_OPTIONS} -DUNICORN_HAS_ARM)
+    set(UNICORN_COMPILE_OPTIONS ${UNICORN_COMPILE_OPTIONS} -DUNICORN_HAS_ARM -DUNICORN_HAS_ARMEB)
     set(UNICORN_LINK_LIBRARIES ${UNICORN_LINK_LIBRARIES} arm-softmmu armeb-softmmu)
     set(UNICORN_SAMPLE_FILE ${UNICORN_SAMPLE_FILE} sample_arm sample_armeb)
 endif()
@@ -930,6 +934,11 @@ if (UNICORN_HAS_SPARC)
     set(UNICORN_COMPILE_OPTIONS ${UNICORN_COMPILE_OPTIONS} -DUNICORN_HAS_SPARC)
     set(UNICORN_LINK_LIBRARIES ${UNICORN_LINK_LIBRARIES} sparc-softmmu sparc64-softmmu)
     set(UNICORN_SAMPLE_FILE ${UNICORN_SAMPLE_FILE} sample_sparc)
+endif()
+if (UNICORN_HAS_PPC)
+    set(UNICORN_COMPILE_OPTIONS ${UNICORN_COMPILE_OPTIONS} -DUNICORN_HAS_PPC)
+    set(UNICORN_LINK_LIBRARIES ${UNICORN_LINK_LIBRARIES} ppc-softmmu)
+    set(UNICORN_SAMPLE_FILE ${UNICORN_SAMPLE_FILE} sample_ppc)
 endif()
 
 target_compile_options(unicorn PRIVATE

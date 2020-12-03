@@ -63,9 +63,12 @@ if SYSTEM == 'darwin':
     LIBRARY_FILE = "libunicornafl.dylib"
     MAC_LIBRARY_FILE = "libunicornafl*.dylib"
     STATIC_LIBRARY_FILE = None
-elif SYSTEM in ('win32', 'cygwin'):
+elif SYSTEM == 'win32':
     LIBRARY_FILE = "unicornafl.dll"
     STATIC_LIBRARY_FILE = "unicornafl.lib"
+elif SYSTEM == 'cygwin':
+    LIBRARY_FILE = "cygunicornafl.dll"
+    STATIC_LIBRARY_FILE = None
 else:
     LIBRARY_FILE = "libunicornafl.so"
     STATIC_LIBRARY_FILE = None
@@ -166,12 +169,7 @@ def build_libraries():
         new_env = dict(os.environ)
         new_env['UNICORN_BUILD_CORE_ONLY'] = 'yes'
         cmd = ['sh', './make.sh']
-        if SYSTEM == "cygwin":
-            if IS_64BITS:
-                cmd.append('cygwin-mingw64')
-            else:
-                cmd.append('cygwin-mingw32')
-        elif SYSTEM == "win32":
+        if SYSTEM == "win32":
             if IS_64BITS:
                 cmd.append('cross-win64')
             else:
@@ -305,7 +303,7 @@ setup(
     install_requires=['typing'] if sys.version_info < (3,5) else [],
     requires=['ctypes'],
     cmdclass={'build': custom_build, 'develop': custom_develop, 'sdist': custom_sdist, 'bdist_egg': custom_bdist_egg},
-    zip_safe=True,
+    zip_safe=False,
     include_package_data=True,
     is_pure=False,
     package_data={
