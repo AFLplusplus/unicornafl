@@ -15,7 +15,7 @@ UNAME_S := $(shell uname -s)
 # pass in a different -jX, with X being the number of threads.
 # For example, to completely disable parallel building, pass "-j1".
 # If you want to use 16 job threads, use "-j16".
-SMP_MFLAGS := -j4
+SMP_MFLAGS := -j
 
 UC_GET_OBJ = $(shell for i in \
     $$(grep '$(1)' $(2) | sed '/^\#/d' | \
