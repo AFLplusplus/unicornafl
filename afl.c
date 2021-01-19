@@ -17,6 +17,7 @@
 #include <sys/shm.h>
 
 #include "config.h"
+#include "types.h"
 #include "uc_priv.h"
 
 UNICORN_EXPORT
