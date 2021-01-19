@@ -31,6 +31,7 @@
  */
 
 #include "config.h"
+#include "types.h"
 
 /* NeverZero */
 

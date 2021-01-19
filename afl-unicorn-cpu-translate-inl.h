@@ -31,6 +31,7 @@
  */
 
 #include "config.h"
+#include "types.h"
 
 /* These are executed on code generation. Execution is in afl-unicorn-tcg-runtime-inl.h */
 /* Roughly afl_gen_maybe_log -> gen_afl_maybe_log -> emit HELPER(afl_maybe_log) -> call afl_maybe_log */
