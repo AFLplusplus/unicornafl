@@ -192,7 +192,7 @@
 
 /* The same, for the test case minimizer: */
 
-#define TMIN_MAX_FILE (10 * 1024 * 1024U)
+#define TMIN_MAX_FILE (10 * 1024 * 1024)
 
 /* Block normalization steps for afl-tmin: */
 
