@@ -488,7 +488,7 @@ class Uc(object):
             # print("Calling back home. :)", c_uc, input, input_len, persistent_round, c_data)
             ret = place_input_callback(
                 self,
-                ctypes.cast((ctypes.c_char * input_len), input).contents,
+                ctypes.cast(input, ctypes.POINTER(ctypes.c_char * input_len)).contents,
                 persistent_round,
                 data
             )
@@ -502,7 +502,7 @@ class Uc(object):
             ret = validate_crash_callback(
                 self,
                 UcError(uc_err),
-                ctypes.cast((ctypes.c_char * input_len), input).contents,
+                ctypes.cast(input, ctypes.POINTER(ctypes.c_char * input_len)).contents,
                 persistent_round,
                 data
             )
