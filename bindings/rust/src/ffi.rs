@@ -128,7 +128,7 @@ pub struct InstructionSysHook<D> {
 
 pub struct AflFuzzCallback<D> {
     pub unicorn: *mut crate::UnicornInner<D>,
-    pub input_callback: Box<dyn FnMut(crate::UnicornHandle<D>, &[u8], i32) -> bool>,
+    pub input_callback: Box<dyn FnMut(crate::UnicornHandle<D>, &mut [u8], i32) -> bool>,
     pub validate_callback: Box<dyn FnMut(crate::UnicornHandle<D>, uc_error, &[u8], i32) -> bool>
 }
 
@@ -196,18 +196,20 @@ pub extern "C" fn insn_sys_hook_proxy<D>(uc: uc_handle, user_data: *mut Instruct
     callback(crate::UnicornHandle { inner: unsafe { Pin::new_unchecked(unicorn) } });
 }
 
+#[inline]
 pub extern "C" fn input_placement_callback_proxy<D>(uc: uc_handle,
-    input: *const u8,
+    input: *mut u8,
     input_len: c_int,
     persistent_round: c_int,
     user_data: *mut AflFuzzCallback<D>) -> bool {
     let unicorn = unsafe { &mut *(*user_data).unicorn };
     let callback = &mut unsafe { &mut *(*user_data).input_callback };
-    let safe_input = unsafe { std::slice::from_raw_parts(input, input_len as usize) };
+    let safe_input = unsafe { std::slice::from_raw_parts_mut(input, input_len as usize) };
     assert_eq!(uc, unicorn.uc);
     callback(crate::UnicornHandle { inner: unsafe { Pin::new_unchecked(unicorn) } }, safe_input, persistent_round)
 }
 
+#[inline]
 pub extern "C" fn crash_validation_callback_proxy<D>(uc: uc_handle,
     unicorn_result: uc_error,
     input: *const u8,

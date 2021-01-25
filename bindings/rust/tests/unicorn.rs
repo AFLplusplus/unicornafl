@@ -680,7 +680,7 @@ fn x86_block_callback() {
 
     let x86_code32: Vec<u8> = vec![0x41, 0x4a]; // INC ecx; DEC edx
 
-    let mut unicorn = unicorn::Unicorn::new(Arch::X86, Mode::MODE_32, 0).expect("failed to initialize unicorn instance");
+    let mut unicorn = unicornafl::Unicorn::new(Arch::X86, Mode::MODE_32, 0).expect("failed to initialize unicorn instance");
     let mut emu = unicorn.borrow();
     assert_eq!(
         emu.mem_map(0x1000, 0x4000, Permission::ALL),

@@ -18,6 +18,10 @@ description = "Rust bindings for the Unicorn emulator with AFL++ extensions and 
 build = "build.rs"
 links = "unicornafl"
 
+[profile.release]
+lto = true
+opt-level = 3
+
 [dependencies]
 bitflags = "1.0"
 libc = "0.2"

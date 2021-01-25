@@ -811,7 +811,7 @@ impl<'a, D> UnicornHandle<'a, D> {
             always_validate: bool,
             persistent_iters: u32) -> Result<(), AflRet> 
         where
-            F: FnMut(UnicornHandle<D>, &[u8], i32) -> bool,
+            F: FnMut(UnicornHandle<D>, &mut [u8], i32) -> bool,
             G: FnMut(UnicornHandle<D>, uc_error, &[u8], i32) -> bool {
         let afl_fuzz_callback = Box::pin(ffi::AflFuzzCallback {
             unicorn: unsafe { self.inner.as_mut().get_unchecked_mut() }, 
