@@ -12,7 +12,7 @@ AR_EXT = a
 # Verbose output?
 V ?= 1
 
-CFLAGS += -Wall -Werror -I../include
+override CFLAGS += -Wall -I../include
 
 LDFLAGS += -L$(LIBDIR) -lunicornafl -lpthread -lm
 #LDFLAGS += -ggdb
@@ -30,7 +30,7 @@ ifeq ($(UNICORN_ASAN),yes)
 CC = clang 
 CXX = clang++
 AR = llvm-ar
-CFLAGS += -fsanitize=address -fno-omit-frame-pointer
+override CFLAGS += -fsanitize=address -fno-omit-frame-pointer
 LDFLAGS := -fsanitize=address ${LDFLAGS}
 endif
 
