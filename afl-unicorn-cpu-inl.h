@@ -61,7 +61,7 @@ static inline uc_afl_ret afl_forkserver(CPUArchState*);
 static int afl_find_wifsignaled_id(void);
 
 static enum afl_child_ret afl_handle_child_requests(CPUArchState*);
-static void afl_request_tsl(struct uc_struct* uc, target_ulong, target_ulong, uint64_t);
+static void afl_request_tsl(CPUArchState *env, target_ulong, target_ulong, uint64_t);
 static uc_afl_ret afl_request_next(struct uc_struct* uc, bool found_crash);
 
 // static TranslationBlock* tb_find_slow(CPUArchState*, target_ulong, target_ulong, uint64_t);
@@ -73,6 +73,10 @@ struct afl_tsl {
   target_ulong pc;
   target_ulong cs_base;
   uint64_t     flags;
+#if defined(TARGET_MIPS)
+  target_ulong hflags;
+  target_ulong btarget;
+#endif
 
 };
 
@@ -378,18 +382,22 @@ static inline uc_afl_ret afl_forkserver(CPUArchState* env) {
    we tell the parent to mirror the operation, so that the next fork() has a
    cached copy. */
 
-static inline void afl_request_tsl(struct uc_struct* uc, target_ulong pc, target_ulong cb, uint64_t flags) {
+static inline void afl_request_tsl(CPUArchState *env, target_ulong pc, target_ulong cb, uint64_t flags) {
 
   /* Dual use: if this func is not set, we're not a child process */
 
+  struct uc_struct* uc = env->uc;
   if (uc->afl_child_request_next == NULL) return;
-
   enum afl_child_ret tsl_req = AFL_CHILD_TSL_REQUEST;
 
   struct afl_tsl t = {
     .pc = pc,
     .cs_base = cb,
     .flags = flags,
+#if defined(TARGET_MIPS)
+    .hflags = env->hflags,
+    .btarget = env->btarget,
+#endif
   };
 
 #if defined(AFL_DEBUG)
@@ -479,6 +487,10 @@ static enum afl_child_ret afl_handle_child_requests(CPUArchState* env) {
       if (read(_R(env->uc->afl_child_pipe), &t, sizeof(struct afl_tsl)) != sizeof(struct afl_tsl)) return AFL_CHILD_EXITED; // child is dead.
 
       // Cache.
+#if defined(TARGET_MIPS)
+      env->hflags = t.hflags;
+      env->btarget = t.btarget;
+#endif
       tb_find_slow(env, t.pc, t.cs_base, t.flags);
 
     } else {
