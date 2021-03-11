@@ -486,12 +486,23 @@ static enum afl_child_ret afl_handle_child_requests(CPUArchState* env) {
       // Child will send a tsl request next, that we have to cache.
       if (read(_R(env->uc->afl_child_pipe), &t, sizeof(struct afl_tsl)) != sizeof(struct afl_tsl)) return AFL_CHILD_EXITED; // child is dead.
 
-      // Cache.
+      // Prepare hflags for delay slot
 #if defined(TARGET_MIPS)
+      struct afl_tsl tmp;
+      tmp.hflags = env->hflags;
+      tmp.btarget = env->btarget;
       env->hflags = t.hflags;
       env->btarget = t.btarget;
 #endif
+
+      // Cache.
       tb_find_slow(env, t.pc, t.cs_base, t.flags);
+
+      // Restore hflags
+#if defined(TARGET_MIPS)
+      env->hflags = tmp.hflags;
+      env->btarget = tmp.btarget;
+#endif
 
     } else {
 
