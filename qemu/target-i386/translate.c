@@ -5035,7 +5035,7 @@ static target_ulong disas_insn(CPUX86State *env, DisasContext *s,
                 return s->pc;
             }
         }
-    } 
+    } else
 #endif
     // end address tells us to stop emulation
     if (s->pc == s->uc->addr_end) {
@@ -8728,7 +8728,7 @@ static inline void gen_intermediate_code_internal(uint8_t *gen_opc_cc_op,
                 goto done_generating;
             }
         }
-    }
+    } else
 #endif
     // early check to see if the address of this block is the until address
     if (tb->pc == env->uc->addr_end) {

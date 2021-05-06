@@ -11129,6 +11129,21 @@ static inline void gen_intermediate_code_internal(PowerPCCPU *cpu,
 #endif
     num_insns = 0;
 
+ #ifdef UNICORN_AFL 
+    // UNICORN-AFL supports (and needs) multiple exits.
+    uint64_t *exits = env->uc->exits;
+    size_t exit_count = env->uc->exit_count;
+    if (exit_count) {
+        size_t i;
+        for (i = 0; i < exit_count; i++) {
+            if (tb->pc == exits[i]) {
+                gen_tb_start(tcg_ctx);
+                gen_exception(ctxp, EXCP_HLT); 
+                goto done_generating;
+            }
+        }
+    } else
+#endif 
     // early check to see if the address of this block is the until address
     if (pc_start == env->uc->addr_end) {
         gen_tb_start(tcg_ctx);
@@ -11140,6 +11155,19 @@ static inline void gen_intermediate_code_internal(PowerPCCPU *cpu,
     if (max_insns == 0)
         max_insns = CF_COUNT_MASK;
 
+#ifdef UNICORN_AFL 
+    // UNICORN-AFL supports (and needs) multiple exits.
+    if (exit_count) {
+        size_t i;
+        for (i = 0; i < exit_count; i++) {
+            if (tb->pc == exits[i]) {
+                gen_tb_start(tcg_ctx);
+                gen_exception(ctxp, EXCP_HLT); 
+                goto done_generating;
+            }
+        }
+    } else
+#endif
     // Unicorn: early check to see if the address of this block is the until address
     if (tb->pc == env->uc->addr_end) {
         gen_tb_start(tcg_ctx);
@@ -11181,6 +11209,20 @@ static inline void gen_intermediate_code_internal(PowerPCCPU *cpu,
             tcg_ctx->gen_opc_icount[lj] = num_insns;
         }
 
+#ifdef UNICORN_AFL 
+        // UNICORN-AFL supports (and needs) multiple exits.
+        uint64_t *exits = ctxp->uc->exits;
+        size_t exit_count = ctxp->uc->exit_count;
+        if (exit_count) {
+            size_t i;
+            for (i = 0; i < exit_count; i++) {
+                if (ctxp->nip == exits[i]) {
+                    gen_exception(ctxp, EXCP_HLT); 
+                    break;
+                }
+            }
+        } else
+#endif
 // Unicorn
         if (ctxp->nip == ctxp->uc->addr_end) {
 //            save_state(ctxp);

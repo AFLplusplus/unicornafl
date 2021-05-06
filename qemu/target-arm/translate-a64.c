@@ -10951,7 +10951,7 @@ static void disas_a64_insn(CPUARMState *env, DisasContext *s)
                 return;
             }
         }
-    }
+    } else
 #endif
     // Unicorn: end address tells us to stop emulation
     if (s->pc == s->uc->addr_end) {
@@ -11098,7 +11098,7 @@ void gen_intermediate_code_internal_a64(ARMCPU *cpu,
                 goto tb_end;
             }
         }
-    }
+    } else
 #endif
     // Unicorn: early check to see if the address of this block is the until address
     if (tb->pc == env->uc->addr_end) {

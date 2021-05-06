@@ -5380,7 +5380,7 @@ static inline void gen_intermediate_code_internal(SPARCCPU *cpu,
     int j, lj = -1;
     int num_insns = 0;
     int max_insns;
-    unsigned int insn;
+    unsigned int insn = 0;
     TCGContext *tcg_ctx = env->uc->tcg_ctx;
     bool block_full = false;
 
@@ -5412,7 +5412,7 @@ static inline void gen_intermediate_code_internal(SPARCCPU *cpu,
                 goto done_generating;
             }
         }
-    }
+    } else
 #endif
     // early check to see if the address of this block is the until address
     if (pc_start == env->uc->addr_end) {
@@ -5439,7 +5439,7 @@ static inline void gen_intermediate_code_internal(SPARCCPU *cpu,
                 goto done_generating;
             }
         }
-    }
+    } else
 #endif
     // Unicorn: early check to see if the address of this block is the until address
     if (tb->pc == env->uc->addr_end) {
@@ -5508,7 +5508,7 @@ static inline void gen_intermediate_code_internal(SPARCCPU *cpu,
                 }
                 if (stop_emu) break;
             }
-        }
+        } else
 #endif
         // Unicorn: end address tells us to stop emulation
         if (dc->pc == dc->uc->addr_end) {
