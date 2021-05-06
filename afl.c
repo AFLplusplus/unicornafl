@@ -36,8 +36,12 @@ uc_afl_ret uc_afl_forkserver_start(uc_engine *uc, uint64_t *exits, size_t exit_c
         fprintf(stderr, "[!] Unicorn Engine passed to uc_afl_fuzz is NULL!\n");
         return UC_AFL_RET_ERROR;
     }
-    if (!exit_count) {
+    if (!exits) {
         fprintf(stderr, "[!] Nullptr provided for exits.\n");
+        return UC_AFL_RET_ERROR;
+    }
+    if (!exit_count) {
+        fprintf(stderr, "[!] No exits provided (exit_count was 0).\n");
         return UC_AFL_RET_ERROR;
     }
     if (unlikely(uc->afl_area_ptr)) {
@@ -55,6 +59,8 @@ uc_afl_ret uc_afl_forkserver_start(uc_engine *uc, uint64_t *exits, size_t exit_c
     }
     memcpy(uc->exits, exits, sizeof(exits[0]) * exit_count);
     uc->exit_count = exit_count;
+    // Set addr_end to make sure unicorn will not stop at addr 0x0.
+    uc->addr_end = uc->exits[0];
 
     /* Fork() :) */
     return uc->afl_forkserver_start(uc);
