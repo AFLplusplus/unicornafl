@@ -19172,7 +19172,7 @@ gen_intermediate_code_internal(MIPSCPU *cpu, TranslationBlock *tb,
     int j, lj = -1;
     int num_insns;
     int max_insns;
-    int insn_bytes;
+    int insn_bytes = 0;
     int is_slot = 0;
     TCGContext *tcg_ctx = env->uc->tcg_ctx;
     TCGArg *save_opparam_ptr = NULL;
