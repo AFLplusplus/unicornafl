@@ -11093,6 +11093,7 @@ void gen_intermediate_code_internal_a64(ARMCPU *cpu,
         size_t i;
         for (i = 0; i < exit_count; i++) {
             if (tb->pc == exits[i]) {
+                gen_tb_start(tcg_ctx);
                 dc->is_jmp = DISAS_WFI;
                 goto tb_end;
             }
