@@ -19225,7 +19225,7 @@ gen_intermediate_code_internal(MIPSCPU *cpu, TranslationBlock *tb,
                 goto done_generating;
             }
         }
-    } else
+    }
 #endif
     // Unicorn: early check to see if the address of this block is the until address
     if (tb->pc == env->uc->addr_end) {
@@ -19299,7 +19299,7 @@ gen_intermediate_code_internal(MIPSCPU *cpu, TranslationBlock *tb,
                 }
             }
             if (stop_emu) break;
-        } else
+        }
 #endif
         // Unicorn: end address tells us to stop emulation
         if (ctx.pc == ctx.uc->addr_end) {
