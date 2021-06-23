@@ -34,7 +34,7 @@ pub struct Heap {
 
 /// Gets the current program counter/`RIP` for this `unicorn` instance.
 #[inline]
-pub fn reg_pc<D>(uc: &super::UnicornHandle<D>) -> Result<u64, uc_error> {
+pub fn read_pc<D>(uc: &super::UnicornHandle<D>) -> Result<u64, uc_error> {
     let arch = uc.get_arch();
     let reg = match arch {
         Arch::X86 => RegisterX86::RIP as i32,
@@ -328,7 +328,7 @@ pub fn uc_free(uc: &mut super::UnicornHandle<RefCell<Heap>>, ptr: u64) -> Result
                 .expect("failed to find requested chunk on heap");
             chunk_size = curr_chunk.len as u64;
             if curr_chunk.freed {
-                panic!("ERROR: unicorn-rs Sanitizer: Double Free detected on addr {:#0x}, $pc: {:#010x}", ptr, reg_pc(&uc).unwrap());
+                panic!("ERROR: unicorn-rs Sanitizer: Double Free detected on addr {:#0x}, $pc: {:#010x}", ptr, read_pc(&uc).unwrap());
             }
             curr_chunk.freed = true;
         }
@@ -371,17 +371,7 @@ fn heap_oob(
     _size: usize,
     _val: i64,
 ) {
-    let arch = uc.get_arch();
-    let reg = match arch {
-        Arch::X86 => RegisterX86::RIP as i32,
-        Arch::ARM => RegisterARM::PC as i32,
-        Arch::ARM64 => RegisterARM64::PC as i32,
-        Arch::MIPS => RegisterMIPS::PC as i32,
-        Arch::SPARC => RegisterSPARC::PC as i32,
-        Arch::M68K => RegisterM68K::PC as i32,
-        _ => panic!("Arch not yet supported by unicorn::utils module"),
-    };
-    let pc = uc.reg_read(reg).expect("failed to read pc");
+    let pc = read_pc(&uc).unwrap();
     panic!(
         "ERROR: unicorn-rs Sanitizer: Heap out-of-bounds read on addr {:#0x}, $pc: {:#010x}",
         addr, pc
@@ -395,17 +385,7 @@ fn heap_bo(
     _size: usize,
     _val: i64,
 ) {
-    let arch = uc.get_arch();
-    let reg = match arch {
-        Arch::X86 => RegisterX86::RIP as i32,
-        Arch::ARM => RegisterARM::PC as i32,
-        Arch::ARM64 => RegisterARM64::PC as i32,
-        Arch::MIPS => RegisterMIPS::PC as i32,
-        Arch::SPARC => RegisterSPARC::PC as i32,
-        Arch::M68K => RegisterM68K::PC as i32,
-        _ => panic!("Arch not yet supported by unicorn::utils module"),
-    };
-    let pc = uc.reg_read(reg).expect("failed to read pc");
+    let pc = read_pc(&uc).unwrap();
     panic!(
         "ERROR: unicorn-rs Sanitizer: Heap buffer-overflow on addr {:#0x}, $pc: {:#010x}",
         addr, pc
@@ -422,7 +402,7 @@ fn heap_uaf(
     panic!(
         "ERROR: unicorn-rs Sanitizer: Heap use-after-free on addr {:#0x}, $pc: {:#010x}",
         addr,
-        reg_pc(&uc).unwrap()
+        read_pc(&uc).unwrap()
     );
 }
 
