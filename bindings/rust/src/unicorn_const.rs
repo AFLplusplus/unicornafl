@@ -11,6 +11,7 @@ pub const MILISECOND_SCALE: u64 = 1000;
 
 #[repr(C)]
 #[derive(PartialEq, Debug, Clone, Copy)]
+#[allow(clippy::upper_case_acronyms)]
 pub enum uc_error {
     OK = 0,
     NOMEM = 1,
@@ -38,6 +39,7 @@ pub enum uc_error {
 
 #[repr(C)]
 #[derive(PartialEq, Debug, Clone, Copy)]
+#[allow(clippy::upper_case_acronyms)]
 pub enum AflRet {
     ERROR = 0,
     CHILD = 1,
@@ -62,6 +64,7 @@ pub enum MemType {
 
 #[repr(i32)]
 #[derive(PartialEq, Debug, Clone, Copy)]
+#[allow(clippy::upper_case_acronyms)]
 pub enum HookType {
     INTR = 1,
     INSN = 2,
@@ -90,6 +93,7 @@ pub enum HookType {
 
 #[repr(C)]
 #[derive(PartialEq, Debug, Clone, Copy)]
+#[allow(clippy::upper_case_acronyms)]
 pub enum Query {
     MODE = 1,
     PAGE_SIZE = 2,
@@ -131,7 +135,6 @@ pub enum Arch {
 #[repr(C)]
 #[derive(PartialEq, Debug, Clone, Copy)]
 pub enum Mode {
-
     LITTLE_ENDIAN = 0,
     BIG_ENDIAN = 1073741824,
 
