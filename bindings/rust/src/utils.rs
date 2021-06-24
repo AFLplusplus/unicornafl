@@ -9,7 +9,7 @@ use super::sparc::RegisterSPARC;
 use super::x86::RegisterX86;
 use super::{uc_error, Arch, HookType, MemType, Mode, Permission};
 use capstone::prelude::*;
-use libc::{c_void, mmap, size_t, MAP_ANON, MAP_PRIVATE, PROT_READ, PROT_WRITE};
+use libc::{c_void, mmap, munmap, size_t, MAP_ANON, MAP_PRIVATE, PROT_READ, PROT_WRITE};
 use std::cell::RefCell;
 use std::collections::HashMap;
 use std::ptr;
@@ -30,6 +30,14 @@ pub struct Heap {
     pub chunk_map: HashMap<u64, Chunk>,
     pub top: u64,
     pub unalloc_hook: super::ffi::uc_hook,
+}
+
+impl Drop for Heap {
+    fn drop(&mut self) {
+        unsafe {
+            munmap(self.real_base as *mut c_void, self.len);
+        }
+    }
 }
 
 /// Gets the current program counter/`RIP` for this `unicorn` instance.
@@ -349,17 +357,7 @@ fn heap_unalloc(
     _size: usize,
     _val: i64,
 ) {
-    let arch = uc.get_arch();
-    let reg = match arch {
-        Arch::X86 => RegisterX86::RIP as i32,
-        Arch::ARM => RegisterARM::PC as i32,
-        Arch::ARM64 => RegisterARM64::PC as i32,
-        Arch::MIPS => RegisterMIPS::PC as i32,
-        Arch::SPARC => RegisterSPARC::PC as i32,
-        Arch::M68K => RegisterM68K::PC as i32,
-        _ => panic!("Arch not yet supported by unicorn::utils module"),
-    };
-    let pc = uc.reg_read(reg).expect("failed to read pc");
+    let pc = read_pc(&uc).expect("failed to read pc");
     panic!("ERROR: unicorn-rs Sanitizer: Heap out-of-bounds access of unallocated memory on addr {:#0x}, $pc: {:#010x}",
         addr, pc);
 }

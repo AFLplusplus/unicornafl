@@ -1,6 +1,6 @@
 [package]
 name = "unicornafl"
-version = "1.0.0"
+version = "1.1.0"
 authors = ["Lukas Seidel"]
 documentation = ""
 edition = "2018"
