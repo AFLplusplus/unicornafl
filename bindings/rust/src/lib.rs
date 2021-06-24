@@ -41,6 +41,7 @@ mod x86;
 pub use crate::{arm::*, arm64::*, m68k::*, mips::*, ppc::*, sparc::*, x86::*};
 
 use ffi::uc_handle;
+use libc::c_int;
 use std::collections::HashMap;
 use std::ffi::c_void;
 use std::marker::PhantomPinned;
@@ -71,6 +72,67 @@ impl Drop for Context {
     fn drop(&mut self) {
         unsafe { ffi::uc_free(self.context) };
     }
+}
+
+/// Callback structure we use to call handler functions
+pub struct AflFuzzCallback<D, F, G>
+where
+    F: FnMut(UnicornHandle<D>, &mut [u8], i32) -> bool,
+    G: FnMut(UnicornHandle<D>, uc_error, &[u8], i32) -> bool,
+{
+    pub unicorn: *mut crate::UnicornInner<D>,
+    pub input_callback: F,
+    pub validate_callback: G,
+}
+
+unsafe extern "C" fn input_placement_callback_proxy<D, F, G>(
+    uc: uc_handle,
+    input: *mut u8,
+    input_len: c_int,
+    persistent_round: c_int,
+    user_data: *mut AflFuzzCallback<D, F, G>,
+) -> bool
+where
+    F: FnMut(UnicornHandle<D>, &mut [u8], i32) -> bool,
+    G: FnMut(UnicornHandle<D>, uc_error, &[u8], i32) -> bool,
+{
+    let unicorn = &mut *(*user_data).unicorn;
+    let callback = &mut (*user_data).input_callback;
+    let safe_input = std::slice::from_raw_parts_mut(input, input_len as usize);
+    assert_eq!(uc, unicorn.uc);
+    callback(
+        crate::UnicornHandle {
+            inner: Pin::new_unchecked(unicorn),
+        },
+        safe_input,
+        persistent_round,
+    )
+}
+
+unsafe extern "C" fn crash_validation_callback_proxy<D, F, G>(
+    uc: uc_handle,
+    unicorn_result: uc_error,
+    input: *const u8,
+    input_len: c_int,
+    persistent_round: c_int,
+    user_data: *mut AflFuzzCallback<D, F, G>,
+) -> bool
+where
+    F: FnMut(UnicornHandle<D>, &mut [u8], i32) -> bool,
+    G: FnMut(UnicornHandle<D>, uc_error, &[u8], i32) -> bool,
+{
+    let unicorn = &mut *(*user_data).unicorn;
+    let callback = &mut (*user_data).validate_callback;
+    assert_eq!(uc, unicorn.uc);
+    let safe_input = std::slice::from_raw_parts(input, input_len as usize);
+    callback(
+        crate::UnicornHandle {
+            inner: Pin::new_unchecked(unicorn),
+        },
+        unicorn_result,
+        safe_input,
+        persistent_round,
+    )
 }
 
 #[derive(Debug)]
@@ -844,10 +906,10 @@ impl<'a, D> UnicornHandle<'a, D> {
         F: FnMut(UnicornHandle<D>, &mut [u8], i32) -> bool,
         G: FnMut(UnicornHandle<D>, uc_error, &[u8], i32) -> bool,
     {
-        let afl_fuzz_callback = Box::pin(ffi::AflFuzzCallback {
+        let afl_fuzz_callback = Box::pin(AflFuzzCallback {
             unicorn: unsafe { self.inner.as_mut().get_unchecked_mut() },
-            input_callback: Box::new(input_placement_callback),
-            validate_callback: Box::new(crash_validation_callback),
+            input_callback: input_placement_callback,
+            validate_callback: crash_validation_callback,
         });
 
         let cstyle_input_file = std::ffi::CString::new(input_file).unwrap();
@@ -855,10 +917,10 @@ impl<'a, D> UnicornHandle<'a, D> {
             ffi::uc_afl_fuzz(
                 self.inner.uc,
                 cstyle_input_file.as_ptr(),
-                ffi::input_placement_callback_proxy::<D> as _,
+                input_placement_callback_proxy::<D, F, G> as _,
                 exits.as_ptr(),
                 exits.len(),
-                ffi::crash_validation_callback_proxy::<D> as _,
+                crash_validation_callback_proxy::<D, F, G> as _,
                 always_validate,
                 persistent_iters,
                 &*afl_fuzz_callback as *const _ as _,

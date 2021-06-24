@@ -1,6 +1,7 @@
 // X86 registers
 #[repr(C)]
 #[derive(PartialEq, Debug, Clone, Copy)]
+#[allow(clippy::upper_case_acronyms)]
 pub enum RegisterX86 {
     INVALID = 0,
     AH,
@@ -256,6 +257,7 @@ pub enum RegisterX86 {
 
 #[repr(C)]
 #[derive(PartialEq, Debug, Clone, Copy)]
+#[allow(clippy::upper_case_acronyms)]
 pub enum InsnX86 {
     IN = 218,
     OUT = 500,
@@ -266,6 +268,7 @@ pub enum InsnX86 {
 
 #[repr(C)]
 #[derive(PartialEq, Debug, Clone, Copy)]
+#[allow(clippy::upper_case_acronyms)]
 pub enum InsnSysX86 {
     SYSCALL = InsnX86::SYSCALL as isize,
     SYSENTER = InsnX86::SYSENTER as isize,

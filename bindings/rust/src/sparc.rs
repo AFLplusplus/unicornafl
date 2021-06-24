@@ -1,6 +1,7 @@
 // SPARC registers
 #[repr(C)]
 #[derive(PartialEq, Debug, Clone, Copy)]
+#[allow(clippy::upper_case_acronyms)]
 pub enum RegisterSPARC {
     INVALID = 0,
     F0 = 1,
