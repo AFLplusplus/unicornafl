@@ -56,6 +56,21 @@ pub fn read_pc<D>(uc: &super::UnicornHandle<D>) -> Result<u64, uc_error> {
     uc.reg_read(reg)
 }
 
+#[inline]
+pub fn set_pc<D>(uc: &mut super::UnicornHandle<D>, value: u64) -> Result<(), uc_error> {
+    let arch = uc.get_arch();
+    let reg = match arch {
+        Arch::X86 => RegisterX86::RIP as i32,
+        Arch::ARM => RegisterARM::PC as i32,
+        Arch::ARM64 => RegisterARM64::PC as i32,
+        Arch::MIPS => RegisterMIPS::PC as i32,
+        Arch::SPARC => RegisterSPARC::PC as i32,
+        Arch::M68K => RegisterM68K::PC as i32,
+        _ => panic!("Arch not yet supported by unicorn::utils module"),
+    };
+    uc.reg_write(reg, value)
+}
+
 /// Hooks (parts of the) code segment to display register info and the current instruction.
 pub fn add_debug_prints_ARM<D>(uc: &mut super::UnicornHandle<D>, code_start: u64, code_end: u64) {
     let cs_arm: Capstone = Capstone::new()
@@ -159,6 +174,7 @@ pub fn add_debug_prints_ARM<D>(uc: &mut super::UnicornHandle<D>, code_start: u64
 /// and thus introduces some overhead.
 pub fn init_emu_with_heap(
     arch: Arch,
+    mode: Mode,
     mut size: u32,
     base_addr: u64,
     grow: bool,
@@ -173,7 +189,7 @@ pub fn init_emu_with_heap(
         unalloc_hook: 0 as _,
     });
 
-    let mut unicorn = super::Unicorn::new(arch, Mode::LITTLE_ENDIAN, heap)?;
+    let mut unicorn = super::Unicorn::new(arch, mode, heap)?;
     let mut uc = unicorn.borrow(); // get handle
 
     // uc memory regions have to be 8 byte aligned
