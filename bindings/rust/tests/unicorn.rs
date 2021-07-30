@@ -282,6 +282,7 @@ fn x86_mem_callback() {
         move |_: Unicorn<'_>, mem_type: MemType, address: u64, size: usize, value: i64| {
             let mut mems = callback_mems.borrow_mut();
             mems.push(MemExpectation(mem_type, address, size, value));
+            return true;
         };
 
     // mov eax, 0xdeadbeef;
@@ -551,7 +552,7 @@ fn mem_map_ptr() {
     );
 
     assert_eq!(
-        emu.mem_map_ptr(0x1000, 0x4000, Permission::ALL, mem.as_mut_ptr() as _),
+        unsafe{emu.mem_map_ptr(0x1000, 0x4000, Permission::ALL, mem.as_mut_ptr() as _)},
         Ok(())
     );
     assert_eq!(emu.mem_write(0x1000, &x86_code32), Ok(()));
@@ -587,7 +588,7 @@ fn mem_map_ptr() {
     );
 
     assert_eq!(
-        emu.mem_map_ptr(0x1000, 0x4000, Permission::ALL, mem.as_mut_ptr() as _),
+        unsafe{emu.mem_map_ptr(0x1000, 0x4000, Permission::ALL, mem.as_mut_ptr() as _)},
         Ok(())
     );
     assert_eq!(emu.mem_write(0x1000, &x86_code32), Ok(()));

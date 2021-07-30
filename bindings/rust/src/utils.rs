@@ -372,7 +372,7 @@ fn heap_unalloc(
     addr: u64,
     _size: usize,
     _val: i64,
-) {
+) -> bool {
     let pc = read_pc(&uc).expect("failed to read pc");
     panic!("ERROR: unicorn-rs Sanitizer: Heap out-of-bounds access of unallocated memory on addr {:#0x}, $pc: {:#010x}",
         addr, pc);
@@ -384,7 +384,7 @@ fn heap_oob(
     addr: u64,
     _size: usize,
     _val: i64,
-) {
+) -> bool {
     let pc = read_pc(&uc).unwrap();
     panic!(
         "ERROR: unicorn-rs Sanitizer: Heap out-of-bounds read on addr {:#0x}, $pc: {:#010x}",
@@ -398,7 +398,7 @@ fn heap_bo(
     addr: u64,
     _size: usize,
     _val: i64,
-) {
+) -> bool {
     let pc = read_pc(&uc).unwrap();
     panic!(
         "ERROR: unicorn-rs Sanitizer: Heap buffer-overflow on addr {:#0x}, $pc: {:#010x}",
@@ -412,7 +412,7 @@ fn heap_uaf(
     addr: u64,
     _size: usize,
     _val: i64,
-) {
+)  -> bool {
     panic!(
         "ERROR: unicorn-rs Sanitizer: Heap use-after-free on addr {:#0x}, $pc: {:#010x}",
         addr,
