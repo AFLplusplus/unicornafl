@@ -526,7 +526,7 @@ impl<'a, D> UnicornHandle<'a, D> {
         callback: F,
     ) -> Result<ffi::uc_hook, uc_error>
     where
-        F: FnMut(UnicornHandle<D>, MemType, u64, usize, i64),
+        F: FnMut(UnicornHandle<D>, MemType, u64, usize, i64) -> bool,
     {
         if (hook_type as i32) < 16 || hook_type == HookType::INSN_INVALID {
             return Err(uc_error::ARG);
