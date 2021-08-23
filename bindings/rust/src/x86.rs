@@ -1,7 +1,7 @@
 // X86 registers
 #[repr(C)]
 #[derive(PartialEq, Debug, Clone, Copy)]
-#[allow(clippy::upper_case_acronyms)]
+#[allow(clippy::upper_case_acronyms,non_camel_case_types)]
 pub enum RegisterX86 {
     INVALID = 0,
     AH,
