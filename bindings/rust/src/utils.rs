@@ -352,7 +352,7 @@ pub fn uc_free(uc: &mut super::UnicornHandle<RefCell<Heap>>, ptr: u64) -> Result
                 .expect("failed to find requested chunk on heap");
             chunk_size = curr_chunk.len as u64;
             if curr_chunk.freed {
-                panic!("ERROR: unicorn-rs Sanitizer: Double Free detected on addr {:#0x}, $pc: {:#010x}", ptr, read_pc(&uc).unwrap());
+                panic!("ERROR: unicorn-rs Sanitizer: Double Free detected on addr {:#0x}, $pc: {:#010x}", ptr, read_pc(uc).unwrap());
             }
             curr_chunk.freed = true;
         }
@@ -412,7 +412,7 @@ fn heap_uaf(
     addr: u64,
     _size: usize,
     _val: i64,
-)  -> bool {
+) -> bool {
     panic!(
         "ERROR: unicorn-rs Sanitizer: Heap use-after-free on addr {:#0x}, $pc: {:#010x}",
         addr,

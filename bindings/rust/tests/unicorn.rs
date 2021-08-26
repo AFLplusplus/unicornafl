@@ -552,7 +552,7 @@ fn mem_map_ptr() {
     );
 
     assert_eq!(
-        unsafe{emu.mem_map_ptr(0x1000, 0x4000, Permission::ALL, mem.as_mut_ptr() as _)},
+        unsafe { emu.mem_map_ptr(0x1000, 0x4000, Permission::ALL, mem.as_mut_ptr() as _) },
         Ok(())
     );
     assert_eq!(emu.mem_write(0x1000, &x86_code32), Ok(()));
@@ -588,7 +588,7 @@ fn mem_map_ptr() {
     );
 
     assert_eq!(
-        unsafe{emu.mem_map_ptr(0x1000, 0x4000, Permission::ALL, mem.as_mut_ptr() as _)},
+        unsafe { emu.mem_map_ptr(0x1000, 0x4000, Permission::ALL, mem.as_mut_ptr() as _) },
         Ok(())
     );
     assert_eq!(emu.mem_write(0x1000, &x86_code32), Ok(()));

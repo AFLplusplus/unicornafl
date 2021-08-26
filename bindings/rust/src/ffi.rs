@@ -103,9 +103,10 @@ pub struct BlockHook<D> {
     pub callback: Box<dyn FnMut(crate::UnicornHandle<D>, u64, u32)>,
 }
 
+#[allow(clippy::type_complexity)]
 pub struct MemHook<D> {
     pub unicorn: *mut crate::UnicornInner<D>,
-    pub callback: Box<dyn FnMut(crate::UnicornHandle<D>, MemType, u64, usize, i64) -> bool>
+    pub callback: Box<dyn FnMut(crate::UnicornHandle<D>, MemType, u64, usize, i64) -> bool>,
 }
 
 pub struct InterruptHook<D> {
