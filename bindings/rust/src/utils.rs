@@ -152,10 +152,10 @@ pub fn add_debug_prints_ARM<D>(uc: &mut super::UnicornHandle<D>, code_start: u64
         let mut buf = vec![0; size as usize];
         uc.mem_read(addr, &mut buf)
             .expect("failed to read opcode from memory");
-        let ins = if cpsr & 0x20 != 0 {
-            cs_thumb.disasm_all(&buf, size as u64)
-        } else {
+        let ins = if cpsr & 0x20 == 0 {
             cs_arm.disasm_all(&buf, size as u64)
+        } else {
+            cs_thumb.disasm_all(&buf, size as u64)
         }
         .unwrap_or_else(|_| panic!("failed to disasm at addr {:#010x}", addr));
         println!("$pc: {:#010x}", addr);
@@ -259,9 +259,7 @@ pub fn uc_alloc(
     let uc_base = heap_info.uc_base;
 
     if addr + size >= uc_base + len as u64 {
-        if !heap_info.grow_dynamically {
-            return Err(uc_error::WRITE_UNMAPPED);
-        } else {
+        if heap_info.grow_dynamically {
             // grow heap
             let mut increase_by = len / 2;
             if increase_by % 8 != 0 {
@@ -276,6 +274,8 @@ pub fn uc_alloc(
                 Permission::READ | Permission::WRITE,
             )?;
             len = new_len;
+        } else {
+            return Err(uc_error::WRITE_UNMAPPED);
         }
     } else {
         drop(heap_info);

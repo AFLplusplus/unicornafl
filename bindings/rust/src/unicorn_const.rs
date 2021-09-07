@@ -6,7 +6,7 @@ pub const API_MINOR: u64 = 0;
 pub const VERSION_MAJOR: u64 = 1;
 pub const VERSION_MINOR: u64 = 0;
 pub const VERSION_EXTRA: u64 = 2;
-pub const SECOND_SCALE: u64 = 1000000;
+pub const SECOND_SCALE: u64 = 1_000_000;
 pub const MILISECOND_SCALE: u64 = 1000;
 
 #[repr(C)]
@@ -136,7 +136,7 @@ pub enum Arch {
 #[derive(PartialEq, Debug, Clone, Copy)]
 pub enum Mode {
     LITTLE_ENDIAN = 0,
-    BIG_ENDIAN = 1073741824,
+    BIG_ENDIAN = 1_073_741_824,
 
     // use LITTLE_ENDIAN.
     // MODE_ARM = 0,
