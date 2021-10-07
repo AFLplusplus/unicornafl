@@ -266,3 +266,9 @@ pub enum RegisterARM64 {
     // pseudo registers
     PC = 260,
 }
+
+impl From<RegisterARM64> for i32 {
+    fn from(r: RegisterARM64) -> Self {
+        r as i32
+    }
+}

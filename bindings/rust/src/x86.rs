@@ -257,6 +257,12 @@ pub enum RegisterX86 {
     GS_BASE,
 }
 
+impl From<RegisterX86> for i32 {
+    fn from(r: RegisterX86) -> Self {
+        r as i32
+    }
+}
+
 #[repr(C)]
 #[derive(PartialEq, Debug, Clone, Copy)]
 #[allow(clippy::upper_case_acronyms)]

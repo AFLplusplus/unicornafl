@@ -154,3 +154,9 @@ pub enum RegisterMIPS {
     MPL1 = 135,
     MPL2 = 136,
 }
+
+impl From<RegisterMIPS> for i32 {
+    fn from(r: RegisterMIPS) -> Self {
+        r as i32
+    }
+}

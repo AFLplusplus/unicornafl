@@ -9,7 +9,7 @@
 //! use unicornafl::RegisterARM;
 //! use unicornafl::unicorn_const::{Arch, Mode, Permission, SECOND_SCALE};
 //!
-//! fn main() {
+//! fn emulate() {
 //!     let arm_code32: Vec<u8> = vec![0x17, 0x00, 0x40, 0xe2]; // sub r0, #23
 //!
 //!     let mut unicorn = unicornafl::Unicorn::new(Arch::ARM, Mode::LITTLE_ENDIAN, 0).expect("failed to initialize Unicorn instance");

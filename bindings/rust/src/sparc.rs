@@ -93,3 +93,9 @@ pub enum RegisterSPARC {
     XCC = 87,
     PC = 88,
 }
+
+impl From<RegisterSPARC> for i32 {
+    fn from(r: RegisterSPARC) -> Self {
+        r as i32
+    }
+}
