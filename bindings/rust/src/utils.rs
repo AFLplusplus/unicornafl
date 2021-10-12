@@ -172,13 +172,13 @@ pub fn add_debug_prints_ARM<D>(uc: &mut super::UnicornHandle<D>, code_start: u64
 /// detecting common memory corruption bugs.
 /// The allocator makes heavy use of Unicorn hooks for sanitization/ crash amplification
 /// and thus introduces some overhead.
-pub fn init_emu_with_heap(
+pub fn init_emu_with_heap<'a>(
     arch: Arch,
     mode: Mode,
     mut size: u32,
     base_addr: u64,
     grow: bool,
-) -> Result<super::Unicorn<RefCell<Heap>>, uc_error> {
+) -> Result<super::Unicorn<'a, RefCell<Heap>>, uc_error> {
     let heap = RefCell::new(Heap {
         real_base: 0 as _,
         uc_base: 0,
@@ -190,7 +190,8 @@ pub fn init_emu_with_heap(
     });
 
     let mut unicorn = super::Unicorn::new(arch, mode, heap)?;
-    let mut uc = unicorn.borrow(); // get handle
+    let mut uc = unicorn;
+    //let mut uc = unicorn.borrow(); // get handle
 
     // uc memory regions have to be 8 byte aligned
     if size % 8 != 0 {
