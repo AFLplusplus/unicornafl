@@ -72,43 +72,43 @@ impl Drop for Context {
 }
 
 /// Callback structure we use to call handler functions
-pub struct AflFuzzCallback<'d, D, F, G>
+pub struct AflFuzzCallback<'a, 'afl, D, F, G>
 where
-    F: FnMut(&mut UnicornHandle<D>, &mut [u8], i32) -> bool,
-    G: FnMut(&mut UnicornHandle<D>, uc_error, &[u8], i32) -> bool,
+    F: 'afl + FnMut(&mut Unicorn<'a, D>, &mut [u8], i32) -> bool,
+    G: 'afl + FnMut(&mut Unicorn<'a, D>, uc_error, &[u8], i32) -> bool,
 {
-    pub unicorn: &'d mut UnicornHandle<'d, D>,
+    pub unicorn: &'afl mut Unicorn<'a, D>,
     pub input_callback: F,
     pub validate_callback: G,
 }
 
-unsafe extern "C" fn input_placement_callback_proxy<D, F, G>(
+unsafe extern "C" fn input_placement_callback_proxy<'a, 'afl, D, F, G>(
     _uc: uc_handle,
     input: *mut u8,
     input_len: c_int,
     persistent_round: c_int,
-    user_data: *mut AflFuzzCallback<D, F, G>,
+    user_data: *mut AflFuzzCallback<'a, 'afl, D, F, G>,
 ) -> bool
 where
-    F: FnMut(&mut UnicornHandle<D>, &mut [u8], i32) -> bool,
-    G: FnMut(&mut UnicornHandle<D>, uc_error, &[u8], i32) -> bool,
+    F: 'afl + FnMut(&mut Unicorn<'a, D>, &mut [u8], i32) -> bool,
+    G: 'afl + FnMut(&mut Unicorn<'a, D>, uc_error, &[u8], i32) -> bool,
 {
     let callback = &mut (*user_data).input_callback;
     let safe_input = std::slice::from_raw_parts_mut(input, input_len as usize);
     callback((*user_data).unicorn, safe_input, persistent_round)
 }
 
-unsafe extern "C" fn crash_validation_callback_proxy<D, F, G>(
+unsafe extern "C" fn crash_validation_callback_proxy<'a, 'afl, D, F, G>(
     _uc: uc_handle,
     unicorn_result: uc_error,
     input: *const u8,
     input_len: c_int,
     persistent_round: c_int,
-    user_data: *mut AflFuzzCallback<D, F, G>,
+    user_data: *mut AflFuzzCallback<'a, 'afl, D, F, G>,
 ) -> bool
 where
-    F: FnMut(&mut UnicornHandle<D>, &mut [u8], i32) -> bool,
-    G: FnMut(&mut UnicornHandle<D>, uc_error, &[u8], i32) -> bool,
+    F: 'afl + FnMut(&mut Unicorn<'a, D>, &mut [u8], i32) -> bool,
+    G: 'afl + FnMut(&mut Unicorn<'a, D>, uc_error, &[u8], i32) -> bool,
 {
     let callback = &mut (*user_data).validate_callback;
     let safe_input = std::slice::from_raw_parts(input, input_len as usize);
@@ -122,14 +122,8 @@ where
 
 #[derive(Debug)]
 /// A Unicorn emulator instance.
-pub struct Unicorn<'a, D> {
-    inner: Pin<Box<UnicornInner<'a, D>>>,
-}
-
-#[derive(Debug)]
-/// Handle used to safely access exposed functions and data of a Unicorn instance.
-pub struct UnicornHandle<'a, D> {
-    inner: Pin<&'a mut UnicornInner<'a, D>>,
+pub struct Unicorn<'a, D: 'a> {
+    inner: UnicornInner<'a, D>,
 }
 
 /// Internal Management struct
@@ -137,7 +131,7 @@ pub struct UnicornInner<'a, D> {
     pub uc: uc_handle,
     pub arch: Arch,
     /// to keep ownership over the hook for this uc instance's lifetime
-    pub hooks: Vec<Box<dyn ffi::IsUcHook<'a> + 'a>>,
+    pub hooks: Vec<(ffi::uc_hook, Box<dyn ffi::IsUcHook<'a> + 'a>)>,
     pub data: D,
     _pin: PhantomPinned,
 }
@@ -153,22 +147,16 @@ where
         let err = unsafe { ffi::uc_open(arch, mode, &mut handle) };
         if err == uc_error::OK {
             Ok(Unicorn {
-                inner: Box::pin(UnicornInner {
+                inner: UnicornInner {
                     uc: handle,
                     arch,
                     data,
                     hooks: vec![],
                     _pin: std::marker::PhantomPinned,
-                }),
+                },
             })
         } else {
             Err(err)
-        }
-    }
-
-    pub fn borrow(&mut self) -> UnicornHandle<'a, _, D> {
-        UnicornHandle {
-            inner: self.inner.as_mut(),
         }
     }
 }
@@ -190,7 +178,7 @@ impl<'a, D> std::fmt::Debug for UnicornInner<'a, D> {
     }
 }
 
-impl<'a, D> UnicornHandle<'a, D> {
+impl<'a, D> Unicorn<'a, D> {
     /// Return whatever data was passed during initialization.
     ///
     /// For an example, have a look at utils::init_emu_with_heap where
@@ -201,7 +189,7 @@ impl<'a, D> UnicornHandle<'a, D> {
 
     /// Return a mutable reference to whatever data was passed during initialization.
     pub fn get_data_mut(&mut self) -> &mut D {
-        unsafe { &mut self.inner.as_mut().get_unchecked_mut().data }
+        &mut self.inner.data
     }
 
     /// Return the architecture of the current emulator.
@@ -445,12 +433,12 @@ impl<'a, D> UnicornHandle<'a, D> {
         callback: F,
     ) -> Result<ffi::uc_hook, uc_error>
     where
-        F: FnMut(crate::UnicornHandle<D>, u64, u32) + 'a,
+        F: FnMut(&mut crate::Unicorn<D>, u64, u32) + 'a,
     {
         let mut hook_ptr = std::ptr::null_mut();
         let mut user_data = Box::new(ffi::UcHook {
-            unicorn: unsafe { self.inner.as_mut().get_unchecked_mut() } as _,
-            callback: Box::new(callback),
+            unicorn: (self as *mut Unicorn<_>),
+            callback,
         });
 
         let err = unsafe {
@@ -465,9 +453,7 @@ impl<'a, D> UnicornHandle<'a, D> {
             )
         };
         if err == uc_error::OK {
-            unsafe { self.inner.as_mut().get_unchecked_mut() }
-                .hooks
-                .push(user_data);
+            self.inner.hooks.push((hook_ptr, user_data));
             Ok(hook_ptr)
         } else {
             Err(err)
@@ -477,12 +463,12 @@ impl<'a, D> UnicornHandle<'a, D> {
     /// Add a block hook.
     pub fn add_block_hook<F: 'a>(&mut self, callback: F) -> Result<ffi::uc_hook, uc_error>
     where
-        F: FnMut(UnicornHandle<D>, u64, u32),
+        F: FnMut(&mut Unicorn<D>, u64, u32),
     {
         let mut hook_ptr = std::ptr::null_mut();
-        let mut user_data = Box::new(ffi::BlockHook {
-            unicorn: unsafe { self.inner.as_mut().get_unchecked_mut() } as _,
-            callback: Box::new(callback),
+        let mut user_data = Box::new(ffi::UcHook {
+            unicorn: (self as *mut Unicorn<_>),
+            callback,
         });
 
         let err = unsafe {
@@ -497,6 +483,8 @@ impl<'a, D> UnicornHandle<'a, D> {
             )
         };
         if err == uc_error::OK {
+            self.inner.hooks.push((hook_ptr, user_data));
+
             Ok(hook_ptr)
         } else {
             Err(err)
@@ -512,16 +500,16 @@ impl<'a, D> UnicornHandle<'a, D> {
         callback: F,
     ) -> Result<ffi::uc_hook, uc_error>
     where
-        F: FnMut(UnicornHandle<D>, MemType, u64, usize, i64) -> bool,
+        F: FnMut(&mut Unicorn<D>, MemType, u64, usize, i64) -> bool,
     {
         if (hook_type as i32) < 16 || hook_type == HookType::INSN_INVALID {
             return Err(uc_error::ARG);
         }
 
         let mut hook_ptr = std::ptr::null_mut();
-        let mut user_data = Box::new(ffi::MemHook {
-            unicorn: unsafe { self.inner.as_mut().get_unchecked_mut() } as _,
-            callback: Box::new(callback),
+        let mut user_data = Box::new(ffi::UcHook {
+            unicorn: (self as *mut Unicorn<_>),
+            callback,
         });
 
         let err = unsafe {
@@ -536,6 +524,8 @@ impl<'a, D> UnicornHandle<'a, D> {
             )
         };
         if err == uc_error::OK {
+            self.inner.hooks.push((hook_ptr, user_data));
+
             Ok(hook_ptr)
         } else {
             Err(err)
@@ -545,12 +535,12 @@ impl<'a, D> UnicornHandle<'a, D> {
     /// Add an interrupt hook.
     pub fn add_intr_hook<F: 'a>(&mut self, callback: F) -> Result<ffi::uc_hook, uc_error>
     where
-        F: FnMut(UnicornHandle<D>, u32),
+        F: FnMut(&mut Unicorn<D>, u32),
     {
         let mut hook_ptr = std::ptr::null_mut();
-        let mut user_data = Box::new(ffi::InterruptHook {
-            unicorn: unsafe { self.inner.as_mut().get_unchecked_mut() } as _,
-            callback: Box::new(callback),
+        let mut user_data = Box::new(ffi::UcHook {
+            unicorn: (self as *mut Unicorn<_>),
+            callback,
         });
 
         let err = unsafe {
@@ -565,6 +555,8 @@ impl<'a, D> UnicornHandle<'a, D> {
             )
         };
         if err == uc_error::OK {
+            self.inner.hooks.push((hook_ptr, user_data));
+
             Ok(hook_ptr)
         } else {
             Err(err)
@@ -574,12 +566,12 @@ impl<'a, D> UnicornHandle<'a, D> {
     /// Add hook for x86 IN instruction.
     pub fn add_insn_in_hook<F: 'a>(&mut self, callback: F) -> Result<ffi::uc_hook, uc_error>
     where
-        F: FnMut(UnicornHandle<D>, u32, usize),
+        F: FnMut(&mut Unicorn<D>, u32, usize) + 'a,
     {
         let mut hook_ptr = std::ptr::null_mut();
-        let mut user_data = Box::new(ffi::InstructionInHook {
-            unicorn: unsafe { self.inner.as_mut().get_unchecked_mut() } as _,
-            callback: Box::new(callback),
+        let mut user_data = Box::new(ffi::UcHook {
+            unicorn: (self as *mut Unicorn<'a, D>),
+            callback,
         });
 
         let err = unsafe {
@@ -595,6 +587,8 @@ impl<'a, D> UnicornHandle<'a, D> {
             )
         };
         if err == uc_error::OK {
+            self.inner.hooks.push((hook_ptr, user_data));
+
             Ok(hook_ptr)
         } else {
             Err(err)
@@ -604,12 +598,12 @@ impl<'a, D> UnicornHandle<'a, D> {
     /// Add hook for x86 OUT instruction.
     pub fn add_insn_out_hook<F: 'a>(&mut self, callback: F) -> Result<ffi::uc_hook, uc_error>
     where
-        F: FnMut(UnicornHandle<D>, u32, usize, u32),
+        F: FnMut(&mut Unicorn<D>, u32, usize, u32) + 'a,
     {
         let mut hook_ptr = std::ptr::null_mut();
-        let mut user_data = Box::new(ffi::InstructionOutHook {
-            unicorn: unsafe { self.inner.as_mut().get_unchecked_mut() } as _,
-            callback: Box::new(callback),
+        let mut user_data = Box::new(ffi::UcHook {
+            unicorn: (self as *mut Unicorn<_>),
+            callback,
         });
 
         let err = unsafe {
@@ -625,6 +619,8 @@ impl<'a, D> UnicornHandle<'a, D> {
             )
         };
         if err == uc_error::OK {
+            self.inner.hooks.push((hook_ptr, user_data));
+
             Ok(hook_ptr)
         } else {
             Err(err)
@@ -640,12 +636,12 @@ impl<'a, D> UnicornHandle<'a, D> {
         callback: F,
     ) -> Result<ffi::uc_hook, uc_error>
     where
-        F: for<'b> FnMut(UnicornHandle<D>),
+        F: FnMut(&mut Unicorn<D>) + 'a,
     {
         let mut hook_ptr = std::ptr::null_mut();
-        let mut user_data = Box::new(ffi::InstructionSysHook {
-            unicorn: unsafe { self.inner.as_mut().get_unchecked_mut() } as _,
-            callback: Box::new(callback),
+        let mut user_data = Box::new(ffi::UcHook {
+            unicorn: (self as *mut Unicorn<_>),
+            callback,
         });
 
         let err = unsafe {
@@ -661,6 +657,8 @@ impl<'a, D> UnicornHandle<'a, D> {
             )
         };
         if err == uc_error::OK {
+            self.inner.hooks.push((hook_ptr, user_data));
+
             Ok(hook_ptr)
         } else {
             Err(err)
@@ -671,9 +669,14 @@ impl<'a, D> UnicornHandle<'a, D> {
     ///
     /// `hook` is the value returned by `add_*_hook` functions.
     pub fn remove_hook(&mut self, hook: ffi::uc_hook) -> Result<(), uc_error> {
-        let handle = unsafe { self.inner.as_mut().get_unchecked_mut() };
         let err: uc_error;
-        err = unsafe { ffi::uc_hook_del(handle.uc, hook) };
+
+        // drop the hook
+        self.inner
+            .hooks
+            .retain(|(hook_ptr, _hook_impl)| hook_ptr != &hook);
+
+        err = unsafe { ffi::uc_hook_del(self.inner.uc, hook) };
 
         if err == uc_error::OK {
             Ok(())
@@ -811,8 +814,8 @@ impl<'a, D> UnicornHandle<'a, D> {
     /// To use persistent mode, set persistent_iters > 0 and
     /// make sure to handle any necessary context restoration, e.g in the
     /// input_placement callback.
-    pub fn afl_fuzz<F: 'a, G: 'a>(
-        &'a mut self,
+    pub fn afl_fuzz<'afl, F, G>(
+        &mut self,
         input_file: &str,
         input_placement_callback: F,
         exits: &[u64],
@@ -821,8 +824,8 @@ impl<'a, D> UnicornHandle<'a, D> {
         persistent_iters: u32,
     ) -> Result<(), AflRet>
     where
-        F: FnMut(&mut UnicornHandle<D>, &mut [u8], i32) -> bool,
-        G: FnMut(&mut UnicornHandle<D>, uc_error, &[u8], i32) -> bool,
+        F: 'afl + FnMut(&mut Unicorn<'a, D>, &mut [u8], i32) -> bool,
+        G: 'afl + FnMut(&mut Unicorn<'a, D>, uc_error, &[u8], i32) -> bool,
     {
         let uc = self.inner.uc;
         let afl_fuzz_callback = Box::pin(AflFuzzCallback {
@@ -836,10 +839,10 @@ impl<'a, D> UnicornHandle<'a, D> {
             ffi::uc_afl_fuzz(
                 uc,
                 cstyle_input_file.as_ptr(),
-                input_placement_callback_proxy::<D, F, G> as _,
+                input_placement_callback_proxy::<'a, 'afl, D, F, G> as _,
                 exits.as_ptr(),
                 exits.len(),
-                crash_validation_callback_proxy::<D, F, G> as _,
+                crash_validation_callback_proxy::<'a, 'afl, D, F, G> as _,
                 always_validate,
                 persistent_iters,
                 &*afl_fuzz_callback as *const _ as _,

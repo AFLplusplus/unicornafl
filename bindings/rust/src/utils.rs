@@ -42,7 +42,7 @@ impl Drop for Heap {
 
 /// Gets the current program counter/`RIP` for this `unicorn` instance.
 #[inline]
-pub fn read_pc<D>(uc: &super::UnicornHandle<D>) -> Result<u64, uc_error> {
+pub fn read_pc<D>(uc: &super::Unicorn<D>) -> Result<u64, uc_error> {
     let arch = uc.get_arch();
     let reg = match arch {
         Arch::X86 => RegisterX86::RIP as i32,
@@ -57,7 +57,7 @@ pub fn read_pc<D>(uc: &super::UnicornHandle<D>) -> Result<u64, uc_error> {
 }
 
 #[inline]
-pub fn set_pc<D>(uc: &mut super::UnicornHandle<D>, value: u64) -> Result<(), uc_error> {
+pub fn set_pc<D>(uc: &mut super::Unicorn<D>, value: u64) -> Result<(), uc_error> {
     let arch = uc.get_arch();
     let reg = match arch {
         Arch::X86 => RegisterX86::RIP as i32,
@@ -72,7 +72,7 @@ pub fn set_pc<D>(uc: &mut super::UnicornHandle<D>, value: u64) -> Result<(), uc_
 }
 
 /// Hooks (parts of the) code segment to display register info and the current instruction.
-pub fn add_debug_prints_ARM<D>(uc: &mut super::UnicornHandle<D>, code_start: u64, code_end: u64) {
+pub fn add_debug_prints_ARM<D>(uc: &mut super::Unicorn<'_, D>, code_start: u64, code_end: u64) {
     let cs_arm: Capstone = Capstone::new()
         .arm()
         .mode(arch::arm::ArchMode::Arm)
@@ -87,7 +87,7 @@ pub fn add_debug_prints_ARM<D>(uc: &mut super::UnicornHandle<D>, code_start: u64
         .build()
         .expect("failed to create capstone for thumb");
 
-    let callback = Box::new(move |uc: super::UnicornHandle<D>, addr: u64, size: u32| {
+    let callback = Box::new(move |uc: &mut super::Unicorn<D>, addr: u64, size: u32| {
         let sp = uc
             .reg_read(RegisterARM::SP as i32)
             .expect("failed to read SP");
@@ -189,9 +189,7 @@ pub fn init_emu_with_heap<'a>(
         unalloc_hook: 0 as _,
     });
 
-    let mut unicorn = super::Unicorn::new(arch, mode, heap)?;
-    let mut uc = unicorn;
-    //let mut uc = unicorn.borrow(); // get handle
+    let mut uc = super::Unicorn::new(arch, mode, heap)?;
 
     // uc memory regions have to be 8 byte aligned
     if size % 8 != 0 {
@@ -220,7 +218,7 @@ pub fn init_emu_with_heap<'a>(
             HookType::MEM_VALID,
             base_addr,
             base_addr + size as u64,
-            Box::new(heap_unalloc),
+            heap_unalloc,
         )?;
         let chunks = HashMap::new();
         let heap: &mut Heap = &mut *uc.get_data().borrow_mut();
@@ -237,7 +235,7 @@ pub fn init_emu_with_heap<'a>(
         heap.unalloc_hook = h; // hook ID, needed to rearrange hooks on allocations
     }
 
-    Ok(unicorn)
+    Ok(uc)
 }
 
 /// `malloc` for the utils allocator.
@@ -246,10 +244,7 @@ pub fn init_emu_with_heap<'a>(
 /// canary hooks to detect out-of-bounds accesses.
 /// Grows the heap if necessary and if it is configured to, otherwise
 /// return WRITE_UNMAPPED if there is no space left.
-pub fn uc_alloc(
-    uc: &mut super::UnicornHandle<RefCell<Heap>>,
-    mut size: u64,
-) -> Result<u64, uc_error> {
+pub fn uc_alloc(uc: &mut super::Unicorn<RefCell<Heap>>, mut size: u64) -> Result<u64, uc_error> {
     // 8 byte aligned
     if size % 8 != 0 {
         size = ((size / 8) + 1) * 8;
@@ -283,19 +278,19 @@ pub fn uc_alloc(
     }
 
     // canary hooks
-    uc.add_mem_hook(HookType::MEM_WRITE, addr, addr + 3, Box::new(heap_bo))?;
-    uc.add_mem_hook(HookType::MEM_READ, addr, addr + 3, Box::new(heap_oob))?;
+    uc.add_mem_hook(HookType::MEM_WRITE, addr, addr + 3, heap_bo)?;
+    uc.add_mem_hook(HookType::MEM_READ, addr, addr + 3, heap_oob)?;
     uc.add_mem_hook(
         HookType::MEM_WRITE,
         addr + 4 + size,
         addr + 4 + size + 3,
-        Box::new(heap_bo),
+        heap_bo,
     )?;
     uc.add_mem_hook(
         HookType::MEM_READ,
         addr + 4 + size,
         addr + 4 + size + 3,
-        Box::new(heap_oob),
+        heap_oob,
     )?;
 
     // add new chunk
@@ -326,7 +321,7 @@ pub fn uc_alloc(
         HookType::MEM_VALID,
         new_top,
         uc_base + len as u64,
-        Box::new(heap_unalloc),
+        heap_unalloc,
     )?;
     uc.get_data().borrow_mut().unalloc_hook = new_h;
 
@@ -338,7 +333,7 @@ pub fn uc_alloc(
 /// Marks the chunk to be freed to detect double-frees later on
 /// and places sanitization hooks over the freed region to detect
 /// use-after-frees.
-pub fn uc_free(uc: &mut super::UnicornHandle<RefCell<Heap>>, ptr: u64) -> Result<(), uc_error> {
+pub fn uc_free(uc: &mut super::Unicorn<RefCell<Heap>>, ptr: u64) -> Result<(), uc_error> {
     #[cfg(debug_assertions)]
     println!("[-] Freeing {:#010x}", ptr);
 
@@ -357,36 +352,31 @@ pub fn uc_free(uc: &mut super::UnicornHandle<RefCell<Heap>>, ptr: u64) -> Result
             }
             curr_chunk.freed = true;
         }
-        uc.add_mem_hook(
-            HookType::MEM_VALID,
-            ptr,
-            ptr + chunk_size - 1,
-            Box::new(heap_uaf),
-        )?;
+        uc.add_mem_hook(HookType::MEM_VALID, ptr, ptr + chunk_size - 1, heap_uaf)?;
     }
     Ok(())
 }
 
 fn heap_unalloc(
-    uc: super::UnicornHandle<RefCell<Heap>>,
+    uc: &mut super::Unicorn<RefCell<Heap>>,
     _mem_type: MemType,
     addr: u64,
     _size: usize,
     _val: i64,
 ) -> bool {
-    let pc = read_pc(&uc).expect("failed to read pc");
+    let pc = read_pc(uc).expect("failed to read pc");
     panic!("ERROR: unicorn-rs Sanitizer: Heap out-of-bounds access of unallocated memory on addr {:#0x}, $pc: {:#010x}",
         addr, pc);
 }
 
 fn heap_oob(
-    uc: super::UnicornHandle<RefCell<Heap>>,
+    uc: &mut super::Unicorn<RefCell<Heap>>,
     _mem_type: MemType,
     addr: u64,
     _size: usize,
     _val: i64,
 ) -> bool {
-    let pc = read_pc(&uc).unwrap();
+    let pc = read_pc(uc).unwrap();
     panic!(
         "ERROR: unicorn-rs Sanitizer: Heap out-of-bounds read on addr {:#0x}, $pc: {:#010x}",
         addr, pc
@@ -394,13 +384,13 @@ fn heap_oob(
 }
 
 fn heap_bo(
-    uc: super::UnicornHandle<RefCell<Heap>>,
+    uc: &mut super::Unicorn<RefCell<Heap>>,
     _mem_type: MemType,
     addr: u64,
     _size: usize,
     _val: i64,
 ) -> bool {
-    let pc = read_pc(&uc).unwrap();
+    let pc = read_pc(uc).unwrap();
     panic!(
         "ERROR: unicorn-rs Sanitizer: Heap buffer-overflow on addr {:#0x}, $pc: {:#010x}",
         addr, pc
@@ -408,7 +398,7 @@ fn heap_bo(
 }
 
 fn heap_uaf(
-    uc: super::UnicornHandle<RefCell<Heap>>,
+    uc: &mut super::Unicorn<RefCell<Heap>>,
     _mem_type: MemType,
     addr: u64,
     _size: usize,
@@ -417,11 +407,11 @@ fn heap_uaf(
     panic!(
         "ERROR: unicorn-rs Sanitizer: Heap use-after-free on addr {:#0x}, $pc: {:#010x}",
         addr,
-        read_pc(&uc).unwrap()
+        read_pc(uc).unwrap()
     );
 }
 
-pub fn vmmap<D>(uc: &mut super::UnicornHandle<D>) {
+pub fn vmmap<D>(uc: &mut super::Unicorn<D>) {
     let regions = uc
         .mem_regions()
         .expect("failed to retrieve memory mappings");
