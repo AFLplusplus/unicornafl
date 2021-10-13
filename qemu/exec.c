@@ -691,7 +691,7 @@ static uint16_t phys_section_add(PhysPageMap *map,
 
 static void phys_section_destroy(MemoryRegion *mr)
 {
-    if (mr->subpage) {
+    if (mr && mr->subpage) {
         subpage_t *subpage = container_of(mr, subpage_t, iomem);
         g_free(subpage);
     }
