@@ -88,6 +88,7 @@ static inline void uc_common_init(struct uc_struct* uc)
         uc->release = release_common;
 
 #ifdef UNICORN_AFL
+    uc->afl_data_ptr = NULL;
     uc->afl_area_ptr = 0;
     uc->exit_count = 0;
     uc->exits = NULL;
