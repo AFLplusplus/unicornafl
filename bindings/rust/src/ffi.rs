@@ -3,7 +3,7 @@
 
 use crate::Unicorn;
 
-use super::unicorn_const::*;
+use super::unicorn_const::{uc_error, AflRet, Arch, HookType, MemRegion, MemType, Mode, Query};
 use libc::{c_char, c_int};
 use std::{ffi::c_void, marker::PhantomData};
 

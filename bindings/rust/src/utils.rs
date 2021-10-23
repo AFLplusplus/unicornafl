@@ -153,9 +153,9 @@ pub fn add_debug_prints_ARM<D>(uc: &mut super::Unicorn<'_, D>, code_start: u64, 
         uc.mem_read(addr, &mut buf)
             .expect("failed to read opcode from memory");
         let ins = if cpsr & 0x20 == 0 {
-            cs_arm.disasm_all(&buf, size as u64)
+            cs_arm.disasm_all(&buf, u64::from(size))
         } else {
-            cs_thumb.disasm_all(&buf, size as u64)
+            cs_thumb.disasm_all(&buf, u64::from(size))
         }
         .unwrap_or_else(|_| panic!("failed to disasm at addr {:#010x}", addr));
         println!("$pc: {:#010x}", addr);
@@ -217,7 +217,7 @@ pub fn init_emu_with_heap<'a>(
         let h = uc.add_mem_hook(
             HookType::MEM_VALID,
             base_addr,
-            base_addr + size as u64,
+            base_addr + u64::from(size),
             heap_unalloc,
         )?;
         let chunks = HashMap::new();
@@ -243,7 +243,7 @@ pub fn init_emu_with_heap<'a>(
 /// Returns a pointer into memory used as heap and applies
 /// canary hooks to detect out-of-bounds accesses.
 /// Grows the heap if necessary and if it is configured to, otherwise
-/// return WRITE_UNMAPPED if there is no space left.
+/// return `WRITE_UNMAPPED` if there is no space left.
 pub fn uc_alloc(uc: &mut super::Unicorn<RefCell<Heap>>, mut size: u64) -> Result<u64, uc_error> {
     // 8 byte aligned
     if size % 8 != 0 {

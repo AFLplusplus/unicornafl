@@ -38,13 +38,15 @@ mod mips;
 mod ppc;
 mod sparc;
 mod x86;
-use std::{marker::PhantomData, ptr};
+use std::{convert::TryInto, marker::PhantomData, ptr};
 
 pub use crate::{arm::*, arm64::*, m68k::*, mips::*, ppc::*, sparc::*, x86::*};
 
 use ffi::uc_handle;
 use libc::{c_int, c_void};
-use unicorn_const::*;
+use unicorn_const::{
+    uc_error, AflRet, Arch, HookType, MemRegion, MemType, Mode, Permission, Query,
+};
 
 #[derive(Debug)]
 pub struct Context {
@@ -52,9 +54,11 @@ pub struct Context {
 }
 
 impl Context {
+    #[must_use]
     pub fn new() -> Self {
         Context { context: 0 }
     }
+    #[must_use]
     pub fn is_initialized(&self) -> bool {
         self.context != 0
     }
@@ -103,7 +107,7 @@ where
         .as_mut()
         .unwrap();
     let callback = &mut (*user_data).input_callback;
-    let safe_input = std::slice::from_raw_parts_mut(input, input_len as usize);
+    let safe_input = std::slice::from_raw_parts_mut(input, input_len.try_into().unwrap());
     callback(unicorn, safe_input, persistent_round)
 }
 
@@ -123,7 +127,7 @@ where
         .as_mut()
         .unwrap();
     let callback = &mut (*user_data).validate_callback;
-    let safe_input = std::slice::from_raw_parts(input, input_len as usize);
+    let safe_input = std::slice::from_raw_parts(input, input_len.try_into().unwrap());
     callback(unicorn, unicorn_result, safe_input, persistent_round)
 }
 
@@ -176,7 +180,7 @@ impl<'a, D> std::fmt::Debug for Unicorn<'a, D> {
 impl<'a, D> Unicorn<'a, D> {
     /// Return whatever data was passed during initialization.
     ///
-    /// For an example, have a look at utils::init_emu_with_heap where
+    /// For an example, have a look at `utils::init_emu_with_heap` where
     /// a struct is passed which is used for a custom allocator.
     pub fn get_data(&self) -> &D {
         &self.data
@@ -200,7 +204,7 @@ impl<'a, D> Unicorn<'a, D> {
         if err == uc_error::OK {
             let mut regions = Vec::new();
             for i in 0..nb_regions {
-                regions.push(unsafe { std::mem::transmute_copy(&*p_regions.offset(i as isize)) });
+                regions.push(unsafe { std::mem::transmute_copy(&*p_regions.add(i as usize)) });
             }
             unsafe { libc::free(p_regions as _) };
             Ok(regions)
@@ -678,7 +682,7 @@ impl<'a, D> Unicorn<'a, D> {
 
     /// Allocate and return an empty Unicorn context.
     ///
-    /// To be populated via context_save.
+    /// To be populated via `context_save`.
     pub fn context_alloc(&self) -> Result<Context, uc_error> {
         let mut empty_context: ffi::uc_context = Default::default();
         let err = unsafe { ffi::uc_context_alloc(self.uc, &mut empty_context) };
@@ -703,8 +707,8 @@ impl<'a, D> Unicorn<'a, D> {
 
     /// Allocate and return a Context struct initialized with the current CPU context.
     ///
-    /// This can be used for fast rollbacks with context_restore.
-    /// In case of many non-concurrent context saves, use context_alloc and *_save
+    /// This can be used for fast rollbacks with `context_restore`.
+    /// In case of many non-concurrent context saves, use `context_alloc` and *_save
     /// individually to avoid unnecessary allocations.
     pub fn context_init(&self) -> Result<Context, uc_error> {
         let mut new_context: ffi::uc_context = Default::default();
@@ -775,7 +779,7 @@ impl<'a, D> Unicorn<'a, D> {
 
     /// Query the internal status of the engine.
     ///
-    /// supported: MODE, PAGE_SIZE, ARCH
+    /// supported: `MODE`, `PAGE_SIZE`, `ARCH`
     pub fn query(&self, query: Query) -> Result<usize, uc_error> {
         let mut result: libc::size_t = Default::default();
         let err = unsafe { ffi::uc_query(self.uc, query, &mut result) };
@@ -789,7 +793,7 @@ impl<'a, D> Unicorn<'a, D> {
     /// Starts the AFL forkserver on some Unicorn emulation.
     ///
     /// Multiple exit addresses can be specified. The Unicorn emulation has to be
-    /// started manually before by using emu_start.
+    /// started manually before by using `emu_start`.
     pub fn afl_forkserver_start(&mut self, exits: &[u64]) -> Result<(), AflRet> {
         let err = unsafe { ffi::uc_afl_forkserver_start(self.uc, exits.as_ptr(), exits.len()) };
         if err == AflRet::ERROR {
@@ -803,9 +807,9 @@ impl<'a, D> Unicorn<'a, D> {
     ///
     /// This function can handle input reading and -placement within
     /// emulation context, crash validation and persistent mode looping.
-    /// To use persistent mode, set persistent_iters > 0 and
+    /// To use persistent mode, set `persistent_iters > 0` and
     /// make sure to handle any necessary context restoration, e.g in the
-    /// input_placement callback.
+    /// `input_placement` callback.
     pub fn afl_fuzz<'afl, F, G>(
         &mut self,
         input_file: &str,
