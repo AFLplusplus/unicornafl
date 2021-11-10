@@ -112,6 +112,10 @@ class UCAFL {
         if (this->h4_) {
             uc_hook_del(this->uc_, this->h4_);
         }
+
+        if(!this->has_afl_) {
+            munmap(this->afl_area_ptr_, MAP_SIZE);
+        }
     }
 
   private:
