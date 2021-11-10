@@ -116,7 +116,7 @@ def _validate_crash_cb(uc, result, input, input_len, persistent_round, idx):
         return True
 
 
-def uc_afl_fuzz(uc,
+def uc_afl_fuzz(uc: Uc,
                 input_file: str,
                 place_input_callback: Callable,
                 exits: List[int],
