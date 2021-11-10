@@ -57,4 +57,6 @@ to
 ```python
 import unicorn2afl as UcAfl
 from unicorn import * # unicorn2afl no longer provide unicorn related definition.
+
+# No more monkeypatch is needed.
 ```
