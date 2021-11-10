@@ -443,7 +443,7 @@ class UCAFL {
             exit(1);
         }
 
-        These two hooks are for compcov and may not be supported by the arch.
+        // These two hooks are for compcov and may not be supported by the arch.
         err = uc_hook_add(this->uc_, &this->h3_, UC_HOOK_TCG_OPCODE,
                           (void*)_uc_hook_sub, (void*)this, 1, 0, UC_TCG_OP_SUB,
                           UC_TCG_OP_FLAG_DIRECT);
