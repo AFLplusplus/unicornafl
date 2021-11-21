@@ -159,7 +159,7 @@ pub static X86_REGISTERS: [RegisterX86; 145] = [
 fn emulate_x86() {
     let x86_code32: Vec<u8> = vec![0x41, 0x4a]; // INC ecx; DEC edx
 
-    let mut emu = unicornafl::Unicorn::new(Arch::X86, Mode::MODE_32, 0)
+    let mut emu = unicornafl::Unicorn::new(Arch::X86, Mode::MODE_32)
         .expect("failed to initialize unicorn instance");
     assert_eq!(emu.reg_write(RegisterX86::EAX as i32, 123), Ok(()));
     assert_eq!(emu.reg_read(RegisterX86::EAX as i32), Ok(123));
@@ -209,7 +209,7 @@ fn x86_code_callback() {
 
     let x86_code32: Vec<u8> = vec![0x41, 0x4a]; // INC ecx; DEC edx
 
-    let mut emu = unicornafl::Unicorn::new(Arch::X86, Mode::MODE_32, ())
+    let mut emu = unicornafl::Unicorn::new(Arch::X86, Mode::MODE_32)
         .expect("failed to initialize unicorn instance");
     assert_eq!(emu.mem_map(0x1000, 0x4000, Permission::ALL), Ok(()));
     assert_eq!(emu.mem_write(0x1000, &x86_code32), Ok(()));
@@ -239,7 +239,7 @@ fn x86_intr_callback() {
 
     let x86_code32: Vec<u8> = vec![0xcd, 0x80]; // INT 0x80;
 
-    let mut emu = unicornafl::Unicorn::new(Arch::X86, Mode::MODE_32, ())
+    let mut emu = unicornafl::Unicorn::new(Arch::X86, Mode::MODE_32)
         .expect("failed to initialize unicorn instance");
     assert_eq!(emu.mem_map(0x1000, 0x4000, Permission::ALL), Ok(()));
     assert_eq!(emu.mem_write(0x1000, &x86_code32), Ok(()));
@@ -287,7 +287,7 @@ fn x86_mem_callback() {
         0xB8, 0xEF, 0xBE, 0xAD, 0xDE, 0xA3, 0x00, 0x20, 0x00, 0x00, 0xA1, 0x00, 0x00, 0x01, 0x00,
     ];
 
-    let mut emu = unicornafl::Unicorn::new(Arch::X86, Mode::MODE_32, ())
+    let mut emu = unicornafl::Unicorn::new(Arch::X86, Mode::MODE_32)
         .expect("failed to initialize unicorn instance");
     assert_eq!(emu.mem_map(0x1000, 0x4000, Permission::ALL), Ok(()));
     assert_eq!(emu.mem_write(0x1000, &x86_code32), Ok(()));
@@ -324,7 +324,7 @@ fn x86_insn_in_callback() {
 
     let x86_code32: Vec<u8> = vec![0xe5, 0x10]; // IN eax, 0x10;
 
-    let mut emu = unicornafl::Unicorn::new(Arch::X86, Mode::MODE_32, ())
+    let mut emu = unicornafl::Unicorn::new(Arch::X86, Mode::MODE_32)
         .expect("failed to initialize unicorn instance");
     assert_eq!(emu.mem_map(0x1000, 0x4000, Permission::ALL), Ok(()));
     assert_eq!(emu.mem_write(0x1000, &x86_code32), Ok(()));
@@ -360,7 +360,7 @@ fn x86_insn_out_callback() {
 
     let x86_code32: Vec<u8> = vec![0xb0, 0x32, 0xe6, 0x46]; // MOV al, 0x32; OUT  0x46, al;
 
-    let mut emu = unicornafl::Unicorn::new(Arch::X86, Mode::MODE_32, ())
+    let mut emu = unicornafl::Unicorn::new(Arch::X86, Mode::MODE_32)
         .expect("failed to initialize unicorn instance");
     assert_eq!(emu.mem_map(0x1000, 0x4000, Permission::ALL), Ok(()));
     assert_eq!(emu.mem_write(0x1000, &x86_code32), Ok(()));
@@ -401,7 +401,7 @@ fn x86_insn_sys_callback() {
         0x48, 0xB8, 0xEF, 0xBE, 0xAD, 0xDE, 0x00, 0x00, 0x00, 0x00, 0x0F, 0x05,
     ];
 
-    let mut emu = unicornafl::Unicorn::new(Arch::X86, Mode::MODE_64, ())
+    let mut emu = unicornafl::Unicorn::new(Arch::X86, Mode::MODE_64)
         .expect("failed to initialize unicorn instance");
     assert_eq!(emu.mem_map(0x1000, 0x4000, Permission::ALL), Ok(()));
     assert_eq!(emu.mem_write(0x1000, &x86_code), Ok(()));
@@ -427,7 +427,7 @@ fn x86_insn_sys_callback() {
 fn emulate_arm() {
     let arm_code32: Vec<u8> = vec![0x83, 0xb0]; // sub    sp, #0xc
 
-    let mut emu = unicornafl::Unicorn::new(Arch::ARM, Mode::THUMB, ())
+    let mut emu = unicornafl::Unicorn::new(Arch::ARM, Mode::THUMB)
         .expect("failed to initialize unicorn instance");
     assert_eq!(emu.reg_write(RegisterARM::R1 as i32, 123), Ok(()));
     assert_eq!(emu.reg_read(RegisterARM::R1 as i32), Ok(123));
@@ -467,7 +467,7 @@ fn emulate_arm() {
 fn emulate_mips() {
     let mips_code32 = vec![0x56, 0x34, 0x21, 0x34]; // ori $at, $at, 0x3456;
 
-    let mut emu = unicornafl::Unicorn::new(Arch::MIPS, Mode::MODE_32, ())
+    let mut emu = unicornafl::Unicorn::new(Arch::MIPS, Mode::MODE_32)
         .expect("failed to initialize unicorn instance");
     assert_eq!(emu.mem_map(0x1000, 0x4000, Permission::ALL), Ok(()));
     assert_eq!(emu.mem_write(0x1000, &mips_code32), Ok(()));
@@ -492,7 +492,7 @@ fn emulate_mips() {
 fn emulate_ppc() {
     let ppc_code32 = vec![0x7F, 0x46, 0x1A, 0x14]; // add 26, 6, 3
 
-    let mut emu = unicornafl::Unicorn::new(Arch::PPC, Mode::PPC32, ())
+    let mut emu = unicornafl::Unicorn::new(Arch::PPC, Mode::PPC32)
         .expect("failed to initialize unicorn instance");
     assert_eq!(emu.mem_map(0x1000, 0x4000, Permission::ALL), Ok(()));
     assert_eq!(emu.mem_write(0x1000, &ppc_code32), Ok(()));
@@ -516,7 +516,7 @@ fn emulate_ppc() {
 
 #[test]
 fn mem_unmapping() {
-    let mut emu = unicornafl::Unicorn::new(Arch::X86, Mode::MODE_32, ())
+    let mut emu = unicornafl::Unicorn::new(Arch::X86, Mode::MODE_32)
         .expect("failed to initialize unicorn instance");
     assert_eq!(emu.mem_map(0x1000, 0x4000, Permission::ALL), Ok(()));
     assert_eq!(emu.mem_unmap(0x1000, 0x4000), Ok(()));
@@ -528,7 +528,7 @@ fn mem_map_ptr() {
     let mut mem: [u8; 4000] = [0; 4000];
     let x86_code32: Vec<u8> = vec![0x41, 0x4a]; // INC ecx; DEC edx
 
-    let mut emu = unicornafl::Unicorn::new(Arch::X86, Mode::MODE_32, ())
+    let mut emu = unicornafl::Unicorn::new(Arch::X86, Mode::MODE_32)
         .expect("failed to initialize unicorn instance");
 
     // Attempt to write to memory before mapping it.
@@ -606,7 +606,7 @@ fn x86_context_save_and_restore() {
         let x86_code: Vec<u8> = vec![
             0x48, 0xB8, 0xEF, 0xBE, 0xAD, 0xDE, 0x00, 0x00, 0x00, 0x00, 0x0F, 0x05,
         ];
-        let mut emu = unicornafl::Unicorn::new(Arch::X86, *mode, ())
+        let mut emu = unicornafl::Unicorn::new(Arch::X86, mode)
             .expect("failed to initialize unicorn instance");
         assert_eq!(emu.mem_map(0x1000, 0x4000, Permission::ALL), Ok(()));
         assert_eq!(emu.mem_write(0x1000, &x86_code), Ok(()));
@@ -622,7 +622,7 @@ fn x86_context_save_and_restore() {
         let context = context.unwrap();
 
         /* and create a new emulator, into which we will "restore" that context */
-        let emu2 = unicornafl::Unicorn::new(Arch::X86, *mode, ())
+        let emu2 = unicornafl::Unicorn::new(Arch::X86, mode)
             .expect("failed to initialize unicorn instance");
         assert_eq!(emu2.context_restore(&context), Ok(()));
         for register in X86_REGISTERS.iter() {
@@ -651,7 +651,7 @@ fn x86_block_callback() {
 
     let x86_code32: Vec<u8> = vec![0x41, 0x4a]; // INC ecx; DEC edx
 
-    let mut emu = unicornafl::Unicorn::new(Arch::X86, Mode::MODE_32, ())
+    let mut emu = unicornafl::Unicorn::new(Arch::X86, Mode::MODE_32)
         .expect("failed to initialize unicorn instance");
     assert_eq!(emu.mem_map(0x1000, 0x4000, Permission::ALL), Ok(()));
     assert_eq!(emu.mem_write(0x1000, &x86_code32), Ok(()));

@@ -29,7 +29,9 @@ pub struct Heap {
     pub grow_dynamically: bool,
     pub chunk_map: HashMap<u64, Chunk>,
     pub top: u64,
-    pub unalloc_hook: super::ffi::uc_hook,
+    /// offset of the unalloc hook in this 
+    pub unalloc_hook_idx: usize,
+    pub own_hooks: Vec<uc_hook>,
 }
 
 impl Drop for Heap {
@@ -38,37 +40,6 @@ impl Drop for Heap {
             munmap(self.real_base as *mut c_void, self.len);
         }
     }
-}
-
-/// Gets the current program counter/`RIP` for this `unicorn` instance.
-#[inline]
-pub fn read_pc<D>(uc: &super::Unicorn<D>) -> Result<u64, uc_error> {
-    let arch = uc.get_arch();
-    let reg = match arch {
-        Arch::X86 => RegisterX86::RIP as i32,
-        Arch::ARM => RegisterARM::PC as i32,
-        Arch::ARM64 => RegisterARM64::PC as i32,
-        Arch::MIPS => RegisterMIPS::PC as i32,
-        Arch::SPARC => RegisterSPARC::PC as i32,
-        Arch::M68K => RegisterM68K::PC as i32,
-        _ => panic!("Arch not yet supported by unicorn::utils module"),
-    };
-    uc.reg_read(reg)
-}
-
-#[inline]
-pub fn set_pc<D>(uc: &mut super::Unicorn<D>, value: u64) -> Result<(), uc_error> {
-    let arch = uc.get_arch();
-    let reg = match arch {
-        Arch::X86 => RegisterX86::RIP as i32,
-        Arch::ARM => RegisterARM::PC as i32,
-        Arch::ARM64 => RegisterARM64::PC as i32,
-        Arch::MIPS => RegisterMIPS::PC as i32,
-        Arch::SPARC => RegisterSPARC::PC as i32,
-        Arch::M68K => RegisterM68K::PC as i32,
-        _ => panic!("Arch not yet supported by unicorn::utils module"),
-    };
-    uc.reg_write(reg, value)
 }
 
 /// Hooks (parts of the) code segment to display register info and the current instruction.
@@ -187,9 +158,10 @@ pub fn init_emu_with_heap<'a>(
         chunk_map: HashMap::new(),
         top: 0,
         unalloc_hook: 0 as _,
+        own_hooks: Vec::with_capacity(16),
     });
 
-    let mut uc = super::Unicorn::new(arch, mode, heap)?;
+    let mut uc = super::Unicorn::new_with_data(arch, mode, heap)?;
 
     // uc memory regions have to be 8 byte aligned
     if size % 8 != 0 {
@@ -232,7 +204,8 @@ pub fn init_emu_with_heap<'a>(
         heap.grow_dynamically = grow;
         heap.chunk_map = chunks;
         heap.top = base_addr; // pointer to top of heap in unicorn mem, increases on allocations
-        heap.unalloc_hook = h; // hook ID, needed to rearrange hooks on allocations
+        heap.hooks.push(h);
+        heap.unalloc_hook = heap.hooks.len() - 1; // hook ID, needed to rearrange hooks on allocations
     }
 
     Ok(uc)
@@ -278,20 +251,21 @@ pub fn uc_alloc(uc: &mut super::Unicorn<RefCell<Heap>>, mut size: u64) -> Result
     }
 
     // canary hooks
-    uc.add_mem_hook(HookType::MEM_WRITE, addr, addr + 3, heap_bo)?;
-    uc.add_mem_hook(HookType::MEM_READ, addr, addr + 3, heap_oob)?;
+    let new_hooks =
+    [uc.add_mem_hook(HookType::MEM_WRITE, addr, addr + 3, heap_bo)?,
+    uc.add_mem_hook(HookType::MEM_READ, addr, addr + 3, heap_oob)?,
     uc.add_mem_hook(
         HookType::MEM_WRITE,
         addr + 4 + size,
         addr + 4 + size + 3,
         heap_bo,
-    )?;
+    )?,
     uc.add_mem_hook(
         HookType::MEM_READ,
         addr + 4 + size,
         addr + 4 + size + 3,
         heap_oob,
-    )?;
+    )?];
 
     // add new chunk
     let curr_offset = addr + 4 - uc_base;
@@ -317,6 +291,7 @@ pub fn uc_alloc(uc: &mut super::Unicorn<RefCell<Heap>>, mut size: u64) -> Result
     // adjust oob hooks
     let old_h = uc.get_data().borrow_mut().unalloc_hook;
     uc.remove_hook(old_h)?;
+
     let new_h = uc.add_mem_hook(
         HookType::MEM_VALID,
         new_top,
@@ -324,6 +299,10 @@ pub fn uc_alloc(uc: &mut super::Unicorn<RefCell<Heap>>, mut size: u64) -> Result
         heap_unalloc,
     )?;
     uc.get_data().borrow_mut().unalloc_hook = new_h;
+
+    uc.get_data().borrow_mut().hooks.append(new_hooks);
+
+
 
     Ok(addr + 4)
 }
@@ -357,6 +336,18 @@ pub fn uc_free(uc: &mut super::Unicorn<RefCell<Heap>>, ptr: u64) -> Result<(), u
     Ok(())
 }
 
+/// Reset the drop-in heap to an empty state
+pub fn uc_heap_reset(uc: &mut super::Unicorn<RefCell<Heap>>) -> Result<(), uc_error> {
+    let hooks = uc.get_data_mut().drain();
+
+    for hook in hooks {
+        uc.remove_hook(hook);
+    }
+
+    Ok(())
+}
+
+/// Error callback on heap oob access for unallocated memory
 fn heap_unalloc(
     uc: &mut super::Unicorn<RefCell<Heap>>,
     _mem_type: MemType,
@@ -369,6 +360,7 @@ fn heap_unalloc(
         addr, pc);
 }
 
+/// Error callback on heap oob read
 fn heap_oob(
     uc: &mut super::Unicorn<RefCell<Heap>>,
     _mem_type: MemType,
@@ -383,6 +375,7 @@ fn heap_oob(
     );
 }
 
+/// Error callback on heap oob write
 fn heap_bo(
     uc: &mut super::Unicorn<RefCell<Heap>>,
     _mem_type: MemType,
@@ -397,6 +390,7 @@ fn heap_bo(
     );
 }
 
+/// Error callback for `use-after-free`
 fn heap_uaf(
     uc: &mut super::Unicorn<RefCell<Heap>>,
     _mem_type: MemType,
@@ -411,6 +405,7 @@ fn heap_uaf(
     );
 }
 
+/// print Unicorn's memory regions
 pub fn vmmap<D>(uc: &mut super::Unicorn<D>) {
     let regions = uc
         .mem_regions()
