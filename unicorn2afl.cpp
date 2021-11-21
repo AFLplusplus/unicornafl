@@ -25,7 +25,7 @@
 #define ERR(str, ...)                                                          \
     fprintf(stderr, "[pid=%d] " str, getpid() __VA_OPT__(, ) __VA_ARGS__)
 #else
-#define ERR(...) fprintf(__VA_ARGS__)
+#define ERR(...) fprintf(stderr, __VA_ARGS__)
 #endif
 
 class UCAFL {
