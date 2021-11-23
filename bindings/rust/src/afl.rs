@@ -62,6 +62,8 @@ where
 {
     let user_data = &mut *user_data;
     debug_assert_eq!(uc, user_data.uc.inner().uc);
+    debug_assert!(input_len >= 0);
+    #[allow(clippy::cast_sign_loss)]
     let safe_input = core::slice::from_raw_parts_mut(input, input_len as usize);
     (user_data.input_callback)(&mut user_data.uc, safe_input, persistent_round)
 }
@@ -80,6 +82,8 @@ where
 {
     let user_data = &mut *user_data;
     debug_assert_eq!(uc, user_data.uc.inner().uc);
+    debug_assert!(input_len >= 0);
+    #[allow(clippy::cast_sign_loss)]
     let safe_input = core::slice::from_raw_parts_mut(input, input_len as usize);
     (user_data.validate_callback)(&mut user_data.uc, error, safe_input, persistent_round)
 }
@@ -87,8 +91,8 @@ where
 /// Starts the AFL forkserver on some Unicorn emulation.
 ///
 /// Multiple exit addresses can be specified. The Unicorn emulation has to be
-/// started manually before by using emu_start.
-pub fn afl_forkserver_start<'a, D>(uc: Unicorn<'a, D>, exits: &[u64]) -> Result<(), AflRet> {
+/// started manually before by using `emu_start`.
+pub fn afl_forkserver_start<'a, D>(uc: &mut Unicorn<'a, D>, exits: &[u64]) -> Result<(), AflRet> {
     let err = unsafe { uc_afl_forkserver_start(uc.inner().uc, exits.as_ptr(), exits.len()) };
     if err == AflRet::Error {
         Err(err)
@@ -101,11 +105,11 @@ pub fn afl_forkserver_start<'a, D>(uc: Unicorn<'a, D>, exits: &[u64]) -> Result<
 ///
 /// This function can handle input reading and -placement within
 /// emulation context, crash validation and persistent mode looping.
-/// To use persistent mode, set persistent_iters > 0 and
+/// To use persistent mode, set `persistent_iters > 0` and
 /// make sure to handle any necessary context restoration, e.g in the
-/// input_placement callback.
+/// `input_placement` callback.
 pub fn afl_fuzz<'afl, 'a, D, F, G>(
-    uc: Unicorn<'a, D>,
+    uc: &mut Unicorn<'a, D>,
     input_file: &str,
     input_placement_callback: &'afl mut F,
     exits: &[u64],
@@ -126,12 +130,13 @@ where
         phantom: PhantomData,
     });
 
+    #[allow(clippy::cast_possible_wrap)]
     let mut cstyle_input_file: Vec<i8> = input_file.bytes().map(|x| x as i8).collect();
     cstyle_input_file.push(0);
 
     let err = unsafe {
         uc_afl_fuzz(
-            uc.inner().uc,
+            uc.inner_mut().uc,
             cstyle_input_file.as_ptr(),
             input_placement_callback_proxy::<'a, 'afl, D, F, G> as _,
             exits.as_ptr(),

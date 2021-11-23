@@ -26,7 +26,7 @@
 //! ```
 //!
 
-#![no_std]
+//#![no_std]
 
 #[macro_use]
 extern crate alloc;
@@ -34,6 +34,7 @@ extern crate alloc;
 pub mod unicorn_const;
 
 pub mod afl;
+pub mod utils;
 
 mod arm;
 mod arm64;
