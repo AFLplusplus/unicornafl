@@ -7,7 +7,6 @@
 #include <vector>
 #include <cstdint>
 #include <cstring>
-
 #include <sys/mman.h>
 #include <sys/stat.h>
 #include <sys/types.h>
@@ -71,7 +70,9 @@ class UCAFL {
         uc_afl_ret ret;
         this->_may_use_shm_testcase();
         this->_afl_steup();
-        this->_uc_setup();
+        if (this->has_afl_) {
+            this->_uc_setup();
+        }
 
         ret = this->_fksrv_start();
 
@@ -250,6 +251,7 @@ class UCAFL {
                 continue;
             }
 
+            // (Lazymio): maybe we cant get rid of this small overhead in the future?
             uint64_t pc = this->_get_pc();
 
 #ifdef AFL_DEBUG
@@ -316,13 +318,8 @@ class UCAFL {
 
     static void _uc_hook_block(uc_engine* uc, uint64_t address, uint32_t size,
                                void* user_data) {
-
-        uint64_t cur_loc = ((address >> 4) ^ (address << 8)) & (MAP_SIZE - 7);
-        UCAFL* ucafl = (UCAFL*)user_data;
-
-        if (unlikely(cur_loc >= ucafl->afl_inst_rms_)) {
-            return;
-        }
+        register uint64_t cur_loc = ((address >> 4) ^ (address << 8)) & (MAP_SIZE - 7);
+        register UCAFL* ucafl = (UCAFL*)user_data;
 
         ucafl->afl_area_ptr_[cur_loc ^ ucafl->afl_prev_loc_]++;
         ucafl->afl_prev_loc_ = cur_loc >> 1;
@@ -448,13 +445,13 @@ class UCAFL {
         }
 
         // These two hooks are for compcov and may not be supported by the arch.
-        err = uc_hook_add(this->uc_, &this->h3_, UC_HOOK_TCG_OPCODE,
-                          (void*)_uc_hook_sub, (void*)this, 1, 0, UC_TCG_OP_SUB,
-                          UC_TCG_OP_FLAG_DIRECT);
+        // err = uc_hook_add(this->uc_, &this->h3_, UC_HOOK_TCG_OPCODE,
+        //                   (void*)_uc_hook_sub, (void*)this, 1, 0, UC_TCG_OP_SUB,
+        //                   UC_TCG_OP_FLAG_DIRECT);
 
-        err = uc_hook_add(this->uc_, &this->h4_, UC_HOOK_TCG_OPCODE,
-                          (void*)_uc_hook_sub_cmp, (void*)this, 1, 0,
-                          UC_TCG_OP_SUB, UC_TCG_OP_FLAG_CMP);
+        // err = uc_hook_add(this->uc_, &this->h4_, UC_HOOK_TCG_OPCODE,
+        //                   (void*)_uc_hook_sub_cmp, (void*)this, 1, 0,
+        //                   UC_TCG_OP_SUB, UC_TCG_OP_FLAG_CMP);
     }
 
     void _afl_steup() {

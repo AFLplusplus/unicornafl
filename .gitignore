@@ -1,3 +1,7 @@
 build*
 build
 .vscode
+bindings/python/unicorn2afl.egg-info/
+bindings/python/unicorn2afl/__pycache__/
+bindings/python/unicorn2afl/include/
+bindings/python/unicorn2afl/lib/
