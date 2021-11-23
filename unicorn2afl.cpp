@@ -318,8 +318,8 @@ class UCAFL {
 
     static void _uc_hook_block(uc_engine* uc, uint64_t address, uint32_t size,
                                void* user_data) {
-        register uint64_t cur_loc = ((address >> 4) ^ (address << 8)) & (MAP_SIZE - 7);
-        register UCAFL* ucafl = (UCAFL*)user_data;
+        uint64_t cur_loc = ((address >> 4) ^ (address << 8)) & (MAP_SIZE - 7);
+        UCAFL* ucafl = (UCAFL*)user_data;
 
         ucafl->afl_area_ptr_[cur_loc ^ ucafl->afl_prev_loc_]++;
         ucafl->afl_prev_loc_ = cur_loc >> 1;
