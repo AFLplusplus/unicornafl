@@ -4,13 +4,22 @@ The project name `Unicorn2afl` stands for both "Uncorn2 AFL" and "Unicorn to(2) 
 
 ## Compile
 
-Don't forget to update submodule before building.
+If you have unicorn installed globally, you may just:
+
+```bash
+mkdir build
+cd build
+cmake .. -DCMAKE_BUILD_TYPE=Release
+make
+```
+
+Or if you prefer a latest build, don't forget to update submodule before building.
 
 ```bash
 git submodule update --init --recursive
 mkdir build
 cd build
-cmake ..
+cmake .. -DCMAKE_BUILD_TYPE=Release
 make
 ```
 
