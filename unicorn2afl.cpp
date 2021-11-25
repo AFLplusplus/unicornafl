@@ -415,18 +415,14 @@ class UCAFL {
 
     void _uc_setup() {
         uc_err err;
-        uint32_t ver, minor, major, extra;
+        uint32_t ver;
 
-        ver = uc_version(&major, &minor);
+        ver = uc_version(NULL, NULL);
 
-        // We need at least Unicorn 2.0.0rc4
+        // We need at least Unicorn 2.0.0rc5
         if (ver < MIN_UC_VERSION) {
-            ERR("[!] You Unicorn Version is not supported!\n");
+            ERR("[!] You Unicorn Version 0x%"PRIx32" is not supported!\n", ver);
             exit(1);
-        }
-
-        if (ver == MIN_UC_VERSION) {
-            ERR("[!] You performance will be degraded on Unicorn 2.0.0-rc4\n");
         }
 
         // For coverage.
