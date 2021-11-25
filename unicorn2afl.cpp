@@ -418,14 +418,15 @@ class UCAFL {
         uint32_t ver, minor, major, extra;
 
         ver = uc_version(&major, &minor);
-        extra = ((ver & ((uint32_t)(-1) << 16)) >> 16);
 
         // We need at least Unicorn 2.0.0rc4
-        if (major < 2 || (minor == 0 && extra < 4)) {
-            ERR("[!] Uc version %" PRIu32 ".%" PRIu32 ".rc%" PRIu32
-                " not supported!.\n",
-                major, minor, extra);
+        if (ver < MIN_UC_VERSION) {
+            ERR("[!] You Unicorn Version is not supported!\n");
             exit(1);
+        }
+
+        if (ver == MIN_UC_VERSION) {
+            ERR("[!] You performance will be degraded on Unicorn 2.0.0-rc4\n");
         }
 
         // For coverage.
