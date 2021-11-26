@@ -26,7 +26,7 @@ HEADERS_DIR = ROOT_DIR / 'unicornafl' / 'include'
 SRC_DIR = ROOT_DIR / '..' / '..'
 BUILD_DIR = SRC_DIR / 'build_python'
 
-VERSION = "1.0.0"
+VERSION = "2.0.0"
 
 if SYSTEM == 'darwin':
     LIBRARY_FILE = "libunicornafl.dylib"
