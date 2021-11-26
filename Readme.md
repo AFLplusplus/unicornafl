@@ -26,6 +26,12 @@ make
 Or if you would like python bindings.
 
 ```bash
+python3 -m pip install unicornafl
+```
+
+Or build it by yourself.
+
+```bash
 git submodule update --init --recursive
 cd bindings/python/
 python3 -m pip install -e .
