@@ -1,6 +1,6 @@
-## UnicornAFL2
+## UnicornAFL
 
-The project name `Unicornafl2` is the next version of [unicornafl](https://github.com/AFLplusplus/unicornafl).
+The project is the next version of [unicornafl](https://github.com/AFLplusplus/unicornafl).
 
 ## Compile
 
