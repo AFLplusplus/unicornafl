@@ -1,5 +1,5 @@
-#ifndef UNICORN2AFL_H
-#define UNICORN2AFL_H
+#ifndef UNICORNAFL_H
+#define UNICORNAFL_H
 
 #include "unicorn/unicorn.h"
 
@@ -8,9 +8,9 @@ extern "C" {
 #endif
 
 #ifdef __GNUC__
-#define UNICORN2AFL_EXPORT __attribute__((visibility("default")))
+#define UNICORNAFL_EXPORT __attribute__((visibility("default")))
 #else
-#define UNICORN2AFL_EXPORT
+#define UNICORNAFL_EXPORT
 #endif
 
 #define MIN_UC_VERSION 0x02000005
@@ -32,7 +32,7 @@ typedef bool (*uc_afl_cb_validate_crash_t)(uc_engine* uc, uc_err unicorn_result,
                                            char* input, int input_len,
                                            int persistent_round, void* data);
 
-UNICORN2AFL_EXPORT
+UNICORNAFL_EXPORT
 uc_afl_ret uc_afl_fuzz(uc_engine* uc, char* input_file,
                        uc_afl_cb_place_input_t place_input_callback,
                        uint64_t* exits, size_t exit_count,

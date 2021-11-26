@@ -1,4 +1,4 @@
-#include "unicorn2afl.h"
+#include "unicornafl.h"
 #include "config.h"
 #include "priv.h"
 
@@ -865,7 +865,7 @@ class UCAFL {
     uc_hook h4_;
 };
 
-extern "C" UNICORN2AFL_EXPORT uc_afl_ret uc_afl_fuzz(
+extern "C" UNICORNAFL_EXPORT uc_afl_ret uc_afl_fuzz(
     uc_engine* uc, char* input_file,
     uc_afl_cb_place_input_t place_input_callback, uint64_t* exits,
     size_t exit_count, uc_afl_cb_validate_crash_t validate_crash_callback,

@@ -1,6 +1,6 @@
-## Unicorn2AFL
+## UnicornAFL2
 
-The project name `Unicorn2afl` stands for both "Uncorn2 AFL" and "Unicorn to(2) AFL". The code is mostly from original [unicornafl](https://github.com/AFLplusplus/unicornafl).
+The project name `Unicornafl2` is the next version of [unicornafl](https://github.com/AFLplusplus/unicornafl).
 
 ## Compile
 
@@ -33,7 +33,7 @@ python3 -m pip install -e .
 
 ## API
 
-The only API currently unicorn2afl exposes is:
+The only API currently unicornafl exposes is:
 
 ```C
 uc_afl_ret uc_afl_fuzz(
@@ -51,21 +51,4 @@ uc_afl_ret uc_afl_fuzz(
 
 ## Migration
 
-While trying to keep the maximum compatiblity with unicornafl, unicorn2afl still needs some minor changes to your existing fuzzer.
-
-If you are writing your fuzzer in C, in most cases it should work as a drop-in replacement. However with python, you need to change
-
-```python
-import unicornafl as UcAfl
-
-UcAfl.monkeypatch()
-```
-
-to
-
-```python
-import unicorn2afl as UcAfl
-from unicorn import * # unicorn2afl no longer provide unicorn related definition.
-
-# No more monkeypatch is needed.
-```
+Unicornafl2 remains the same API compatible to unicornafl so there is no extra work to migrate.
