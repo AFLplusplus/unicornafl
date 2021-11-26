@@ -1,4 +1,4 @@
-#include "unicorn2afl.h"
+#include "unicornafl.h"
 #include "config.h"
 #include "priv.h"
 
@@ -415,16 +415,13 @@ class UCAFL {
 
     void _uc_setup() {
         uc_err err;
-        uint32_t ver, minor, major, extra;
+        uint32_t ver;
 
-        ver = uc_version(&major, &minor);
-        extra = ((ver & ((uint32_t)(-1) << 16)) >> 16);
+        ver = uc_version(NULL, NULL);
 
-        // We need at least Unicorn 2.0.0rc4
-        if (major < 2 || (minor == 0 && extra < 4)) {
-            ERR("[!] Uc version %" PRIu32 ".%" PRIu32 ".rc%" PRIu32
-                " not supported!.\n",
-                major, minor, extra);
+        // We need at least Unicorn 2.0.0rc5
+        if (ver < MIN_UC_VERSION) {
+            ERR("[!] You Unicorn Version 0x%"PRIx32" is not supported!\n", ver);
             exit(1);
         }
 
@@ -868,7 +865,7 @@ class UCAFL {
     uc_hook h4_;
 };
 
-extern "C" UNICORN2AFL_EXPORT uc_afl_ret uc_afl_fuzz(
+extern "C" UNICORNAFL_EXPORT uc_afl_ret uc_afl_fuzz(
     uc_engine* uc, char* input_file,
     uc_afl_cb_place_input_t place_input_callback, uint64_t* exits,
     size_t exit_count, uc_afl_cb_validate_crash_t validate_crash_callback,

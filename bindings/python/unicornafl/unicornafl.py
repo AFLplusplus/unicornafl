@@ -8,9 +8,9 @@ import os
 
 from pathlib import Path
 
-_lib = {'darwin': 'libunicorn2afl.dylib',
-        'linux': 'libunicorn2afl.so',
-        'linux2': 'libunicorn2afl.so'}.get(sys.platform, "libunicorn2afl.so")
+_lib = {'darwin': 'libunicornafl.dylib',
+        'linux': 'libunicornafl.so',
+        'linux2': 'libunicornafl.so'}.get(sys.platform, "libunicornafl.so")
 
 _path_list = [Path(pkg_resources.resource_filename(__name__, 'lib')),
               Path(os.path.realpath(__file__)).parent / "lib",
@@ -35,7 +35,7 @@ for _p in _path_list:
     if _uc2afl is not None:
         break
 else:
-    raise ImportError("Fail to load the dynamic library for unicorn2afl.")
+    raise ImportError("Fail to load the dynamic library for unicornafl.")
 
 
 class UcAflError(Exception):
@@ -156,6 +156,6 @@ def uc_afl_fuzz(uc: Uc,
     # Really?
     return err
 
-
-# Monkey Patch!
-Uc.afl_fuzz = uc_afl_fuzz
+# Compatibility monkeypatch
+def monkeypatch():
+    Uc.afl_fuzz = uc_afl_fuzz

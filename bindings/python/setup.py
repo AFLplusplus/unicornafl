@@ -21,18 +21,18 @@ IS_64BITS = platform.architecture()[0] == '64bit'
 
 # are we building from the repository or from a source distribution?
 ROOT_DIR = Path(os.path.realpath(__file__)).parent
-LIBS_DIR = ROOT_DIR / 'unicorn2afl' / 'lib'
-HEADERS_DIR = ROOT_DIR / 'unicorn2afl' / 'include'
+LIBS_DIR = ROOT_DIR / 'unicornafl' / 'lib'
+HEADERS_DIR = ROOT_DIR / 'unicornafl' / 'include'
 SRC_DIR = ROOT_DIR / '..' / '..'
 BUILD_DIR = SRC_DIR / 'build_python'
 
-VERSION = "1.0.0"
+VERSION = "2.0.0"
 
 if SYSTEM == 'darwin':
-    LIBRARY_FILE = "libunicorn2afl.dylib"
+    LIBRARY_FILE = "libunicornafl.dylib"
     STATIC_LIBRARY_FILE = None
 else:
-    LIBRARY_FILE = "libunicorn2afl.so"
+    LIBRARY_FILE = "libunicornafl.so"
     STATIC_LIBRARY_FILE = None
 
 def clean_builds():
@@ -45,7 +45,7 @@ def build_uc2afl():
     os.mkdir(LIBS_DIR)
     os.mkdir(HEADERS_DIR)
 
-    shutil.copytree(SRC_DIR / "include" / "unicorn2afl", HEADERS_DIR / "unicorn2afl") 
+    shutil.copytree(SRC_DIR / "include" / "unicornafl", HEADERS_DIR / "unicornafl") 
     
     os.chdir(SRC_DIR)
 
@@ -107,7 +107,7 @@ if 'bdist_wheel' in sys.argv and '--plat-name' not in sys.argv:
         sys.argv.insert(idx + 1, name.replace('.', '_').replace('-', '_'))
 
 long_desc = '''
-Unicorn2afl
+Unicornafl
 -----------
 
 Bring Unicorn to afl++.
@@ -115,13 +115,13 @@ Bring Unicorn to afl++.
 '''
 
 setuptools.setup(
-    provides=['unicorn2afl'],
-    packages=['unicorn2afl'],
-    name='unicorn2afl',
+    provides=['unicornafl'],
+    packages=['unicornafl'],
+    name='unicornafl',
     version=VERSION,
     author='Lazymio',
     author_email='mio@lazym.io',
-    description='Unicorn2afl',
+    description='Unicornafl',
     long_description=long_desc,
     long_description_content_type="text/markdown",
     url='http://github.com/wtdcode/unicorn2afl',
@@ -140,10 +140,10 @@ setuptools.setup(
     zip_safe=False,
     include_package_data=True,
     install_requires=[
-        "unicorn>=2.0.0rc4"
-    ]
+        "unicorn>=2.0.0rc5"
+    ],
     is_pure=False,
     package_data={
-        'unicorn2afl': ['lib/*', 'include/*']
+        'unicornafl': ['lib/*', 'include/*']
     }
 )
