@@ -46,12 +46,12 @@ mod sparc;
 mod x86;
 
 pub use crate::{arm::*, arm64::*, m68k::*, mips::*, ppc::*, sparc::*, unicorn_const::*, x86::*};
+pub use unicorn_const::{uc_error, Arch, HookType, MemRegion, MemType, Mode, Permission, Query};
 
 use alloc::{boxed::Box, rc::Rc, vec::Vec};
 use core::{cell::UnsafeCell, ptr};
 use ffi::uc_handle;
 use libc::c_void;
-use unicorn_const::{uc_error, Arch, HookType, MemRegion, MemType, Mode, Permission, Query};
 
 #[derive(Debug)]
 pub struct Context {

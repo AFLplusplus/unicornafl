@@ -20,23 +20,6 @@
 #include "types.h"
 #include "uc_priv.h"
 
-// Set the data pointer for this uc instance
-UNICORN_EXPORT
-void uc_afl_data_ptr_set(uc_engine *uc, void *ptr) {
-    uc->afl_data_ptr = ptr;
-}
-
-// Clear the data pointer from this uc instance
-UNICORN_EXPORT
-void uc_afl_data_ptr_clear(uc_engine *uc) {
-    uc->afl_data_ptr = NULL;
-}
-
-// Get the data pointer from this uc instance
-UNICORN_EXPORT
-void *uc_afl_data_ptr_get(uc_engine *uc) {
-    return uc->afl_data_ptr;
-}
 
 UNICORN_EXPORT
 uc_afl_ret uc_afl_forkserver_start(uc_engine *uc, uint64_t *exits, size_t exit_count)

@@ -246,7 +246,6 @@ struct uc_struct {
     uint64_t *exits; // pointer to the actual exits
     char *afl_testcase_ptr; // map, shared with afl, to get testcases delivered from for each run
     uint32_t *afl_testcase_size_p; // size of the current testcase, if using shared map fuzzing with afl.
-    void *afl_data_ptr; // Pointer for various (bindings-related) uses.
 #endif
 
 };

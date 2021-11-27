@@ -44,8 +44,8 @@ where
     G: 'afl + FnMut(&mut Unicorn<'a, D>, uc_error, &[u8], i32) -> bool,
 {
     pub uc: Unicorn<'a, D>,
-    pub input_callback: &'afl mut F,
-    pub validate_callback: &'afl mut G,
+    pub input_callback: F,
+    pub validate_callback: G,
     pub phantom: PhantomData<&'afl ()>,
 }
 
@@ -111,9 +111,9 @@ pub fn afl_forkserver_start<'a, D>(uc: &mut Unicorn<'a, D>, exits: &[u64]) -> Re
 pub fn afl_fuzz<'afl, 'a, D, F, G>(
     uc: &mut Unicorn<'a, D>,
     input_file: &str,
-    input_placement_callback: &'afl mut F,
+    input_placement_callback: F,
     exits: &[u64],
-    crash_validation_callback: &'afl mut G,
+    crash_validation_callback: G,
     always_validate: bool,
     persistent_iters: u32,
 ) -> Result<(), AflRet>
