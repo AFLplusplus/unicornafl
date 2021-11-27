@@ -168,13 +168,11 @@ pub fn init_emu_with_heap<'a>(
     });
 
     let mut uc = super::Unicorn::new_with_data(arch, mode, heap)?;
-    
 
     // uc memory regions have to be 8 byte aligned
     if size % 8 != 0 {
         size = ((size / 8) + 1) * 8;
     }
-
 
     // init heap management struct for later use within unicorn
     let null_ptr = ptr::null_mut();
@@ -198,7 +196,6 @@ pub fn init_emu_with_heap<'a>(
             arena_ptr,
         )?;
 
-        println!("0x{:x} 0x{:x}", &base_addr, size);
         // set the initial unalloc hook
         let unalloc_hook = uc.add_mem_hook(
             HookType::MEM_VALID,
@@ -206,7 +203,6 @@ pub fn init_emu_with_heap<'a>(
             base_addr + u64::from(size),
             heap_unalloc,
         )?;
-        println!("fun");
 
         let chunks = HashMap::new();
         let heap: &mut Heap = &mut *uc.get_data().borrow_mut();

@@ -484,7 +484,15 @@ impl<'a, D> Unicorn<'a, D> {
     where
         F: FnMut(&mut Unicorn<D>, MemType, u64, usize, i64) -> bool,
     {
-        if ![HookType::MEM_ALL, HookType::MEM_READ_AFTER].contains(&hook_type) {
+        if [
+            HookType::INTR,
+            HookType::INSN,
+            HookType::CODE,
+            HookType::BLOCK,
+            HookType::INSN_INVALID,
+        ]
+        .contains(&hook_type)
+        {
             return Err(uc_error::ARG);
         }
 
