@@ -6,13 +6,21 @@ option(AFL_DEBUG "Enable debug output" off)
 
 set (CMAKE_CXX_STANDARD 17)
 
-add_library(unicornafl SHARED unicornafl.cpp)
+option(UNICORN_BUILD_SHARED "Build shared instead of static library" ON)
+
+if (UNICORN_BUILD_SHARED)
+    add_library(unicornafl SHARED unicornafl.cpp)
+else()
+    add_library(unicornafl STATIC unicornafl.cpp)
+    target_compile_options(unicornafl PRIVATE -DUNICORN_BUILD_SHARED)
+endif()
 
 if (AFL_DEBUG)
     target_compile_options(unicornafl PRIVATE -DAFL_DEBUG)
 endif()
 
 find_package(PkgConfig)
+exec_program("echo things")
 if (PKG_CONFIG_FOUND)
     pkg_check_modules(UNICORN unicorn>=2.0.0)
     if (UNICORN_FOUND)
@@ -32,3 +40,4 @@ target_link_libraries(unicornafl PRIVATE unicorn)
 target_include_directories(unicornafl PRIVATE unicorn/include)
 target_include_directories(unicornafl PRIVATE include)
 target_include_directories(unicornafl PRIVATE include/unicornafl)
+target_include_directories(unicornafl PRIVATE unicorn/build)

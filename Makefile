@@ -12,7 +12,7 @@ unicorn/build/libunicorn-common.a:
 	$(MAKE) -C ./unicorn/build -j8
 
 build/libunicornafl: build unicorn/build/libunicorn-common.a
-	cd ./build && cmake ..
+	cd ./build && cmake .. -D UNICORN_BUILD_SHARED=no
 	$(MAKE) -C ./build -j8
 
 format:
