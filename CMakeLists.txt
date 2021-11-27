@@ -28,5 +28,7 @@ else()
     target_link_libraries(unicornafl PRIVATE unicorn)
 endif()
 
+target_link_libraries(unicornafl PRIVATE unicorn)
+target_include_directories(unicornafl PRIVATE unicorn/include)
 target_include_directories(unicornafl PRIVATE include)
 target_include_directories(unicornafl PRIVATE include/unicornafl)
