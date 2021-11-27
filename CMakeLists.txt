@@ -6,10 +6,7 @@ option(AFL_DEBUG "Enable debug output" off)
 
 set (CMAKE_CXX_STANDARD 17)
 
-# TODO: Link a installed global unicorn if possible?
-add_subdirectory(unicorn)
-
-add_library(unicorn2afl STATIC unicornafl.cpp)
+add_library(unicornafl SHARED unicornafl.cpp)
 
 if (AFL_DEBUG)
     target_compile_options(unicornafl PRIVATE -DAFL_DEBUG)
@@ -31,7 +28,5 @@ else()
     target_link_libraries(unicornafl PRIVATE unicorn)
 endif()
 
-target_link_libraries(unicornafl PRIVATE unicorn)
 target_include_directories(unicornafl PRIVATE include)
 target_include_directories(unicornafl PRIVATE include/unicornafl)
-target_include_directories(unicornafl PRIVATE unicorn/include)
