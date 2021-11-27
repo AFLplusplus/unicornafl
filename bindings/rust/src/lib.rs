@@ -31,6 +31,7 @@ mod ffi;
 pub mod unicorn_const;
 pub mod utils;
 
+mod afl;
 mod arm;
 mod arm64;
 mod m68k;
@@ -40,7 +41,7 @@ mod sparc;
 mod x86;
 use std::{convert::TryInto, marker::PhantomData, ptr};
 
-pub use crate::{arm::*, arm64::*, m68k::*, mips::*, ppc::*, sparc::*, x86::*};
+pub use crate::{afl::*, arm::*, arm64::*, m68k::*, mips::*, ppc::*, sparc::*, x86::*};
 
 use ffi::uc_handle;
 use libc::{c_int, c_void};
