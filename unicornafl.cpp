@@ -421,7 +421,7 @@ class UCAFL {
 
         // We need at least Unicorn 2.0.0rc5
         if (ver < MIN_UC_VERSION) {
-            ERR("[!] You Unicorn Version 0x%"PRIx32" is not supported!\n", ver);
+            ERR("[!] You Unicorn Version 0x%" PRIx32 " is not supported!\n", ver);
             exit(1);
         }
 
