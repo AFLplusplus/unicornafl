@@ -1,6 +1,18 @@
 use std::{env, process::Command};
 
-use build_helper::rustc::{link_lib, link_search};
+use build_helper::rustc::link_search;
+
+fn add_lib(path: &str, name: &str) {
+    let out_dir = env::var("OUT_DIR").unwrap();
+
+    let _ = Command::new("cp")
+        .current_dir(path)
+        .arg(format!("lib{}.a", name))
+        .arg(&out_dir)
+        .status()
+        .unwrap();
+    println!("cargo:rustc-link-lib=static={}", name);
+}
 
 fn main() {
     println!("cargo:rerun-if-changed=unicornafl");
@@ -9,26 +21,20 @@ fn main() {
     println!("cargo:rerun-if-changed=../../unicornafl.cpp");
     println!("cargo:rerun-if-changed=../../CMakeLists.txt");
 
-    let out_dir = env::var("OUT_DIR").unwrap();
-    let unicorn = "libunicornafl.a";
-
     Command::new("make")
         .args(&["-C", "../.."])
         .status()
         .expect("failed to build unicornafl");
 
-    let _ = Command::new("cp")
-        .current_dir("../../build")
-        .arg(&unicorn)
-        .arg(&out_dir)
-        .status()
-        .unwrap();
-
     link_search(
         Some(build_helper::SearchKind::Native),
         build_helper::out_dir(),
     );
-    link_lib(Some(build_helper::LibKind::Static), "unicornafl");
+
+    add_lib("../../build", "unicornafl");
+
+    add_lib("../../build/unicorn", "unicorn");
+    add_lib("../../build/unicorn", "unicorn-common");
 
     //println!("cargo:rustc-link-lib=static=unicorn");
     for arch in [
@@ -51,21 +57,6 @@ fn main() {
     ]
     .iter()
     {
-        let _ = Command::new("cp")
-            .current_dir("../../build/unicorn")
-            .arg(format!("lib{}-softmmu.a", arch))
-            .arg(&out_dir)
-            .status()
-            .unwrap();
-
-        println!("cargo:rustc-link-lib=static={}-softmmu", arch);
+        add_lib("../../build/unicorn", &format!("{}-softmmu", arch));
     }
-
-    let _ = Command::new("cp")
-        .current_dir("../../build/unicorn")
-        .arg("libunicorn-common.a")
-        .arg(&out_dir)
-        .status()
-        .unwrap();
-    println!("cargo:rustc-link-lib=static=unicorn-common");
 }
