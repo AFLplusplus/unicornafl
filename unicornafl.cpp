@@ -114,7 +114,7 @@ class UCAFL {
             uc_hook_del(this->uc_, this->h4_);
         }
 
-        if(!this->has_afl_) {
+        if (!this->has_afl_) {
             munmap(this->afl_area_ptr_, MAP_SIZE);
         }
     }
@@ -201,7 +201,16 @@ class UCAFL {
                 uc_reg_read(this->uc_, UC_X86_REG_RIP, &pc);
             }
         } else if (arch == UC_ARCH_ARM) {
+            uint64_t cpsr = 0;
             uc_reg_read(this->uc_, UC_ARM_REG_PC, &pc);
+
+            // check for thumb mode
+            uc_reg_read(this->uc_, UC_ARM_REG_CPSR, &cpsr);
+            if (cpsr & 0x20) {
+                // thumb mode, the address should end with 1
+                pc &= ~1;
+            }
+
         } else if (arch == UC_ARCH_RISCV) {
             uc_reg_read(this->uc_, UC_RISCV_REG_PC, &pc);
         } else if (arch == UC_ARCH_MIPS) {
@@ -251,7 +260,8 @@ class UCAFL {
                 continue;
             }
 
-            // (Lazymio): maybe we cant get rid of this small overhead in the future?
+            // (Lazymio): maybe we cant get rid of this small overhead in the
+            // future?
             uint64_t pc = this->_get_pc();
 
 #ifdef AFL_DEBUG
@@ -421,7 +431,8 @@ class UCAFL {
 
         // We need at least Unicorn 2.0.0rc5
         if (ver < MIN_UC_VERSION) {
-            ERR("[!] You Unicorn Version 0x%" PRIx32 " is not supported!\n", ver);
+            ERR("[!] You Unicorn Version 0x%" PRIx32 " is not supported!\n",
+                ver);
             exit(1);
         }
 
@@ -443,8 +454,8 @@ class UCAFL {
 
         // These two hooks are for compcov and may not be supported by the arch.
         // err = uc_hook_add(this->uc_, &this->h3_, UC_HOOK_TCG_OPCODE,
-        //                   (void*)_uc_hook_sub, (void*)this, 1, 0, UC_TCG_OP_SUB,
-        //                   UC_TCG_OP_FLAG_DIRECT);
+        //                   (void*)_uc_hook_sub, (void*)this, 1, 0,
+        //                   UC_TCG_OP_SUB, UC_TCG_OP_FLAG_DIRECT);
 
         // err = uc_hook_add(this->uc_, &this->h4_, UC_HOOK_TCG_OPCODE,
         //                   (void*)_uc_hook_sub_cmp, (void*)this, 1, 0,
