@@ -208,7 +208,7 @@ class UCAFL {
             uc_reg_read(this->uc_, UC_ARM_REG_CPSR, &cpsr);
             if (cpsr & 0x20) {
                 // thumb mode, the address should end with 1
-                pc &= ~1;
+                pc |= 1;
             }
 
         } else if (arch == UC_ARCH_RISCV) {
