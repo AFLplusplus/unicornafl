@@ -1,4 +1,4 @@
-build*
+build/*
 build
 .vscode
 bindings/python/unicornafl.egg-info/
