@@ -7,7 +7,7 @@ build:
 
 unicorn/build/libunicorn-common.a:
 	git submodule update --init --recursive
-	cmake -S unicorn/ -B unicorn/build
+	cmake -S unicorn/ -B unicorn/build -D UNICORN_BUILD_SHARED=no
 	$(MAKE) -C ./unicorn/build -j8
 
 build/libunicornafl: build unicorn/build/libunicorn-common.a

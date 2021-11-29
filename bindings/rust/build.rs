@@ -23,9 +23,49 @@ fn main() {
         .arg(&out_dir)
         .status()
         .unwrap();
+
     link_search(
         Some(build_helper::SearchKind::Native),
         build_helper::out_dir(),
     );
     link_lib(Some(build_helper::LibKind::Static), "unicornafl");
+
+    //println!("cargo:rustc-link-lib=static=unicorn");
+    for arch in [
+        "x86_64",
+        "arm",
+        "armeb",
+        "aarch64",
+        "aarch64eb",
+        "riscv32",
+        "riscv64",
+        "mips",
+        "mipsel",
+        "mips64",
+        "mips64el",
+        "sparc",
+        "sparc64",
+        "m68k",
+        "ppc",
+        "ppc64",
+    ]
+    .iter()
+    {
+        let _ = Command::new("cp")
+            .current_dir("../../build/unicorn")
+            .arg(format!("lib{}-softmmu.a", arch))
+            .arg(&out_dir)
+            .status()
+            .unwrap();
+
+        println!("cargo:rustc-link-lib=static={}-softmmu", arch);
+    }
+
+    let _ = Command::new("cp")
+        .current_dir("../../build/unicorn")
+        .arg("libunicorn-common.a")
+        .arg(&out_dir)
+        .status()
+        .unwrap();
+    println!("cargo:rustc-link-lib=static=unicorn-common");
 }

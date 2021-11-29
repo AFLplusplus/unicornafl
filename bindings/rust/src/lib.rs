@@ -29,6 +29,8 @@
 #[macro_use]
 extern crate alloc;
 
+extern crate link_cplusplus;
+
 pub mod unicorn_const;
 
 mod arm;
