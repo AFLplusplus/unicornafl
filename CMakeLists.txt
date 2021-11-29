@@ -1,5 +1,10 @@
 cmake_minimum_required(VERSION 3.14)
 
+# Workaround to fix wrong compiler on macos.
+if ((APPLE) AND (NOT CMAKE_C_COMPILER))
+    set(CMAKE_C_COMPILER "/usr/bin/cc")
+endif()
+
 project(unicornafl)
 
 option(AFL_DEBUG "Enable debug output" off)
