@@ -1,10 +1,11 @@
 #![allow(non_snake_case)]
 extern crate libc;
 
-use crate::ffi::uc_hook;
-
-use super::arm::RegisterARM;
-use super::{uc_error, Arch, HookType, MemType, Mode, Permission};
+use crate::{
+    ffi::uc_hook,
+    unicorn_const::{uc_error, Arch, HookType, MemType, Mode, Permission},
+    RegisterARM,
+};
 use capstone::prelude::*;
 use libc::{c_void, mmap, munmap, size_t, MAP_ANON, MAP_PRIVATE, PROT_READ, PROT_WRITE};
 use std::{cell::RefCell, collections::HashMap, ptr};

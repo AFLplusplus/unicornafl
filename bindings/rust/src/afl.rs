@@ -6,7 +6,7 @@ use core::marker::PhantomData;
 use alloc::{boxed::Box, vec::Vec};
 use libc::{c_int, c_void};
 
-use crate::{ffi::uc_handle, unicorn_const::uc_error, Unicorn};
+use crate::{ffi::uc_handle, uc_error, Unicorn};
 
 /// FFI for the forkserver
 extern "C" {
