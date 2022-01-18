@@ -46,6 +46,8 @@ jobs:
         pip install setuptools wheel auditwheel
 
     - name: '🚧 Build distribution'
+      env:
+        UCAFL_NO_LOG: '1'
       shell: bash 
       run: |
         if [ ${{ matrix.config.name }} == 'manylinux2014_i686' ]; then

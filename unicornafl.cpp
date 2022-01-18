@@ -19,12 +19,71 @@
 
 #include <x86intrin.h>
 
-#ifdef AFL_DEBUG
 #include <errno.h>
-#define ERR(str, ...)                                                          \
-    fprintf(stderr, "[pid=%d] " str, getpid() __VA_OPT__(, ) __VA_ARGS__)
+#include <chrono>
+#include <cstdlib>
+
+static bool afl_debug_enabled = false;       // General debug message
+static bool afl_debug_child_enabled = false; // Child specific debug message
+static std::chrono::time_point<std::chrono::steady_clock> t0;
+
+static void log_init() {
+    if (getenv("AFL_DEBUG")) {
+        afl_debug_enabled = true;
+    }
+
+    if (getenv("AFL_DEBUG_CHILD")) {
+        afl_debug_child_enabled = true;
+    }
+
+    t0 = std::chrono::steady_clock::now();
+}
+
+static void log(bool in_child, const char* fmt, ...) {
+    va_list args;
+
+    if (likely(!afl_debug_enabled && !afl_debug_child_enabled)) {
+        return;
+    }
+
+    if (in_child && !afl_debug_child_enabled) {
+        return;
+    }
+
+    if (!in_child && !afl_debug_enabled) {
+        return;
+    }
+
+    fprintf(stderr, "[u] ");
+
+    if (afl_debug_enabled) {
+        auto n = std::chrono::steady_clock::now();
+
+        fprintf(stderr,
+            "[%04.6f] ",
+            std::chrono::duration_cast<std::chrono::duration<double>>(n - t0)
+                .count());
+    }
+
+    if (in_child && afl_debug_child_enabled) {
+        pid_t p = getpid();
+
+        fprintf(stderr, "[%04" PRId32 "] ", p);
+    }
+
+    va_start(args, fmt);
+
+    vfprintf(stderr, fmt, args);
+
+    va_end(args);
+}
+
+#ifndef UCAFL_NO_LOG
+#define ERR(...) log(false, __VA_ARGS__)
+#define ERR_CHILD(...) log(true, __VA_ARGS__)
 #else
-#define ERR(...) fprintf(stderr, __VA_ARGS__)
+#define ERR(...)
+#define ERR_CHILD(...)
 #endif
 
 class UCAFL {
@@ -51,7 +110,7 @@ class UCAFL {
 
         err = uc_ctl_exits_enable(this->uc_);
         if (err) {
-            ERR("[!] Fail to enable exits for Unicorn Engine.\n");
+            ERR("Fail to enable exits for Unicorn Engine.\n");
             return UC_AFL_RET_ERROR;
         }
 
@@ -59,7 +118,7 @@ class UCAFL {
         err = uc_ctl_set_exits(uc_, (uint64_t*)&v[0], exit_count);
 
         if (err) {
-            ERR("[!] Fail to set exits.\n");
+            ERR("Fail to set exits.\n");
             return UC_AFL_RET_ERROR;
         }
 
@@ -76,9 +135,7 @@ class UCAFL {
 
         ret = this->_fksrv_start();
 
-#ifdef AFL_DEBUG
-        ERR("[d] fksrv_start returns %d\n", ret);
-#endif
+        ERR("fksrv_start returns %d\n", ret);
 
         switch (ret) {
         case UC_AFL_RET_CHILD:
@@ -232,10 +289,6 @@ class UCAFL {
         bool input_accepted;
         uint32_t i = 0;
 
-#ifdef AFL_DEBUG
-        ERR("[d] Entering child fuzzing loop.\n");
-#endif
-
         for (i = 0; this->persistent_iters_ == 0 || i < this->persistent_iters_;
              i++) {
             if (unlikely(first_round)) {
@@ -254,9 +307,7 @@ class UCAFL {
                 this->uc_, testcase.ptr(), testcase.len(), i, this->data_);
 
             if (unlikely(!input_accepted)) {
-#ifdef AFL_DEBUG
-                ERR("[d] Input is not accepted.\n");
-#endif
+                ERR_CHILD("Input is not accepted.\n");
                 continue;
             }
 
@@ -264,17 +315,13 @@ class UCAFL {
             // future?
             uint64_t pc = this->_get_pc();
 
-#ifdef AFL_DEBUG
-            ERR("[d] We are starting from 0x%" PRIx64 "\n", pc);
-#endif
+            ERR_CHILD("We are starting from 0x%" PRIx64 "\n", pc);
 
             // Note we have enabled exits.
             uc_err uc_ret = uc_emu_start(this->uc_, pc, 0, 0, 0);
 
-#ifdef AFL_DEBUG
-            ERR("[d] We are stopping for uc_err=%d (%s)\n", uc_ret,
+            ERR_CHILD("We are stopping for uc_err=%d (%s)\n", uc_ret,
                 uc_strerror(uc_ret));
-#endif
 
             if (unlikely(uc_ret != UC_ERR_OK) ||
                 (this->always_validate_ && this->validate_crash_callback_)) {
@@ -291,7 +338,7 @@ class UCAFL {
                     continue;
                 }
 
-                ERR("[!] UC returned Error: '%s' - let's abort().\n",
+                ERR_CHILD("UC returned Error: '%s' - let's abort().\n",
                     uc_strerror(uc_ret));
                 fflush(stderr);
 
@@ -318,12 +365,11 @@ class UCAFL {
         if ((write(_W(ucafl->afl_child_pipe_), &tsl_req,
                    sizeof(enum afl_child_ret))) != sizeof(enum afl_child_ret) ||
             (write(_W(ucafl->afl_child_pipe_), &cur_tb->pc, 8) != 8)) {
-            ERR("[!] Fail to request cache at 0x%" PRIx64 "\n", cur_tb->pc);
+            ERR_CHILD("Fail to request cache at 0x%" PRIx64 "\n", cur_tb->pc);
+            return;
         }
 
-#ifdef AFL_DEBUG
-        ERR("[d] A new TB is generated at 0x%" PRIx64 "\n", cur_tb->pc);
-#endif
+        ERR_CHILD("A new TB is generated at 0x%" PRIx64 "\n", cur_tb->pc);
     }
 
     static void _uc_hook_block(uc_engine* uc, uint64_t address, uint32_t size,
@@ -334,10 +380,8 @@ class UCAFL {
         ucafl->afl_area_ptr_[cur_loc ^ ucafl->afl_prev_loc_]++;
         ucafl->afl_prev_loc_ = cur_loc >> 1;
 
-#ifdef AFL_DEBUG
-        ERR("[d] uc_hook_block cur_loc=" PRIu64 " prev_loc=" PRIu64 "\n",
+        ERR_CHILD("uc_hook_block address=0x%" PRIx64 " cur_loc=%" PRIu64 " prev_loc=%" PRIu64 "\n", address,
             cur_loc, ucafl->afl_prev_loc_);
-#endif
     }
 
     void _uc_hook_sub_impl_16(uint64_t cur_loc, uint64_t arg1, uint64_t arg2) {
@@ -431,7 +475,7 @@ class UCAFL {
 
         // We need at least Unicorn 2.0.0rc5
         if (ver < MIN_UC_VERSION) {
-            ERR("[!] You Unicorn Version 0x%" PRIx32 " is not supported!\n",
+            ERR("You Unicorn Version 0x%" PRIx32 " is not supported!\n",
                 ver);
             exit(1);
         }
@@ -488,7 +532,7 @@ class UCAFL {
             this->afl_area_ptr_ = (uint8_t*)shmat(map_id, NULL, 0);
 
             if (this->afl_area_ptr_ == (void*)-1) {
-                ERR("[!] Can't get the afl mapping area.\n");
+                ERR("Can't get the afl mapping area.\n");
                 exit(0);
             }
 
@@ -536,25 +580,18 @@ class UCAFL {
         /* afl tells us in an extra message if it accepted this option or not */
         if (this->afl_testcase_ptr_ && getenv(SHM_FUZZ_ENV_VAR)) {
             if (read(FORKSRV_FD, &status, 4) != 4) {
-                ERR("[!] AFL parent exited before forkserver was up\n");
+                ERR("AFL parent exited before forkserver was up\n");
                 return UC_AFL_RET_ERROR;
             }
             if (status != (FS_OPT_ENABLED | FS_OPT_SHDMEM_FUZZ)) {
-                ERR("[!] Unexpected response from AFL++ on forkserver setup\n");
+                ERR("Unexpected response from AFL++ on forkserver setup\n");
                 return UC_AFL_RET_ERROR;
             }
         } else {
-#if defined(AFL_DEBUG)
-            ERR("[d] AFL++ sharedmap fuzzing not supported/SHM_FUZZ_ENV_VAR "
-                "not set\n");
-#endif
+            ERR("AFL++ sharedmap fuzzing not supported/SHM_FUZZ_ENV_VAR not set\n");
         }
 
         void (*old_sigchld_handler)(int) = signal(SIGCHLD, SIG_DFL);
-
-#if defined(AFL_DEBUG)
-        ERR("[d] Entering forkserver loop\n");
-#endif
 
         while (1) {
 
@@ -573,13 +610,11 @@ class UCAFL {
 
             if ((child_ret != AFL_CHILD_EXITED) && was_killed) {
 
-#if defined(AFL_DEBUG)
-                ERR("[d] Child was killed by AFL in the meantime.\n");
-#endif
+                ERR("Child was killed by AFL in the meantime.\n");
 
                 child_ret = AFL_CHILD_EXITED;
                 if (waitpid(child_pid, &status, 0) < 0) {
-                    ERR("[!] Error waiting for child!");
+                    ERR("Error waiting for child!");
                     return UC_AFL_RET_ERROR;
                 }
             }
@@ -669,7 +704,7 @@ class UCAFL {
                 // See _uc_afl_next
                 if (write(_W(this->afl_parent_pipe_), tmp, 4) != 4) {
 
-                    ERR("[!] Child died when we tried to resume it\n");
+                    ERR("Child died when we tried to resume it\n");
                     return UC_AFL_RET_ERROR;
                 }
             }
@@ -723,10 +758,6 @@ class UCAFL {
     afl_child_ret _handle_child_requests() {
         enum afl_child_ret child_msg;
 
-#ifdef AFL_DEBUG
-        ERR("[d] Entering _handle_child_requests\n");
-#endif
-
         while (1) {
 
             /* Broken pipe means it's time to return to the fork server routine.
@@ -736,9 +767,7 @@ class UCAFL {
                      sizeof(enum afl_child_ret)) != sizeof(enum afl_child_ret))
                 return AFL_CHILD_EXITED; // child is dead.
 
-#ifdef AFL_DEBUG
-            ERR("[d] Get a child_msg=%d\n", child_msg);
-#endif
+            ERR("Get a child_msg=%d\n", child_msg);
 
             if (child_msg == AFL_CHILD_NEXT ||
                 child_msg == AFL_CHILD_FOUND_CRASH) {
@@ -751,21 +780,21 @@ class UCAFL {
                 uc_err err;
 
                 if (read(_R(this->afl_child_pipe_), &pc, 8) != 8) {
-                    ERR("[d] Fail to read child tsl request.\n");
+                    ERR("Fail to read child tsl request.\n");
                     return AFL_CHILD_EXITED; // child is dead.
                 }
 
                 err = uc_ctl_request_cache(this->uc_, pc, NULL);
 
                 if (unlikely(err != UC_ERR_OK)) {
-                    ERR("[d] Fail to cache the TB at 0x%" PRIx64 ".\n", pc);
+                    ERR("Fail to cache the TB at 0x%" PRIx64 ".\n", pc);
+                } else {
+                    ERR("TB is cached at 0x%" PRIx64 ".\n", pc);
                 }
 
             } else {
 
-                fprintf(
-                    stderr,
-                    "[!] Unexpected response by child! %d. Please report this "
+                ERR("Unexpected response by child! %d. Please report this "
                     "as bug for unicornafl.\n"
                     "    Expected one of {AFL_CHILD_NEXT: %d, "
                     "AFL_CHILD_FOUND_CRASH: %d, AFL_CHILD_TSL_REQUEST: %d}.\n",
@@ -803,7 +832,7 @@ class UCAFL {
             return;
         } else {
             this->afl_use_shm_testcase_ = false;
-            ERR("[!] SHARED MEMORY FUZZING Feature is not enabled.\n");
+            ERR("SHARED MEMORY FUZZING Feature is not enabled.\n");
             return;
         }
     }
@@ -881,31 +910,30 @@ extern "C" UNICORNAFL_EXPORT uc_afl_ret uc_afl_fuzz(
     uc_afl_cb_place_input_t place_input_callback, uint64_t* exits,
     size_t exit_count, uc_afl_cb_validate_crash_t validate_crash_callback,
     bool always_validate, uint32_t persistent_iters, void* data) {
-#ifdef AFL_DEBUG
-    ERR("[d] Entering uc_afl_fuzz with input_file=%s and "
-        "persistent_iters=%" PRIu32 "\n",
+
+    log_init();
+
+    ERR("Entering uc_afl_fuzz with input_file=%s and persistent_iters=%" PRIu32 "\n",
         input_file, persistent_iters);
-#endif
     // Sanity Check.
     if (!uc) {
-        ERR("[!] Unicorn Engine passed to uc_afl_fuzz is NULL!\n");
+        ERR("Unicorn Engine passed to uc_afl_fuzz is NULL!\n");
         return UC_AFL_RET_ERROR;
     }
     if (!input_file || input_file[0] == 0) {
-        ERR("[!] No input file provided to uc_afl_fuzz.\n");
+        ERR("No input file provided to uc_afl_fuzz.\n");
         return UC_AFL_RET_ERROR;
     }
     if (!place_input_callback) {
-        ERR("[!] no place_input_callback set.\n");
+        ERR("no place_input_callback set.\n");
         return UC_AFL_RET_ERROR;
     }
     if (always_validate && !validate_crash_callback) {
-        ERR("[!] always_validate set but validate_crash_callback is "
-            "missing.\n");
+        ERR("always_validate set but validate_crash_callback is missing.\n");
         return UC_AFL_RET_ERROR;
     }
     if (!exit_count) {
-        ERR("[!] Nullptr provided for exits.\n");
+        ERR("Nullptr provided for exits.\n");
         return UC_AFL_RET_ERROR;
     }
 

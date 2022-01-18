@@ -19,7 +19,7 @@ Or if you prefer a latest build, don't forget to update submodule before buildin
 git submodule update --init --recursive
 mkdir build
 cd build
-cmake .. -DCMAKE_BUILD_TYPE=Release
+cmake .. -DCMAKE_BUILD_TYPE=Release -DUCAFL_NO_LOG=on # disable logging for the maximum speed
 make
 ```
 

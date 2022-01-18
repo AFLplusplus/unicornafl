@@ -53,9 +53,15 @@ def build_uc2afl():
         os.mkdir(BUILD_DIR)
     
     if os.getenv("DEBUG", ""):
-        subprocess.check_call(["cmake", "-B", BUILD_DIR, "-DCMAKE_BUILD_TYPE=Debug", "-DAFL_DEBUG=1"])
+        args = ["cmake", "-B", BUILD_DIR, "-DCMAKE_BUILD_TYPE=Debug"]
     else:
-        subprocess.check_call(["cmake", "-B", BUILD_DIR, "-DCMAKE_BUILD_TYPE=Release"])
+        args = ["cmake", "-B", BUILD_DIR, "-DCMAKE_BUILD_TYPE=Release"]
+    
+    if os.getenv("UCAFL_NO_LOG", ""):
+        args += ["-DUCAFL_NO_LOG=on"]
+
+    subprocess.check_call(args)
+
     os.chdir(BUILD_DIR)
     threads = os.getenv("THREADS", "6")
     subprocess.check_call(["make", "-j" + threads])
