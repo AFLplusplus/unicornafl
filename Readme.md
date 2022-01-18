@@ -1,6 +1,6 @@
-## UnicornAFL
+# UnicornAFL
 
-The project is the next version of [unicornafl](https://github.com/AFLplusplus/unicornafl).
+The project builds a bridge between AFL++ and unicorn engine.
 
 ## Compile
 
