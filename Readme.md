@@ -57,4 +57,24 @@ uc_afl_ret uc_afl_fuzz(
 
 ## Migration
 
-Unicornafl2 remains the same API compatible to unicornafl so there is no extra work to migrate.
+unicornafl 2.x remains the same API compatible to unicornafl 1.x so there is no extra work to migrate.
+
+However, a change in unicornafl 2.x is that the monkey patch is no longer needed for Python, which is a bit more elegant. For instance:
+
+```python
+# works with both unicornafl 1.x and unicornafl 2.x
+import unicornafl
+
+unicornafl.monkeypatch()
+
+uc.afl_fuzz(...)
+```
+
+In unicornafl 2.x, we recommend:
+
+```python
+# unicornafl 2.x only!
+import unicornafl
+
+unicornafl.uc_afl_fuzz(uc, ...)
+```
