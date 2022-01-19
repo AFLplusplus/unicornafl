@@ -38,12 +38,6 @@ else:
     raise ImportError("Fail to load the dynamic library for unicornafl.")
 
 
-class UcAflError(Exception):
-
-    def __init__(self, errno):
-        super().__init__()
-        self.errno = errno
-
 # typedef enum uc_afl_ret {
 #     UC_AFL_RET_OK = 0,
 #     UC_AFL_RET_ERROR,
@@ -60,6 +54,38 @@ UC_AFL_RET_CHILD = 2
 UC_AFL_RET_NO_AFL = 3
 UC_AFL_RET_CALLED_TWICE = 4
 UC_AFL_RET_FINISHED = 5
+
+class UcAflError(Exception):
+
+    def __init__(self, errno=UC_AFL_RET_ERROR, message=None):
+        super().__init__()
+        self.errno = errno
+        self.message = message
+
+    def __str__(self):
+        # type: (UcAflError) -> str
+        if self.message:
+            return self.message
+        return {
+            UC_AFL_RET_CHILD: "Fork worked. we are a child (no Error)",
+            UC_AFL_RET_NO_AFL: "No AFL, no need to fork (but no real Error)",
+            UC_AFL_RET_FINISHED: "We forked before but now AFL is gone (time to quit)",
+            UC_AFL_RET_CALLED_TWICE: "Forkserver already running. This may be an error.",
+            UC_AFL_RET_ERROR: "Something went horribly wrong in the parent!"
+        }[self.errno]
+
+    def __eq__(self, other):
+        # type: (UcAflError) -> str
+        if isinstance(other, int):
+            return self.errno == other
+        elif isinstance(other, str):
+            return self.message == other
+        elif isinstance(other, UcAflError):
+            return self.errno == other.errno
+        elif other is None:
+            return None
+        else:
+            raise ValueError("Tried to compare UcAflError to {} ({})".format((type(other), other)))
 
 # typedef bool (*uc_afl_cb_place_input_t)(uc_engine* uc, char* input,
 #                                         size_t input_len,
