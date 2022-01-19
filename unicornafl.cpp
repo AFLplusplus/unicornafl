@@ -59,8 +59,8 @@ static void log(bool in_child, const char* fmt, ...) {
     if (afl_debug_enabled) {
         auto n = std::chrono::steady_clock::now();
 
-        fprintf(stderr,
-            "[%04.6f] ",
+        fprintf(
+            stderr, "[%04.6f] ",
             std::chrono::duration_cast<std::chrono::duration<double>>(n - t0)
                 .count());
     }
@@ -100,7 +100,10 @@ class UCAFL {
           persistent_iters_(persistent_iters), data_(data),
           afl_testcase_ptr_(nullptr), afl_testcase_len_p_(nullptr),
           afl_area_ptr_(nullptr), has_afl_(false), afl_prev_loc_(0), h1_(0),
-          h2_(0), h3_(0), h4_(0) {}
+          h2_(0), h3_(0), h4_(0) {
+        memset(this->afl_child_pipe_, 0, sizeof(this->afl_child_pipe_));
+        memset(this->afl_parent_pipe_, 0, sizeof(this->afl_parent_pipe_));
+    }
 
     UCAFL(const UCAFL& ucafl) = delete;
 
@@ -321,7 +324,7 @@ class UCAFL {
             uc_err uc_ret = uc_emu_start(this->uc_, pc, 0, 0, 0);
 
             ERR_CHILD("We are stopping for uc_err=%d (%s)\n", uc_ret,
-                uc_strerror(uc_ret));
+                      uc_strerror(uc_ret));
 
             if (unlikely(uc_ret != UC_ERR_OK) ||
                 (this->always_validate_ && this->validate_crash_callback_)) {
@@ -339,7 +342,7 @@ class UCAFL {
                 }
 
                 ERR_CHILD("UC returned Error: '%s' - let's abort().\n",
-                    uc_strerror(uc_ret));
+                          uc_strerror(uc_ret));
                 fflush(stderr);
 
                 abort();
@@ -380,8 +383,9 @@ class UCAFL {
         ucafl->afl_area_ptr_[cur_loc ^ ucafl->afl_prev_loc_]++;
         ucafl->afl_prev_loc_ = cur_loc >> 1;
 
-        ERR_CHILD("uc_hook_block address=0x%" PRIx64 " cur_loc=%" PRIu64 " prev_loc=%" PRIu64 "\n", address,
-            cur_loc, ucafl->afl_prev_loc_);
+        ERR_CHILD("uc_hook_block address=0x%" PRIx64 " cur_loc=%" PRIu64
+                  " prev_loc=%" PRIu64 "\n",
+                  address, cur_loc, ucafl->afl_prev_loc_);
     }
 
     void _uc_hook_sub_impl_16(uint64_t cur_loc, uint64_t arg1, uint64_t arg2) {
@@ -475,8 +479,7 @@ class UCAFL {
 
         // We need at least Unicorn 2.0.0rc5
         if (ver < MIN_UC_VERSION) {
-            ERR("You Unicorn Version 0x%" PRIx32 " is not supported!\n",
-                ver);
+            ERR("You Unicorn Version 0x%" PRIx32 " is not supported!\n", ver);
             exit(1);
         }
 
@@ -588,7 +591,8 @@ class UCAFL {
                 return UC_AFL_RET_ERROR;
             }
         } else {
-            ERR("AFL++ sharedmap fuzzing not supported/SHM_FUZZ_ENV_VAR not set\n");
+            ERR("AFL++ sharedmap fuzzing not supported/SHM_FUZZ_ENV_VAR not "
+                "set\n");
         }
 
         void (*old_sigchld_handler)(int) = signal(SIGCHLD, SIG_DFL);
@@ -913,7 +917,8 @@ extern "C" UNICORNAFL_EXPORT uc_afl_ret uc_afl_fuzz(
 
     log_init();
 
-    ERR("Entering uc_afl_fuzz with input_file=%s and persistent_iters=%" PRIu32 "\n",
+    ERR("Entering uc_afl_fuzz with input_file=%s and persistent_iters=%" PRIu32
+        "\n",
         input_file, persistent_iters);
     // Sanity Check.
     if (!uc) {
