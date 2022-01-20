@@ -26,7 +26,7 @@ HEADERS_DIR = ROOT_DIR / 'unicornafl' / 'include'
 SRC_DIR = ROOT_DIR / '..' / '..'
 BUILD_DIR = SRC_DIR / 'build_python'
 
-VERSION = "2.0.0"
+VERSION = "2.0.1"
 
 if SYSTEM == 'darwin':
     LIBRARY_FILE = "libunicornafl.dylib"
@@ -130,7 +130,7 @@ setuptools.setup(
     description='Unicornafl',
     long_description=long_desc,
     long_description_content_type="text/markdown",
-    url='http://github.com/wtdcode/unicorn2afl',
+    url='https://github.com/AFLplusplus/unicornafl',
     classifiers=[
         'License :: OSI Approved :: BSD License',
         'Programming Language :: Python :: 2',
