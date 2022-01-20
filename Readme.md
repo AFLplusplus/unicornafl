@@ -42,17 +42,29 @@ python3 -m pip install -e .
 The only API currently unicornafl exposes is:
 
 ```C
-uc_afl_ret uc_afl_fuzz(
-        uc_engine *uc, 
-        char* input_file, 
-        uc_afl_cb_place_input_t place_input_callback, 
-        uint64_t *exits, 
-        size_t exit_count, 
-        uc_afl_cb_validate_crash_t validate_crash_callback, 
-        bool always_validate,
-        uint32_t persistent_iters,
-        void *data
-)
+//
+//  Start our fuzzer.
+//
+//  If no afl-fuzz instance is found, this function is almost identical to ql.run.
+//    
+//  @input_file: This usually is the input file name provided by the command argument.
+//  @place_input_callback: This callback is triggered every time a new child is generated. It returns 
+//                         true if the input is accepted, or the input would be skipped.
+//  @exits: All possible exits.
+//  @validate_crash_callback: This callback is triggered every time to check if we are crashed.                     
+//  @always_validate: If this is set to False, validate_crash_callback will be only triggered if
+//                    uc_emu_start (which is called internally by afl_fuzz) returns an error. Or
+//                    the validate_crash_callback will be triggered every time.
+//  @persistent_iters: Fuzz how many times before forking a new child.
+//
+//  @uc_afl_ret: The error the fuzzer returns.
+UNICORNAFL_EXPORT
+uc_afl_ret uc_afl_fuzz(uc_engine* uc, char* input_file,
+                       uc_afl_cb_place_input_t place_input_callback,
+                       uint64_t* exits, size_t exit_count,
+                       uc_afl_cb_validate_crash_t validate_crash_callback,
+                       bool always_validate, uint32_t persistent_iters,
+                       void* data);
 ```
 
 ## Migration
