@@ -46,7 +46,8 @@ The only API currently unicornafl exposes is:
 //  Start our fuzzer.
 //
 //  If no afl-fuzz instance is found, this function is almost identical to ql.run.
-//    
+//  
+//  @uc: The uc_engine return-ed from uc_open().
 //  @input_file: This usually is the input file name provided by the command argument.
 //  @place_input_callback: This callback is triggered every time a new child is generated. It returns 
 //                         true if the input is accepted, or the input would be skipped.
