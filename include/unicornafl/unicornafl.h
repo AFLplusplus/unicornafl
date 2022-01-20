@@ -35,18 +35,20 @@ typedef bool (*uc_afl_cb_validate_crash_t)(uc_engine* uc, uc_err unicorn_result,
 //
 //  Start our fuzzer.
 //
-//  If no afl-fuzz instance is found, this function is almost identical to ql.run.
+//  If no afl-fuzz instance is found, this function is almost identical to uc_emu_start()
 //  
 //  @uc: The uc_engine return-ed from uc_open().
 //  @input_file: This usually is the input file name provided by the command argument.
 //  @place_input_callback: This callback is triggered every time a new child is generated. It returns 
 //                         true if the input is accepted, or the input would be skipped.
 //  @exits: All possible exits.
+//  @exit_count: The count of the @exits array.
 //  @validate_crash_callback: This callback is triggered every time to check if we are crashed.                     
 //  @always_validate: If this is set to False, validate_crash_callback will be only triggered if
-//                    uc_emu_start (which is called internally by afl_fuzz) returns an error. Or
+//                    uc_emu_start (which is called internally by uc_afl_fuzz) returns an error. Or
 //                    the validate_crash_callback will be triggered every time.
 //  @persistent_iters: Fuzz how many times before forking a new child.
+//  @data: The extra data user provides.
 //
 //  @uc_afl_ret: The error the fuzzer returns.
 UNICORNAFL_EXPORT
