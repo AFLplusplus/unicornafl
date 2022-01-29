@@ -19,6 +19,7 @@
 
 #include <x86intrin.h>
 
+#include <signal.h>
 #include <errno.h>
 #include <chrono>
 #include <cstdlib>
