@@ -11,9 +11,9 @@ option(AFL_DEBUG "Enable debug output" off)
 
 set (CMAKE_CXX_STANDARD 17)
 
-option(UNICORN_BUILD_SHARED "Build shared instead of static library" ON)
+option(BUILD_SHARED_LIBS "Build shared instead of static library" ON)
 
-if (UNICORN_BUILD_SHARED)
+if (BUILD_SHARED_LIBS)
     add_library(unicornafl SHARED unicornafl.cpp)
 else()
     add_library(unicornafl STATIC unicornafl.cpp)
