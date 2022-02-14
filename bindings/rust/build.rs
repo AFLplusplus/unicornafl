@@ -40,9 +40,7 @@ fn main() {
     for arch in [
         "x86_64",
         "arm",
-        "armeb",
         "aarch64",
-        "aarch64eb",
         "riscv32",
         "riscv64",
         "mips",
