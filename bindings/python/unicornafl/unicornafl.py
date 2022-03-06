@@ -95,12 +95,18 @@ class UcAflError(Exception):
 #                                            char* input, int input_len,
 #                                            int persistent_round, void* data);
 
+# typedef uc_err (*uc_afl_fuzz_cb_t)(uc_engine *uc, void *data);
+
 UC_AFL_PLACE_INPUT_CB = ctypes.CFUNCTYPE(
     ctypes.c_bool, ctypes.c_void_p, ctypes.c_char_p, ctypes.c_size_t, ctypes.c_uint32, ctypes.c_void_p
 )
 
 UC_AFL_VALIDATE_CRASH_CB = ctypes.CFUNCTYPE(
     ctypes.c_bool, ctypes.c_void_p, ctypes.c_int, ctypes.c_char_p, ctypes.c_uint32, ctypes.c_int, ctypes.c_void_p
+)
+
+UC_AFL_FUZZ_CALLBACK_CB = ctypes.CFUNCTYPE(
+    ctypes.c_int, ctypes.c_void_p, ctypes.c_void_p
 )
 
 # uc_afl_ret uc_afl_fuzz(uc_engine* uc, char* input_file,
@@ -113,13 +119,22 @@ _uc2afl.uc_afl_fuzz.restype = ctypes.c_int
 _uc2afl.uc_afl_fuzz.argtypes = (ctypes.c_void_p, ctypes.c_char_p, ctypes.c_void_p, ctypes.c_void_p,
                                 ctypes.c_size_t, ctypes.c_void_p, ctypes.c_bool, ctypes.c_uint32, ctypes.c_void_p)
 
+# uc_afl_ret uc_afl_fuzz_ext(uc_engine* uc, char* input_file,
+#                            uc_afl_cb_place_input_t place_input_callback,
+#                            uc_afl_fuzz_cb_t fuzz_callbck,
+#                            uc_afl_cb_validate_crash_t validate_crash_callback,
+#                            bool always_validate, uint32_t persistent_iters,
+#                            void* data)
+_uc2afl.uc_afl_fuzz_ext.restype = ctypes.c_int
+_uc2afl.uc_afl_fuzz_ext.argtypes = (ctypes.c_void_p, ctypes.c_char_p, ctypes.c_void_p, ctypes.c_void_p,
+                                    ctypes.c_void_p, ctypes.c_bool, ctypes.c_uint32, ctypes.c_void_p)
 # Is it necessary?
 _data_dict = {}
 _data_idx = 0
 
 
 def _place_input_cb(uc, input, input_len, persistent_round, idx):
-    cb, _, uc, data = _data_dict[idx]
+    cb, _, _, uc, data = _data_dict[idx]
     input_bs = ctypes.string_at(input, input_len)
     if cb is not None:
         ret = cb(uc, input_bs, persistent_round, data)
@@ -131,7 +146,7 @@ def _place_input_cb(uc, input, input_len, persistent_round, idx):
 
 
 def _validate_crash_cb(uc, result, input, input_len, persistent_round, idx):
-    _, cb, uc, data = _data_dict[idx]
+    _, cb, _, uc, data = _data_dict[idx]
     input_bs = ctypes.string_at(input, input_len)
     if cb is not None:
         ret = cb(uc, result, input_bs, persistent_round, data)
@@ -140,6 +155,11 @@ def _validate_crash_cb(uc, result, input, input_len, persistent_round, idx):
         return True
     else:
         return True
+
+def _fuzz_callback_cb(uc, idx):
+    _, _, cb, uc, data = _data_dict[idx]
+
+    return cb(uc, data)
 
 
 def uc_afl_fuzz(uc: Uc,
@@ -159,7 +179,7 @@ def uc_afl_fuzz(uc: Uc,
 
     _data_idx += 1
     idx = _data_idx # 1 will be interpreted as None so we skip it
-    _data_dict[idx] = (place_input_callback, validate_crash_callback, uc, data)
+    _data_dict[idx] = (place_input_callback, validate_crash_callback, None, uc, data)
     exits_len = len(exits)
     exits_array = (ctypes.c_uint64 * exits_len)()
 
@@ -173,6 +193,43 @@ def uc_afl_fuzz(uc: Uc,
 
     err = _uc2afl.uc_afl_fuzz(uc._uch, input_file.encode("utf-8"), cb1, ctypes.cast(
         exits_array, ctypes.c_void_p), exits_len, cb2, always_validate, persistent_iters, ctypes.cast(idx, ctypes.c_void_p))
+
+    if err != UC_AFL_RET_OK:
+        del _data_dict[idx]
+        raise UcAflError(err)
+
+    del _data_dict[idx]
+    # Really?
+    return err
+
+def uc_afl_fuzz_ext(uc: Uc,
+                    input_file: str,
+                    place_input_callback: Callable,
+                    fuzzing_callback: Callable,
+                    validate_crash_callback: Callable = None,
+                    always_validate: bool = False,
+                    persistent_iters: int = 1,
+                    data: Any = None):
+    global _data_idx, _data_dict
+
+    # Someone else is fuzzing, quit!
+    # For unicornafl compatiblity
+    if len(_data_dict) != 0:
+        raise UcAflError(UC_AFL_RET_CALLED_TWICE)
+
+    _data_idx += 1
+    idx = _data_idx # 1 will be interpreted as None so we skip it
+    _data_dict[idx] = (place_input_callback, validate_crash_callback, fuzzing_callback, uc, data)
+
+    cb1 = ctypes.cast(UC_AFL_PLACE_INPUT_CB(
+        _place_input_cb), UC_AFL_PLACE_INPUT_CB)
+    cb2 = ctypes.cast(UC_AFL_VALIDATE_CRASH_CB(
+        _validate_crash_cb), UC_AFL_VALIDATE_CRASH_CB)
+    cb3 = ctypes.cast(UC_AFL_FUZZ_CALLBACK_CB(
+        _fuzz_callback_cb), UC_AFL_FUZZ_CALLBACK_CB)
+
+    err = _uc2afl.uc_afl_fuzz_ext(uc._uch, input_file.encode("utf-8"), cb1, cb3, 
+        cb2, always_validate, persistent_iters, ctypes.cast(idx, ctypes.c_void_p))
 
     if err != UC_AFL_RET_OK:
         del _data_dict[idx]
