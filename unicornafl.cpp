@@ -87,8 +87,8 @@ static void log(bool in_child, const char* fmt, ...) {
 #define ERR_CHILD(...)
 #endif
 
-static uc_err dummy_uc_afl_fuzz_callback(uc_engine *uc, void *data);
-static uint64_t uc_get_pc(uc_engine *uc);
+static uc_err dummy_uc_afl_fuzz_callback(uc_engine* uc, void* data);
+static uint64_t uc_get_pc(uc_engine* uc);
 
 class UCAFL {
 
@@ -96,13 +96,12 @@ class UCAFL {
     UCAFL(uc_engine* uc, const char* input_file,
           uc_afl_cb_place_input_t place_input_callback,
           uc_afl_cb_validate_crash_t validate_crash_callback,
-          uc_afl_fuzz_cb_t fuzz_callback,
-          bool always_validate, uint32_t persistent_iters, void* data)
+          uc_afl_fuzz_cb_t fuzz_callback, bool always_validate,
+          uint32_t persistent_iters, void* data)
         : uc_(uc), input_file_(input_file),
           place_input_callback_(place_input_callback),
           validate_crash_callback_(validate_crash_callback),
-          fuzz_callback_(fuzz_callback),
-          always_validate_(always_validate),
+          fuzz_callback_(fuzz_callback), always_validate_(always_validate),
           persistent_iters_(persistent_iters), data_(data),
           afl_testcase_ptr_(nullptr), afl_testcase_len_p_(nullptr),
           afl_area_ptr_(nullptr), has_afl_(false), afl_prev_loc_(0), h1_(0),
@@ -877,16 +876,16 @@ class UCAFL {
     uc_hook h4_;
 };
 
-static uc_err dummy_uc_afl_fuzz_callback(uc_engine *uc, void *data) {
+static uc_err dummy_uc_afl_fuzz_callback(uc_engine* uc, void* data) {
     uint64_t pc;
 
     pc = uc_get_pc(uc);
 
     // Note the multiple exits is enabled in this case.
-    return uc_emu_start(uc, pc, 0, 0 ,0);
+    return uc_emu_start(uc, pc, 0, 0, 0);
 }
 
-static uint64_t uc_get_pc(uc_engine *uc) {
+static uint64_t uc_get_pc(uc_engine* uc) {
     uc_arch arch;
     uc_mode mode;
     uint64_t pc = 0;
@@ -963,8 +962,9 @@ extern "C" UNICORNAFL_EXPORT uc_afl_ret uc_afl_fuzz(
         return UC_AFL_RET_ERROR;
     }
 
-    UCAFL ucafl(uc, input_file, place_input_callback, validate_crash_callback, dummy_uc_afl_fuzz_callback,
-                always_validate, persistent_iters, data);
+    UCAFL ucafl(uc, input_file, place_input_callback, validate_crash_callback,
+                dummy_uc_afl_fuzz_callback, always_validate, persistent_iters,
+                data);
 
     if (unlikely(ucafl.set_exits(exits, exit_count))) {
         return UC_AFL_RET_ERROR;
@@ -978,7 +978,7 @@ extern "C" UNICORNAFL_EXPORT uc_afl_ret uc_afl_fuzz_ext(
     uc_afl_cb_place_input_t place_input_callback, uc_afl_fuzz_cb_t fuzz_callbck,
     uc_afl_cb_validate_crash_t validate_crash_callback, bool always_validate,
     uint32_t persistent_iters, void* data) {
-    
+
     log_init();
 
     if (!uc) {
@@ -1002,8 +1002,8 @@ extern "C" UNICORNAFL_EXPORT uc_afl_ret uc_afl_fuzz_ext(
         return UC_AFL_RET_ERROR;
     }
 
-    UCAFL ucafl(uc, input_file, place_input_callback, validate_crash_callback, fuzz_callbck,
-                always_validate, persistent_iters, data);
+    UCAFL ucafl(uc, input_file, place_input_callback, validate_crash_callback,
+                fuzz_callbck, always_validate, persistent_iters, data);
 
     return ucafl.fsrv_run();
 }
