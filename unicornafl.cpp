@@ -87,17 +87,21 @@ static void log(bool in_child, const char* fmt, ...) {
 #define ERR_CHILD(...)
 #endif
 
+static uc_err dummy_uc_afl_fuzz_callback(uc_engine* uc, void* data);
+static uint64_t uc_get_pc(uc_engine* uc);
+
 class UCAFL {
 
   public:
     UCAFL(uc_engine* uc, const char* input_file,
           uc_afl_cb_place_input_t place_input_callback,
           uc_afl_cb_validate_crash_t validate_crash_callback,
-          bool always_validate, uint32_t persistent_iters, void* data)
+          uc_afl_fuzz_cb_t fuzz_callback, bool always_validate,
+          uint32_t persistent_iters, void* data)
         : uc_(uc), input_file_(input_file),
           place_input_callback_(place_input_callback),
           validate_crash_callback_(validate_crash_callback),
-          always_validate_(always_validate),
+          fuzz_callback_(fuzz_callback), always_validate_(always_validate),
           persistent_iters_(persistent_iters), data_(data),
           afl_testcase_ptr_(nullptr), afl_testcase_len_p_(nullptr),
           afl_area_ptr_(nullptr), has_afl_(false), afl_prev_loc_(0), h1_(0),
@@ -245,48 +249,6 @@ class UCAFL {
         UCAFL* ucafl_;
     };
 
-    uint64_t _get_pc() {
-        uc_arch arch;
-        uc_mode mode;
-        uint64_t pc = 0;
-
-        uc_ctl_get_arch(this->uc_, &arch);
-        uc_ctl_get_mode(this->uc_, &mode);
-
-        if (arch == UC_ARCH_X86) {
-            if (mode == UC_MODE_32) {
-                uc_reg_read(this->uc_, UC_X86_REG_EIP, &pc);
-            } else if (mode == UC_MODE_16) {
-                uc_reg_read(this->uc_, UC_X86_REG_IP, &pc);
-            } else {
-                uc_reg_read(this->uc_, UC_X86_REG_RIP, &pc);
-            }
-        } else if (arch == UC_ARCH_ARM) {
-            uint64_t cpsr = 0;
-            uc_reg_read(this->uc_, UC_ARM_REG_PC, &pc);
-
-            // check for thumb mode
-            uc_reg_read(this->uc_, UC_ARM_REG_CPSR, &cpsr);
-            if (cpsr & 0x20) {
-                // thumb mode, the address should end with 1
-                pc |= 1;
-            }
-
-        } else if (arch == UC_ARCH_RISCV) {
-            uc_reg_read(this->uc_, UC_RISCV_REG_PC, &pc);
-        } else if (arch == UC_ARCH_MIPS) {
-            uc_reg_read(this->uc_, UC_MIPS_REG_PC, &pc);
-        } else if (arch == UC_ARCH_PPC) {
-            uc_reg_read(this->uc_, UC_PPC_REG_PC, &pc);
-        } else if (arch == UC_ARCH_SPARC) {
-            uc_reg_read(this->uc_, UC_SPARC_REG_PC, &pc);
-        } else if (arch == UC_ARCH_M68K) {
-            uc_reg_read(this->uc_, UC_M68K_REG_PC, &pc);
-        }
-
-        return pc;
-    }
-
     uc_afl_ret _child_fuzz(bool afl_exist) {
         bool crash_found = false;
         bool first_round = true;
@@ -315,14 +277,7 @@ class UCAFL {
                 continue;
             }
 
-            // (Lazymio): maybe we cant get rid of this small overhead in the
-            // future?
-            uint64_t pc = this->_get_pc();
-
-            ERR_CHILD("We are starting from 0x%" PRIx64 "\n", pc);
-
-            // Note we have enabled exits.
-            uc_err uc_ret = uc_emu_start(this->uc_, pc, 0, 0, 0);
+            uc_err uc_ret = this->fuzz_callback_(this->uc_, this->data_);
 
             ERR_CHILD("We are stopping for uc_err=%d (%s)\n", uc_ret,
                       uc_strerror(uc_ret));
@@ -890,6 +845,7 @@ class UCAFL {
     const char* input_file_;
     uc_afl_cb_place_input_t place_input_callback_;
     uc_afl_cb_validate_crash_t validate_crash_callback_;
+    uc_afl_fuzz_cb_t fuzz_callback_;
     bool always_validate_;
     uint32_t persistent_iters_;
     void* data_;
@@ -919,6 +875,59 @@ class UCAFL {
     uc_hook h3_;
     uc_hook h4_;
 };
+
+static uc_err dummy_uc_afl_fuzz_callback(uc_engine* uc, void* data) {
+    uint64_t pc;
+
+    pc = uc_get_pc(uc);
+
+    // Note the multiple exits is enabled in this case.
+    return uc_emu_start(uc, pc, 0, 0, 0);
+}
+
+static uint64_t uc_get_pc(uc_engine* uc) {
+    uc_arch arch;
+    uc_mode mode;
+    uint64_t pc = 0;
+
+    uc_ctl_get_arch(uc, &arch);
+    uc_ctl_get_mode(uc, &mode);
+
+    if (arch == UC_ARCH_X86) {
+        if (mode == UC_MODE_32) {
+            uc_reg_read(uc, UC_X86_REG_EIP, &pc);
+        } else if (mode == UC_MODE_16) {
+            uc_reg_read(uc, UC_X86_REG_IP, &pc);
+        } else {
+            uc_reg_read(uc, UC_X86_REG_RIP, &pc);
+        }
+    } else if (arch == UC_ARCH_ARM) {
+        uint64_t cpsr = 0;
+        uc_reg_read(uc, UC_ARM_REG_PC, &pc);
+
+        // check for thumb mode
+        uc_reg_read(uc, UC_ARM_REG_CPSR, &cpsr);
+        if (cpsr & 0x20) {
+            // thumb mode, the address should end with 1
+            pc |= 1;
+        }
+
+    } else if (arch == UC_ARCH_RISCV) {
+        uc_reg_read(uc, UC_RISCV_REG_PC, &pc);
+    } else if (arch == UC_ARCH_MIPS) {
+        uc_reg_read(uc, UC_MIPS_REG_PC, &pc);
+    } else if (arch == UC_ARCH_PPC) {
+        uc_reg_read(uc, UC_PPC_REG_PC, &pc);
+    } else if (arch == UC_ARCH_SPARC) {
+        uc_reg_read(uc, UC_SPARC_REG_PC, &pc);
+    } else if (arch == UC_ARCH_M68K) {
+        uc_reg_read(uc, UC_M68K_REG_PC, &pc);
+    } else if (arch == UC_ARCH_S390X) {
+        uc_reg_read(uc, UC_S390X_REG_PC, &pc);
+    }
+
+    return pc;
+}
 
 extern "C" UNICORNAFL_EXPORT uc_afl_ret uc_afl_fuzz(
     uc_engine* uc, char* input_file,
@@ -954,11 +963,47 @@ extern "C" UNICORNAFL_EXPORT uc_afl_ret uc_afl_fuzz(
     }
 
     UCAFL ucafl(uc, input_file, place_input_callback, validate_crash_callback,
-                always_validate, persistent_iters, data);
+                dummy_uc_afl_fuzz_callback, always_validate, persistent_iters,
+                data);
 
     if (unlikely(ucafl.set_exits(exits, exit_count))) {
         return UC_AFL_RET_ERROR;
     }
+
+    return ucafl.fsrv_run();
+}
+
+extern "C" UNICORNAFL_EXPORT uc_afl_ret uc_afl_fuzz_custom(
+    uc_engine* uc, char* input_file,
+    uc_afl_cb_place_input_t place_input_callback, uc_afl_fuzz_cb_t fuzz_callbck,
+    uc_afl_cb_validate_crash_t validate_crash_callback, bool always_validate,
+    uint32_t persistent_iters, void* data) {
+
+    log_init();
+
+    if (!uc) {
+        ERR("Unicorn Engine passed to uc_afl_fuzz is NULL!\n");
+        return UC_AFL_RET_ERROR;
+    }
+    if (!input_file || input_file[0] == 0) {
+        ERR("No input file provided to uc_afl_fuzz.\n");
+        return UC_AFL_RET_ERROR;
+    }
+    if (!place_input_callback) {
+        ERR("no place_input_callback set.\n");
+        return UC_AFL_RET_ERROR;
+    }
+    if (always_validate && !validate_crash_callback) {
+        ERR("always_validate set but validate_crash_callback is missing.\n");
+        return UC_AFL_RET_ERROR;
+    }
+    if (!fuzz_callbck) {
+        ERR("No fuzz_callback set.\n");
+        return UC_AFL_RET_ERROR;
+    }
+
+    UCAFL ucafl(uc, input_file, place_input_callback, validate_crash_callback,
+                fuzz_callbck, always_validate, persistent_iters, data);
 
     return ucafl.fsrv_run();
 }

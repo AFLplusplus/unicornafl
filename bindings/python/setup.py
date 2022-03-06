@@ -145,7 +145,7 @@ setuptools.setup(
     zip_safe=False,
     include_package_data=True,
     install_requires=[
-        "unicorn>=2.0.0rc5"
+        "unicorn>=2.0.0rc6"
     ],
     is_pure=False,
     package_data={
