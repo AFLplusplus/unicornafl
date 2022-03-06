@@ -67,14 +67,13 @@ uc_afl_ret uc_afl_fuzz(uc_engine* uc, char* input_file,
 //
 // To implement more complex fuzzing logic, pass an extra fuzzing_callback with this API.
 //
-//
 UNICORN_EXPORT
-uc_afl_ret uc_afl_fuzz_ext(uc_engine* uc, char* input_file,
-                           uc_afl_cb_place_input_t place_input_callback,
-                           uc_afl_fuzz_cb_t fuzz_callbck,
-                           uc_afl_cb_validate_crash_t validate_crash_callback,
-                           bool always_validate, uint32_t persistent_iters,
-                           void* data);
+uc_afl_ret uc_afl_fuzz_custom(uc_engine* uc, char* input_file,
+                              uc_afl_cb_place_input_t place_input_callback,
+                              uc_afl_fuzz_cb_t fuzz_callbck,
+                              uc_afl_cb_validate_crash_t validate_crash_callback,
+                              bool always_validate, uint32_t persistent_iters,
+                              void* data);
 
 #ifdef __cplusplus
 }

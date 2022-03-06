@@ -119,14 +119,14 @@ _uc2afl.uc_afl_fuzz.restype = ctypes.c_int
 _uc2afl.uc_afl_fuzz.argtypes = (ctypes.c_void_p, ctypes.c_char_p, ctypes.c_void_p, ctypes.c_void_p,
                                 ctypes.c_size_t, ctypes.c_void_p, ctypes.c_bool, ctypes.c_uint32, ctypes.c_void_p)
 
-# uc_afl_ret uc_afl_fuzz_ext(uc_engine* uc, char* input_file,
+# uc_afl_ret uc_afl_fuzz_custom(uc_engine* uc, char* input_file,
 #                            uc_afl_cb_place_input_t place_input_callback,
 #                            uc_afl_fuzz_cb_t fuzz_callbck,
 #                            uc_afl_cb_validate_crash_t validate_crash_callback,
 #                            bool always_validate, uint32_t persistent_iters,
 #                            void* data)
-_uc2afl.uc_afl_fuzz_ext.restype = ctypes.c_int
-_uc2afl.uc_afl_fuzz_ext.argtypes = (ctypes.c_void_p, ctypes.c_char_p, ctypes.c_void_p, ctypes.c_void_p,
+_uc2afl.uc_afl_fuzz_custom.restype = ctypes.c_int
+_uc2afl.uc_afl_fuzz_custom.argtypes = (ctypes.c_void_p, ctypes.c_char_p, ctypes.c_void_p, ctypes.c_void_p,
                                     ctypes.c_void_p, ctypes.c_bool, ctypes.c_uint32, ctypes.c_void_p)
 # Is it necessary?
 _data_dict = {}
@@ -202,14 +202,14 @@ def uc_afl_fuzz(uc: Uc,
     # Really?
     return err
 
-def uc_afl_fuzz_ext(uc: Uc,
-                    input_file: str,
-                    place_input_callback: Callable,
-                    fuzzing_callback: Callable,
-                    validate_crash_callback: Callable = None,
-                    always_validate: bool = False,
-                    persistent_iters: int = 1,
-                    data: Any = None):
+def uc_afl_fuzz_custom(uc: Uc,
+                       input_file: str,
+                       place_input_callback: Callable,
+                       fuzzing_callback: Callable,
+                       validate_crash_callback: Callable = None,
+                       always_validate: bool = False,
+                       persistent_iters: int = 1,
+                       data: Any = None):
     global _data_idx, _data_dict
 
     # Someone else is fuzzing, quit!
@@ -228,7 +228,7 @@ def uc_afl_fuzz_ext(uc: Uc,
     cb3 = ctypes.cast(UC_AFL_FUZZ_CALLBACK_CB(
         _fuzz_callback_cb), UC_AFL_FUZZ_CALLBACK_CB)
 
-    err = _uc2afl.uc_afl_fuzz_ext(uc._uch, input_file.encode("utf-8"), cb1, cb3, 
+    err = _uc2afl.uc_afl_fuzz_custom(uc._uch, input_file.encode("utf-8"), cb1, cb3, 
         cb2, always_validate, persistent_iters, ctypes.cast(idx, ctypes.c_void_p))
 
     if err != UC_AFL_RET_OK:

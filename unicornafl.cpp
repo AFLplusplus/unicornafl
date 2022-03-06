@@ -973,7 +973,7 @@ extern "C" UNICORNAFL_EXPORT uc_afl_ret uc_afl_fuzz(
     return ucafl.fsrv_run();
 }
 
-extern "C" UNICORNAFL_EXPORT uc_afl_ret uc_afl_fuzz_ext(
+extern "C" UNICORNAFL_EXPORT uc_afl_ret uc_afl_fuzz_custom(
     uc_engine* uc, char* input_file,
     uc_afl_cb_place_input_t place_input_callback, uc_afl_fuzz_cb_t fuzz_callbck,
     uc_afl_cb_validate_crash_t validate_crash_callback, bool always_validate,
