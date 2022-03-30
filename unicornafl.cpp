@@ -911,7 +911,6 @@ static uint64_t uc_get_pc(uc_engine* uc) {
             // thumb mode, the address should end with 1
             pc |= 1;
         }
-
     } else if (arch == UC_ARCH_RISCV) {
         uc_reg_read(uc, UC_RISCV_REG_PC, &pc);
     } else if (arch == UC_ARCH_MIPS) {
@@ -924,6 +923,8 @@ static uint64_t uc_get_pc(uc_engine* uc) {
         uc_reg_read(uc, UC_M68K_REG_PC, &pc);
     } else if (arch == UC_ARCH_S390X) {
         uc_reg_read(uc, UC_S390X_REG_PC, &pc);
+    } else if (arch == UC_ARCH_ARM64) {
+        uc_reg_read(uc, UC_ARM64_REG_PC, &pc);
     }
 
     return pc;
