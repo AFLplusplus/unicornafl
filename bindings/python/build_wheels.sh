@@ -10,5 +10,6 @@ else
   python3 setup.py bdist_wheel
 fi
 cd dist
-auditwheel repair *.whl
+python3 -m pip install --user auditwheel
+python3 ../auditwheel repair *.whl
 mv -f wheelhouse/*.whl .
