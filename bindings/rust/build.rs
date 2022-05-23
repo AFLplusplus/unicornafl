@@ -33,7 +33,7 @@ fn main() {
 
     add_lib("../../build", "unicornafl");
 
-    add_lib("../../build/unicorn", "unicorn");
+    add_lib("../../build/unicorn", "unicorn-static");
     add_lib("../../build/unicorn", "unicorn-common");
 
     //println!("cargo:rustc-link-lib=static=unicorn");
