@@ -10,13 +10,13 @@
                      Dominik Maier <mail@dmnk.co>
 
    Copyright 2016, 2017 Google Inc. All rights reserved.
-   Copyright 2019-2021 AFLplusplus Project. All rights reserved.
+   Copyright 2019-2022 AFLplusplus Project. All rights reserved.
 
    Licensed under the Apache License, Version 2.0 (the "License");
    you may not use this file except in compliance with the License.
    You may obtain a copy of the License at:
 
-     http://www.apache.org/licenses/LICENSE-2.0
+     https://www.apache.org/licenses/LICENSE-2.0
 
  */
 
@@ -26,7 +26,7 @@
 /* Version string: */
 
 // c = release, a = volatile github dev, e = experimental branch
-#define VERSION "++3.15a"
+#define VERSION "++4.03a"
 
 /******************************************************
  *                                                    *
@@ -99,10 +99,10 @@
 #define USE_COLOR
 
 #ifdef USE_COLOR
-/* Comment in to always enable terminal colors */
-/* Comment out to enable runtime controlled terminal colors via AFL_NO_COLOR
- */
-#define ALWAYS_COLORED 1
+  /* Comment in to always enable terminal colors */
+  /* Comment out to enable runtime controlled terminal colors via AFL_NO_COLOR
+   */
+  #define ALWAYS_COLORED 1
 #endif
 
 /* StatsD config
@@ -120,8 +120,8 @@
 
 /* Comment out to disable fancy ANSI boxes and use poor man's 7-bit UI: */
 
-#ifndef ANDROID_DISABLE_FANCY // Fancy boxes are ugly from adb
-#define FANCY_BOXES
+#ifndef ANDROID_DISABLE_FANCY  // Fancy boxes are ugly from adb
+  #define FANCY_BOXES
 #endif
 
 /* Default timeout for fuzzed code (milliseconds). This is the upper bound,
@@ -135,7 +135,7 @@
 
 /* 64bit arch MACRO */
 #if (defined(__x86_64__) || defined(__arm64__) || defined(__aarch64__))
-#define WORD_SIZE_64 1
+  #define WORD_SIZE_64 1
 #endif
 
 /* Default memory limit for child process (MB) 0 = disabled : */
@@ -153,8 +153,9 @@
 /* Number of calibration cycles per every new test case (and for test
    cases that show variable behavior): */
 
-#define CAL_CYCLES 8U
-#define CAL_CYCLES_LONG 20U
+#define CAL_CYCLES_FAST 3U
+#define CAL_CYCLES 7U
+#define CAL_CYCLES_LONG 12U
 
 /* Number of subsequent timeouts before abandoning an input file: */
 
@@ -210,9 +211,9 @@
 /* Probabilities of skipping non-favored entries in the queue, expressed as
    percentages: */
 
-#define SKIP_TO_NEW_PROB 99   /* ...when there are new, pending favorites */
-#define SKIP_NFAV_OLD_PROB 95 /* ...no new favs, cur entry already fuzzed */
-#define SKIP_NFAV_NEW_PROB 75 /* ...no new favs, cur entry not fuzzed yet */
+#define SKIP_TO_NEW_PROB 99     /* ...when there are new, pending favorites */
+#define SKIP_NFAV_OLD_PROB 95   /* ...no new favs, cur entry already fuzzed */
+#define SKIP_NFAV_NEW_PROB 75   /* ...no new favs, cur entry not fuzzed yet */
 
 /* Splicing cycle count: */
 
@@ -267,8 +268,8 @@
    (first value), and to keep in memory as candidates. The latter should be much
    higher than the former. */
 
-#define USE_AUTO_EXTRAS 128
-#define MAX_AUTO_EXTRAS (USE_AUTO_EXTRAS * 64)
+#define USE_AUTO_EXTRAS 4096
+#define MAX_AUTO_EXTRAS (USE_AUTO_EXTRAS * 8)
 
 /* Scaling factor for the effector map used to skip some of the more
    expensive deterministic steps. The actual divisor is set to
@@ -317,42 +318,42 @@
 
 /* List of interesting values to use in fuzzing. */
 
-#define INTERESTING_8                                                          \
-    -128,    /* Overflow signed 8-bit when decremented  */                     \
-        -1,  /*                                         */                     \
-        0,   /*                                         */                     \
-        1,   /*                                         */                     \
-        16,  /* One-off with common buffer size         */                     \
-        32,  /* One-off with common buffer size         */                     \
-        64,  /* One-off with common buffer size         */                     \
-        100, /* One-off with common buffer size         */                     \
-        127  /* Overflow signed 8-bit when incremented  */
+#define INTERESTING_8                                    \
+  -128,    /* Overflow signed 8-bit when decremented  */ \
+      -1,  /*                                         */ \
+      0,   /*                                         */ \
+      1,   /*                                         */ \
+      16,  /* One-off with common buffer size         */ \
+      32,  /* One-off with common buffer size         */ \
+      64,  /* One-off with common buffer size         */ \
+      100, /* One-off with common buffer size         */ \
+      127                        /* Overflow signed 8-bit when incremented  */
 
 #define INTERESTING_8_LEN 9
 
-#define INTERESTING_16                                                         \
-    -32768,   /* Overflow signed 16-bit when decremented */                    \
-        -129, /* Overflow signed 8-bit                   */                    \
-        128,  /* Overflow signed 8-bit                   */                    \
-        255,  /* Overflow unsig 8-bit when incremented   */                    \
-        256,  /* Overflow unsig 8-bit                    */                    \
-        512,  /* One-off with common buffer size         */                    \
-        1000, /* One-off with common buffer size         */                    \
-        1024, /* One-off with common buffer size         */                    \
-        4096, /* One-off with common buffer size         */                    \
-        32767 /* Overflow signed 16-bit when incremented */
+#define INTERESTING_16                                    \
+  -32768,   /* Overflow signed 16-bit when decremented */ \
+      -129, /* Overflow signed 8-bit                   */ \
+      128,  /* Overflow signed 8-bit                   */ \
+      255,  /* Overflow unsig 8-bit when incremented   */ \
+      256,  /* Overflow unsig 8-bit                    */ \
+      512,  /* One-off with common buffer size         */ \
+      1000, /* One-off with common buffer size         */ \
+      1024, /* One-off with common buffer size         */ \
+      4096, /* One-off with common buffer size         */ \
+      32767                      /* Overflow signed 16-bit when incremented */
 
 #define INTERESTING_16_LEN 10
 
-#define INTERESTING_32                                                         \
-    -2147483648LL,  /* Overflow signed 32-bit when decremented */              \
-        -100663046, /* Large negative number (endian-agnostic) */              \
-        -32769,     /* Overflow signed 16-bit                  */              \
-        32768,      /* Overflow signed 16-bit                  */              \
-        65535,      /* Overflow unsig 16-bit when incremented  */              \
-        65536,      /* Overflow unsig 16 bit                   */              \
-        100663045,  /* Large positive number (endian-agnostic) */              \
-        2147483647  /* Overflow signed 32-bit when incremented */
+#define INTERESTING_32                                          \
+  -2147483648LL,  /* Overflow signed 32-bit when decremented */ \
+      -100663046, /* Large negative number (endian-agnostic) */ \
+      -32769,     /* Overflow signed 16-bit                  */ \
+      32768,      /* Overflow signed 16-bit                  */ \
+      65535,      /* Overflow unsig 16-bit when incremented  */ \
+      65536,      /* Overflow unsig 16 bit                   */ \
+      100663045,  /* Large positive number (endian-agnostic) */ \
+      2147483647                 /* Overflow signed 32-bit when incremented */
 
 #define INTERESTING_32_LEN 8
 
@@ -506,4 +507,5 @@
 
 #define AFL_TXT_STRING_MAX_MUTATIONS 6
 
-#endif /* ! _HAVE_CONFIG_H */
+#endif                                                  /* ! _HAVE_CONFIG_H */
+

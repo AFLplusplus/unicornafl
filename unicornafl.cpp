@@ -17,8 +17,6 @@
 #include <sys/select.h>
 #include <sys/fcntl.h>
 
-#include <x86intrin.h>
-
 #include <signal.h>
 #include <errno.h>
 #include <chrono>

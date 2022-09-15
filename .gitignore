@@ -5,3 +5,5 @@ bindings/python/unicornafl.egg-info/
 bindings/python/unicornafl/__pycache__/
 bindings/python/unicornafl/include/
 bindings/python/unicornafl/lib/
+bindings/python/dist/
+build_python/
