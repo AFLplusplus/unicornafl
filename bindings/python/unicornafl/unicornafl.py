@@ -98,7 +98,7 @@ class UcAflError(Exception):
 # typedef uc_err (*uc_afl_fuzz_cb_t)(uc_engine *uc, void *data);
 
 UC_AFL_PLACE_INPUT_CB = ctypes.CFUNCTYPE(
-    ctypes.c_bool, ctypes.c_void_p, ctypes.c_char_p, ctypes.c_size_t, ctypes.c_uint32, ctypes.c_void_p
+    ctypes.c_bool, ctypes.c_void_p, ctypes.c_void_p, ctypes.c_size_t, ctypes.c_uint32, ctypes.c_void_p
 )
 
 UC_AFL_VALIDATE_CRASH_CB = ctypes.CFUNCTYPE(
