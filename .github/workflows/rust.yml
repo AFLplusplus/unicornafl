@@ -1,0 +1,35 @@
+name: Rust
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  build:
+    runs-on: ${{ matrix.config.os }}
+    name: ${{ matrix.config.name }}
+    strategy:
+      fail-fast: false
+      matrix:
+        config:
+          - os: ubuntu-latest,
+            arch: x64,
+          - os: ubuntu-latest,
+            arch: x32,
+          - os: macos-latest,
+            arch: x64,
+    steps:
+    - uses: actions/checkout@v3
+    - name: '🛠️ Checkout submodules'
+      run: git submodule update --init
+    - name: build
+      run: make -j `nproc`
+    - name: rust-cargo
+      uses: actions-rs/cargo@v1.0.1
+      with:
+        command: build
