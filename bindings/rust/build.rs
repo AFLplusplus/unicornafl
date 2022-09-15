@@ -15,7 +15,6 @@ fn add_lib(path: &str, name: &str) {
 }
 
 fn main() {
-    println!("cargo:rerun-if-changed=unicornafl");
     println!("cargo:rerun-if-changed=src");
     println!("cargo:rerun-if-changed=../../include");
     println!("cargo:rerun-if-changed=../../unicornafl.cpp");
