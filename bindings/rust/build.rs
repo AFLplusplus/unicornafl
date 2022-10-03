@@ -52,6 +52,7 @@ fn main() {
         "ppc",
         "ppc64",
         "s390x",
+        "tricore",
     ]
     .iter()
     {
