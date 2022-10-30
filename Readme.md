@@ -96,3 +96,10 @@ import unicornafl
 
 unicornafl.uc_afl_fuzz(uc, ...)
 ```
+
+## Debugging
+
+UnicornAFL supports debugging in a similar way to AFL++.
+Setting the environment variable `AFL_DEBUG` will provide additional output relating to the forkserver and interaction between parent and child processes during execution.
+As usual with AFL++, `AFL_DEBUG_CHILD` will enable the output of the fuzzed children.
+This output can be further enriched via the `AFL_DEBUG_UNICORN` variable, which will detail information about child execution including block translations, hooks, and encountered errors. Note that this variable also requires `AFL_DEBUG_CHILD` to be set, as the output is provided from child context.

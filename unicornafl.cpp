@@ -23,7 +23,7 @@
 #include <cstdlib>
 
 static bool afl_debug_enabled = false;       // General debug message
-static bool afl_debug_child_enabled = false; // Child specific debug message
+static bool afl_debug_unicorn_enabled = false; // Unicorn specific debug messages from child
 static std::chrono::time_point<std::chrono::steady_clock> t0;
 
 static void log_init() {
@@ -31,8 +31,8 @@ static void log_init() {
         afl_debug_enabled = true;
     }
 
-    if (getenv("AFL_DEBUG_CHILD")) {
-        afl_debug_child_enabled = true;
+    if (getenv("AFL_DEBUG_UNICORN")) {
+        afl_debug_unicorn_enabled = true;
     }
 
     t0 = std::chrono::steady_clock::now();
@@ -41,11 +41,11 @@ static void log_init() {
 static void log(bool in_child, const char* fmt, ...) {
     va_list args;
 
-    if (likely(!afl_debug_enabled && !afl_debug_child_enabled)) {
+    if (likely(!afl_debug_enabled && !afl_debug_unicorn_enabled)) {
         return;
     }
 
-    if (in_child && !afl_debug_child_enabled) {
+    if (in_child && !afl_debug_unicorn_enabled) {
         return;
     }
 
@@ -64,7 +64,7 @@ static void log(bool in_child, const char* fmt, ...) {
                 .count());
     }
 
-    if (in_child && afl_debug_child_enabled) {
+    if (in_child && afl_debug_unicorn_enabled) {
         pid_t p = getpid();
 
         fprintf(stderr, "[%04" PRId32 "] ", p);
