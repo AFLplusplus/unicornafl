@@ -135,7 +135,7 @@ _data_idx = 0
 
 def _place_input_cb(uc, input, input_len, persistent_round, idx):
     cb, _, _, uc, data = _data_dict[idx]
-    input_bs = ctypes.string_at(input, input_len)
+    input_bs = ctypes.cast(input, ctypes.POINTER(ctypes.c_char * input_len)).contents
     if cb is not None:
         ret = cb(uc, input_bs, persistent_round, data)
         if ret is False: # None is considered as True, for unicornafl compatibility
@@ -147,7 +147,7 @@ def _place_input_cb(uc, input, input_len, persistent_round, idx):
 
 def _validate_crash_cb(uc, result, input, input_len, persistent_round, idx):
     _, cb, _, uc, data = _data_dict[idx]
-    input_bs = ctypes.string_at(input, input_len)
+    input_bs = ctypes.cast(input, ctypes.POINTER(ctypes.c_char * input_len)).contents
     if cb is not None:
         ret = cb(uc, result, input_bs, persistent_round, data)
         if ret is False: # None is considered as True, for unicornafl compatibility
