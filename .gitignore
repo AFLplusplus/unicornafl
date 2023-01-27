@@ -7,3 +7,5 @@ bindings/python/unicornafl/include/
 bindings/python/unicornafl/lib/
 bindings/python/dist/
 build_python/
+target/
+Cargo.lock
