@@ -26,7 +26,7 @@ HEADERS_DIR = ROOT_DIR / 'unicornafl' / 'include'
 SRC_DIR = ROOT_DIR / '..' / '..'
 BUILD_DIR = SRC_DIR / 'build_python'
 
-VERSION = "2.0.2"
+VERSION = "2.1.0"
 
 if SYSTEM == 'darwin':
     LIBRARY_FILE = "libunicornafl.dylib"
@@ -145,7 +145,7 @@ setuptools.setup(
     zip_safe=False,
     include_package_data=True,
     install_requires=[
-        "unicorn>=2.0.0rc7"
+        "unicorn>=2.0.1"
     ],
     is_pure=False,
     package_data={

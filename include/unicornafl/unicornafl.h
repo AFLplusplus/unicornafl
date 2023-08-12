@@ -13,7 +13,7 @@ extern "C" {
 #define UNICORNAFL_EXPORT
 #endif
 
-#define MIN_UC_VERSION 0x02000006
+#define MIN_UC_VERSION 0x02000100
 
 typedef enum uc_afl_ret {
     UC_AFL_RET_OK = 0,
