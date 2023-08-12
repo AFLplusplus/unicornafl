@@ -81,7 +81,7 @@
    will be kept and written to the crash/ directory as RECORD:... files.
    Note that every crash will be written, not only unique ones! */
 
-//#define AFL_PERSISTENT_RECORD
+// #define AFL_PERSISTENT_RECORD
 
 /* console output colors: There are three ways to configure its behavior
  * 1. default: colored outputs fixed on: defined USE_COLOR && defined
@@ -99,10 +99,10 @@
 #define USE_COLOR
 
 #ifdef USE_COLOR
-  /* Comment in to always enable terminal colors */
-  /* Comment out to enable runtime controlled terminal colors via AFL_NO_COLOR
-   */
-  #define ALWAYS_COLORED 1
+/* Comment in to always enable terminal colors */
+/* Comment out to enable runtime controlled terminal colors via AFL_NO_COLOR
+ */
+#define ALWAYS_COLORED 1
 #endif
 
 /* StatsD config
@@ -120,8 +120,8 @@
 
 /* Comment out to disable fancy ANSI boxes and use poor man's 7-bit UI: */
 
-#ifndef ANDROID_DISABLE_FANCY  // Fancy boxes are ugly from adb
-  #define FANCY_BOXES
+#ifndef ANDROID_DISABLE_FANCY // Fancy boxes are ugly from adb
+#define FANCY_BOXES
 #endif
 
 /* Default timeout for fuzzed code (milliseconds). This is the upper bound,
@@ -135,7 +135,7 @@
 
 /* 64bit arch MACRO */
 #if (defined(__x86_64__) || defined(__arm64__) || defined(__aarch64__))
-  #define WORD_SIZE_64 1
+#define WORD_SIZE_64 1
 #endif
 
 /* Default memory limit for child process (MB) 0 = disabled : */
@@ -211,9 +211,9 @@
 /* Probabilities of skipping non-favored entries in the queue, expressed as
    percentages: */
 
-#define SKIP_TO_NEW_PROB 99     /* ...when there are new, pending favorites */
-#define SKIP_NFAV_OLD_PROB 95   /* ...no new favs, cur entry already fuzzed */
-#define SKIP_NFAV_NEW_PROB 75   /* ...no new favs, cur entry not fuzzed yet */
+#define SKIP_TO_NEW_PROB 99   /* ...when there are new, pending favorites */
+#define SKIP_NFAV_OLD_PROB 95 /* ...no new favs, cur entry already fuzzed */
+#define SKIP_NFAV_NEW_PROB 75 /* ...no new favs, cur entry not fuzzed yet */
 
 /* Splicing cycle count: */
 
@@ -318,42 +318,42 @@
 
 /* List of interesting values to use in fuzzing. */
 
-#define INTERESTING_8                                    \
-  -128,    /* Overflow signed 8-bit when decremented  */ \
-      -1,  /*                                         */ \
-      0,   /*                                         */ \
-      1,   /*                                         */ \
-      16,  /* One-off with common buffer size         */ \
-      32,  /* One-off with common buffer size         */ \
-      64,  /* One-off with common buffer size         */ \
-      100, /* One-off with common buffer size         */ \
-      127                        /* Overflow signed 8-bit when incremented  */
+#define INTERESTING_8                                                          \
+    -128,    /* Overflow signed 8-bit when decremented  */                     \
+        -1,  /*                                         */                     \
+        0,   /*                                         */                     \
+        1,   /*                                         */                     \
+        16,  /* One-off with common buffer size         */                     \
+        32,  /* One-off with common buffer size         */                     \
+        64,  /* One-off with common buffer size         */                     \
+        100, /* One-off with common buffer size         */                     \
+        127  /* Overflow signed 8-bit when incremented  */
 
 #define INTERESTING_8_LEN 9
 
-#define INTERESTING_16                                    \
-  -32768,   /* Overflow signed 16-bit when decremented */ \
-      -129, /* Overflow signed 8-bit                   */ \
-      128,  /* Overflow signed 8-bit                   */ \
-      255,  /* Overflow unsig 8-bit when incremented   */ \
-      256,  /* Overflow unsig 8-bit                    */ \
-      512,  /* One-off with common buffer size         */ \
-      1000, /* One-off with common buffer size         */ \
-      1024, /* One-off with common buffer size         */ \
-      4096, /* One-off with common buffer size         */ \
-      32767                      /* Overflow signed 16-bit when incremented */
+#define INTERESTING_16                                                         \
+    -32768,   /* Overflow signed 16-bit when decremented */                    \
+        -129, /* Overflow signed 8-bit                   */                    \
+        128,  /* Overflow signed 8-bit                   */                    \
+        255,  /* Overflow unsig 8-bit when incremented   */                    \
+        256,  /* Overflow unsig 8-bit                    */                    \
+        512,  /* One-off with common buffer size         */                    \
+        1000, /* One-off with common buffer size         */                    \
+        1024, /* One-off with common buffer size         */                    \
+        4096, /* One-off with common buffer size         */                    \
+        32767 /* Overflow signed 16-bit when incremented */
 
 #define INTERESTING_16_LEN 10
 
-#define INTERESTING_32                                          \
-  -2147483648LL,  /* Overflow signed 32-bit when decremented */ \
-      -100663046, /* Large negative number (endian-agnostic) */ \
-      -32769,     /* Overflow signed 16-bit                  */ \
-      32768,      /* Overflow signed 16-bit                  */ \
-      65535,      /* Overflow unsig 16-bit when incremented  */ \
-      65536,      /* Overflow unsig 16 bit                   */ \
-      100663045,  /* Large positive number (endian-agnostic) */ \
-      2147483647                 /* Overflow signed 32-bit when incremented */
+#define INTERESTING_32                                                         \
+    -2147483648LL,  /* Overflow signed 32-bit when decremented */              \
+        -100663046, /* Large negative number (endian-agnostic) */              \
+        -32769,     /* Overflow signed 16-bit                  */              \
+        32768,      /* Overflow signed 16-bit                  */              \
+        65535,      /* Overflow unsig 16-bit when incremented  */              \
+        65536,      /* Overflow unsig 16 bit                   */              \
+        100663045,  /* Large positive number (endian-agnostic) */              \
+        2147483647  /* Overflow signed 32-bit when incremented */
 
 #define INTERESTING_32_LEN 8
 
@@ -507,5 +507,4 @@
 
 #define AFL_TXT_STRING_MAX_MUTATIONS 6
 
-#endif                                                  /* ! _HAVE_CONFIG_H */
-
+#endif /* ! _HAVE_CONFIG_H */

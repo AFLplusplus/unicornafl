@@ -21,9 +21,11 @@
 #include <errno.h>
 #include <chrono>
 #include <cstdlib>
+#include "afl-hash.h"
 
-static bool afl_debug_enabled = false;       // General debug message
-static bool afl_debug_unicorn_enabled = false; // Unicorn specific debug messages from child
+static bool afl_debug_enabled = false; // General debug message
+static bool afl_debug_unicorn_enabled =
+    false; // Unicorn specific debug messages from child
 static std::chrono::time_point<std::chrono::steady_clock> t0;
 
 static void log_init() {
@@ -331,7 +333,7 @@ class UCAFL {
 
     static void _uc_hook_block(uc_engine* uc, uint64_t address, uint32_t size,
                                void* user_data) {
-        uint64_t cur_loc = ((address >> 4) ^ (address << 8)) & (MAP_SIZE - 7);
+        uint64_t cur_loc = afl_hash_ip(address);
         UCAFL* ucafl = (UCAFL*)user_data;
 
         ucafl->afl_area_ptr_[cur_loc ^ ucafl->afl_prev_loc_]++;
