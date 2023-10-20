@@ -136,7 +136,7 @@ class UCAFL {
     uc_afl_ret fsrv_run() {
         uc_afl_ret ret;
         this->_may_use_shm_testcase();
-        this->_afl_steup();
+        this->_afl_setup();
         if (this->has_afl_) {
             this->_uc_setup();
         }
@@ -333,7 +333,7 @@ class UCAFL {
 
     static void _uc_hook_block(uc_engine* uc, uint64_t address, uint32_t size,
                                void* user_data) {
-        uint64_t cur_loc = afl_hash_ip(address);
+        uint64_t cur_loc = afl_hash_ip(address) & (MAP_SIZE - 1);
         UCAFL* ucafl = (UCAFL*)user_data;
 
         ucafl->afl_area_ptr_[cur_loc ^ ucafl->afl_prev_loc_]++;
@@ -413,7 +413,7 @@ class UCAFL {
                                  uint64_t arg2, uint32_t size,
                                  void* user_data) {
         UCAFL* ucafl = (UCAFL*)user_data;
-        uint64_t cur_loc = ((address >> 4) ^ (address << 8)) & (MAP_SIZE - 7);
+        uint64_t cur_loc = afl_hash_ip(address) & (MAP_SIZE - 1);
 
         if (unlikely(cur_loc >= ucafl->afl_inst_rms_)) {
             return;
@@ -475,7 +475,7 @@ class UCAFL {
         }
     }
 
-    void _afl_steup() {
+    void _afl_setup() {
         char* map_id_str = getenv(SHM_ENV_VAR);
         char* inst_r_str = getenv("AFL_INST_RATIO");
 
