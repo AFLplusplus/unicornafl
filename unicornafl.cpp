@@ -925,6 +925,8 @@ static uint64_t uc_get_pc(uc_engine* uc) {
         uc_reg_read(uc, UC_S390X_REG_PC, &pc);
     } else if (arch == UC_ARCH_ARM64) {
         uc_reg_read(uc, UC_ARM64_REG_PC, &pc);
+    } else if (arch == UC_ARCH_TRICORE) {
+        uc_reg_read(uc, UC_TRICORE_REG_PC, &pc);
     }
 
     return pc;
