@@ -20,7 +20,11 @@ SYSTEM = sys.platform
 IS_64BITS = platform.architecture()[0] == '64bit'
 
 # are we building from the repository or from a source distribution?
-ROOT_DIR = Path(os.path.realpath(__file__)).parent
+provided_root_dir = os.environ.get('AFL_UNICORN_PYBINDINGS_DIR')
+if provided_root_dir:
+    ROOT_DIR = Path(provided_root_dir)
+else:
+    ROOT_DIR = Path(os.path.realpath(__file__)).parent
 LIBS_DIR = ROOT_DIR / 'unicornafl' / 'lib'
 HEADERS_DIR = ROOT_DIR / 'unicornafl' / 'include'
 SRC_DIR = ROOT_DIR / '..' / '..'
