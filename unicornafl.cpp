@@ -537,14 +537,13 @@ class UCAFL {
             /* Parent supports testcases via shared map - and the user wants to
              * use it. Tell AFL. */
             status = (FS_OPT_ENABLED | FS_OPT_SHDMEM_FUZZ);
+            /* Phone home and tell the parent that we're OK. If parent isn't there,
+                assume we're not running in forkserver mode and just execute
+               program. */
+            if (write(FORKSRV_FD + 1, &status, 4) != 4)
+                return UC_AFL_RET_NO_AFL;
         }
 
-        /* Phone home and tell the parent that we're OK. If parent isn't there,
-            assume we're not running in forkserver mode and just execute
-           program. */
-
-        if (write(FORKSRV_FD + 1, &status, 4) != 4)
-            return UC_AFL_RET_NO_AFL;
 
         /* afl tells us in an extra message if it accepted this option or not */
         if (this->afl_testcase_ptr_ && getenv(SHM_FUZZ_ENV_VAR)) {
