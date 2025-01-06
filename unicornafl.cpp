@@ -400,11 +400,18 @@ class UCAFL {
 
     void _uc_hook_sub_impl(uint64_t cur_loc, uint64_t arg1, uint64_t arg2,
                            uint32_t size) {
+
         if (size >= 64) {
+            if (unlikely(MAP_SIZE - cur_loc < 8))
+                cur_loc -= 8;
             this->_uc_hook_sub_impl_64(cur_loc, arg1, arg2);
         } else if (size >= 32) {
+            if (unlikely(MAP_SIZE - cur_loc < 4))
+                cur_loc -= 4;
             this->_uc_hook_sub_impl_32(cur_loc, arg1, arg2);
         } else {
+            if (unlikely(MAP_SIZE - cur_loc < 2))
+                cur_loc -= 2;
             this->_uc_hook_sub_impl_16(cur_loc, arg1, arg2);
         }
     }
@@ -537,13 +544,12 @@ class UCAFL {
             /* Parent supports testcases via shared map - and the user wants to
              * use it. Tell AFL. */
             status = (FS_OPT_ENABLED | FS_OPT_SHDMEM_FUZZ);
-            /* Phone home and tell the parent that we're OK. If parent isn't there,
-                assume we're not running in forkserver mode and just execute
-               program. */
+            /* Phone home and tell the parent that we're OK. If parent isn't
+               there, assume we're not running in forkserver mode and just
+               execute program. */
             if (write(FORKSRV_FD + 1, &status, 4) != 4)
                 return UC_AFL_RET_NO_AFL;
         }
-
 
         /* afl tells us in an extra message if it accepted this option or not */
         if (this->afl_testcase_ptr_ && getenv(SHM_FUZZ_ENV_VAR)) {
