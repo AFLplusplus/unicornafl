@@ -616,7 +616,7 @@ class UCAFL {
         if (this->afl_testcase_ptr_) {
             /* Parent supports testcases via shared map - and the user wants to
              * use it. Tell AFL. */
-            status = (FS_OPT_ENABLED | FS_OPT_SHDMEM_FUZZ);
+            status = (FS_OPT_ENABLED | FS_OPT_SHDMEM_FUZZ | FS_OPT_NEWCMPLOG);
             /* Phone home and tell the parent that we're OK. If parent isn't
                there, assume we're not running in forkserver mode and just
                execute program. */

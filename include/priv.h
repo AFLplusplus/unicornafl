@@ -20,6 +20,7 @@
 /* Copied from aflpp/types.h to talk to forkserver */
 #define FS_OPT_ENABLED 0x80000001
 #define FS_OPT_SHDMEM_FUZZ 0x01000000
+#define FS_OPT_NEWCMPLOG 0x02000000
 
 /**
  * The correct fds for reading and writing pipes
