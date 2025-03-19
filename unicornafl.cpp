@@ -1,6 +1,7 @@
 #include "unicornafl.h"
 #include "config.h"
 #include "priv.h"
+#include "cmplog.h"
 
 #include <cstdio>
 #include <cstdlib>
@@ -398,9 +399,7 @@ class UCAFL {
         }
     }
 
-    void _uc_hook_sub_impl(uint64_t cur_loc, uint64_t arg1, uint64_t arg2,
-                           uint32_t size) {
-
+    void _uc_hook_cmpcov(uint64_t cur_loc, uint64_t arg1, uint64_t arg2, uint32_t size) {
         if (size >= 64) {
             if (unlikely(MAP_SIZE - cur_loc < 8))
                 cur_loc -= 8;
@@ -414,6 +413,53 @@ class UCAFL {
                 cur_loc -= 2;
             this->_uc_hook_sub_impl_16(cur_loc, arg1, arg2);
         }
+    }
+
+    void _uc_hook_cmplog(uint64_t cur_loc, uint64_t arg1, uint64_t arg2, uint32_t size) {
+        struct cmp_map* map = this->cmpmap_;
+
+        uintptr_t k = (uintptr_t)cur_loc & (CMP_MAP_W - 1);
+        uint32_t shape = 0;
+        switch (size) {
+            case 16:
+                shape = 1;
+                break;
+            case 32:
+                shape = 3;
+                break;
+            case 64:
+                shape = 7;
+                break;
+            default:
+                break;
+        }
+
+        // get hits count
+        uint16_t hits;
+        if (map->headers[k].type != CMP_TYPE_INS) {
+            map->headers[k].type = CMP_TYPE_INS;
+            map->headers[k].hits = 1;
+            map->headers[k].shape = shape;
+            hits = 0;
+        } else {
+            hits = map->headers[k].hits++;
+            if (map->headers[k].shape < shape) {
+                map->headers[k].shape = shape;
+            }
+        }
+
+        hits &= CMP_MAP_H - 1;
+        map->log[k][hits].v0 = arg1;
+        map->log[k][hits].v1 = arg2;
+    }
+
+    void _uc_hook_sub_impl(uint64_t cur_loc, uint64_t arg1, uint64_t arg2,
+                           uint32_t size) {
+        if (this->has_cmplog_) {
+            return _uc_hook_cmplog(cur_loc, arg1, arg2, size);
+        }
+
+        _uc_hook_cmpcov(cur_loc, arg1, arg2, size);
     }
 
     static void _uc_hook_sub_cmp(uc_engine* uc, uint64_t address, uint64_t arg1,
@@ -462,23 +508,27 @@ class UCAFL {
             exit(1);
         }
 
-        // These two hooks are for compcov and may not be supported by the arch.
-        err = uc_hook_add(this->uc_, &this->h3_, UC_HOOK_TCG_OPCODE,
-                          (void*)_uc_hook_sub, (void*)this, 1, 0, UC_TCG_OP_SUB,
-                          UC_TCG_OP_FLAG_DIRECT);
+        // If we should use Laf-Intel or Red-Queen do add CMP hooks
+        if (this->has_cmpcov_ || this->has_cmplog_) {
 
-        if (err) {
-            ERR("Failed to setup UC_TCG_OP_SUB direct hook.\n");
-            exit(1);
-        }
+            // These two hooks may not be supported by the arch.
+            err = uc_hook_add(this->uc_, &this->h3_, UC_HOOK_TCG_OPCODE,
+                            (void*)_uc_hook_sub, (void*)this, 1, 0, UC_TCG_OP_SUB,
+                            UC_TCG_OP_FLAG_DIRECT);
 
-        err = uc_hook_add(this->uc_, &this->h4_, UC_HOOK_TCG_OPCODE,
-                          (void*)_uc_hook_sub_cmp, (void*)this, 1, 0,
-                          UC_TCG_OP_SUB, UC_TCG_OP_FLAG_CMP);
+            if (err) {
+                ERR("Failed to setup UC_TCG_OP_SUB direct hook.\n");
+                exit(1);
+            }
 
-        if (err) {
-            ERR("Failed to setup UC_TCG_OP_SUB cmp hook.\n");
-            exit(1);
+            err = uc_hook_add(this->uc_, &this->h4_, UC_HOOK_TCG_OPCODE,
+                            (void*)_uc_hook_sub_cmp, (void*)this, 1, 0,
+                            UC_TCG_OP_SUB, UC_TCG_OP_FLAG_CMP);
+
+            if (err) {
+                ERR("Failed to setup UC_TCG_OP_SUB cmp hook.\n");
+                exit(1);
+            }
         }
     }
 
@@ -528,6 +578,29 @@ class UCAFL {
 
             this->has_afl_ = false;
         }
+
+        char* cmplog_map_id_str = getenv(CMPLOG_SHM_ENV_VAR);
+        this->has_cmpcov_ = !!getenv("UNICORN_AFL_CMPCOV");
+
+        if (cmplog_map_id_str) {
+            if (this->has_cmpcov_) {
+                ERR("CMPLOG and CMPCOV turned on at the same time!\n");
+                ERR("I'll turn off CMPCOV.\n");
+                this->has_cmpcov_ = false;
+            }
+
+            int cmplog_map_id = atoi(cmplog_map_id_str);
+            this->cmpmap_ = (struct cmp_map*)shmat(cmplog_map_id, NULL, 0);
+
+            if (this->cmpmap_ == (void*)-1) {
+                ERR("Can't get the afl cmp-mapping area.\n");
+                exit(0);
+            }
+
+            this->has_cmplog_ = true;
+        } else {
+            this->has_cmplog_ = false;
+        }
     }
 
     uc_afl_ret _fksrv_start() {
@@ -543,7 +616,7 @@ class UCAFL {
         if (this->afl_testcase_ptr_) {
             /* Parent supports testcases via shared map - and the user wants to
              * use it. Tell AFL. */
-            status = (FS_OPT_ENABLED | FS_OPT_SHDMEM_FUZZ);
+            status = (FS_OPT_ENABLED | FS_OPT_SHDMEM_FUZZ | FS_OPT_NEWCMPLOG);
             /* Phone home and tell the parent that we're OK. If parent isn't
                there, assume we're not running in forkserver mode and just
                execute program. */
@@ -866,6 +939,10 @@ class UCAFL {
     bool has_afl_;
     uint32_t afl_inst_rms_;
     uint64_t afl_prev_loc_;
+
+    bool has_cmpcov_;
+    bool has_cmplog_;
+    struct cmp_map* cmpmap_;
 
     // Fake signal value
     int wifsignaled_;
