@@ -134,7 +134,7 @@ pub struct UnicornAflExecutor {
     block_hook: uc_hook,
     cmp_hook: uc_hook,
     sub_hook: uc_hook,
-    dumb_ob: tuple_list_type!(ValueObserver<'static, ()>),
+    dumb_ob: tuple_list_type!(ValueObserver<'static, bool>),
 }
 
 impl UnicornAflExecutor {
@@ -164,6 +164,7 @@ impl UnicornAflExecutor {
                     1u32,
                 );
                 if ret != uc_error::OK {
+                    warn!("Fail to enable exits due to {:?}", ret);
                     return Err(ret);
                 }
                 let ret = uc_ctl(
@@ -173,6 +174,7 @@ impl UnicornAflExecutor {
                     exits.len(),
                 );
                 if ret != uc_error::OK {
+                    warn!("Fail to write exits due to {:?}", ret);
                     return Err(ret);
                 }
             }
@@ -187,6 +189,7 @@ impl UnicornAflExecutor {
                 0,
             );
             if ret != uc_error::OK {
+                warn!("Fail to add block hooks due to {:?}", ret);
                 return Err(ret);
             }
             let ret = uc_hook_add(
@@ -201,6 +204,7 @@ impl UnicornAflExecutor {
                 unicorn_engine::TcgOpFlag::CMP,
             );
             if ret != uc_error::OK {
+                warn!("Fail to add cmp hooks due to {:?}", ret);
                 return Err(ret);
             }
             let ret = uc_hook_add(
@@ -215,6 +219,7 @@ impl UnicornAflExecutor {
                 unicorn_engine::TcgOpFlag::DIRECT,
             );
             if ret != uc_error::OK {
+                warn!("Fail to add sub hooks due to {:?}", ret);
                 return Err(ret);
             }
         }
@@ -230,13 +235,13 @@ impl UnicornAflExecutor {
             block_hook,
             cmp_hook,
             sub_hook,
-            dumb_ob: tuple_list!(ValueObserver::new("dumb_ob", OwnedRef::Owned(().into()))),
+            dumb_ob: tuple_list!(ValueObserver::new("dumb_ob", OwnedRef::Owned(false.into()))),
         })
     }
 }
 
 impl HasObservers for UnicornAflExecutor {
-    type Observers = tuple_list_type!(ValueObserver<'static, ()>);
+    type Observers = tuple_list_type!(ValueObserver<'static, bool>);
     fn observers(&self) -> libafl_bolts::tuples::RefIndexable<&Self::Observers, Self::Observers> {
         RefIndexable::from(&self.dumb_ob)
     }
@@ -307,6 +312,8 @@ where
                 ) {
                     return Ok(ExitKind::Crash);
                 }
+            } else if err != uc_error::OK {
+                return Ok(ExitKind::Crash);
             }
         }
 

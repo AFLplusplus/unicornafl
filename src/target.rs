@@ -1,9 +1,11 @@
 use std::os::raw::c_void;
 
 use libafl::{
-    corpus::InMemoryCorpus,
+    corpus::{Corpus, InMemoryCorpus, Testcase},
     events::SimpleEventManager,
+    executors::HasObservers,
     feedbacks::{BoolValueFeedback, CrashFeedback},
+    inputs::BytesInput,
     monitors::SimpleMonitor,
     observers::ValueObserver,
     schedulers::QueueScheduler,
@@ -13,10 +15,10 @@ use libafl::{
 use libafl_bolts::{
     ownedref::OwnedRef,
     rands::StdRand,
-    tuples::{tuple_list, Handled},
+    tuples::{tuple_list, Handle, Handled, MatchNameRef},
 };
 use libafl_targets::EDGES_MAP_SIZE;
-use log::debug;
+use log::{debug, trace, warn};
 use unicorn_engine::{
     ffi::{uc_ctl, uc_emu_start, uc_handle, uc_reg_read},
     uc_error, Arch, ControlType, Mode, RegisterARM, RegisterARM64, RegisterM68K, RegisterMIPS,
@@ -120,33 +122,16 @@ pub fn child_fuzz(
     run_once: bool,
     data: *mut c_void,
 ) -> Result<(), uc_afl_ret> {
+    // Enable logging
+    env_logger::init();
     let has_afl = libafl_targets::map_input_shared_memory() && libafl_targets::map_shared_memory();
+    trace!("AFL detected: {}", has_afl);
     if has_afl || run_once {
         let map_size = get_afl_map_size();
         unsafe { EDGES_MAP_SIZE = map_size as usize }
         libafl_targets::start_forkserver();
-        let map_size = unsafe { EDGES_MAP_SIZE };
-
         // Only child returns here
-        let ob = ValueObserver::new("dumb", OwnedRef::Owned(false.into()));
-        let mut fb = BoolValueFeedback::new(&ob.handle());
-        let mut sol = CrashFeedback::new();
-        let mut state = StdState::new(
-            StdRand::new(),
-            InMemoryCorpus::new(),
-            InMemoryCorpus::new(),
-            &mut fb,
-            &mut sol,
-        )?;
-
-        let mut mgr = SimpleEventManager::new(SimpleMonitor::new(|s| {
-            debug!("[u]: {}", s);
-        }));
-        let sched = QueueScheduler::new();
-        let iters = if run_once { 1 } else { iters };
-        let stage = LegacyHarnessStage::new(iters as usize, map_size);
-        let mut stages = tuple_list!(stage);
-        let mut fuzzer = StdFuzzer::new(sched, fb, sol);
+        let map_size = unsafe { EDGES_MAP_SIZE };
         let mut executor = UnicornAflExecutor::new(
             uc,
             place_input_cb,
@@ -158,7 +143,30 @@ pub fn child_fuzz(
             data,
         )?;
 
-        fuzzer.fuzz_one(&mut stages, &mut executor, &mut state, &mut mgr)?;
+        let mut fb = BoolValueFeedback::new(&Handle::new("dumb_ob".into()));
+        let mut sol = CrashFeedback::new();
+        let mut corpus = InMemoryCorpus::new();
+        corpus.add(Testcase::new(BytesInput::new(vec![])))?;
+        let mut state = StdState::new(
+            StdRand::new(),
+            corpus,
+            InMemoryCorpus::new(),
+            &mut fb,
+            &mut sol,
+        )?;
+
+        let mut mgr = SimpleEventManager::new(SimpleMonitor::new(|s| {
+            debug!("{}", s);
+        }));
+        let sched = QueueScheduler::new();
+        let iters = if run_once { 1 } else { iters };
+        let stage = LegacyHarnessStage::new(iters as usize, map_size);
+        let mut stages = tuple_list!(stage);
+        let mut fuzzer = StdFuzzer::new(sched, fb, sol);
+
+        if let Err(e) = fuzzer.fuzz_one(&mut stages, &mut executor, &mut state, &mut mgr) {
+            warn!("Fuzzing fails with error from libafl: {}", e);
+        }
     } else {
         // Run with libafl directly
     }
