@@ -1,6 +1,18 @@
-[workspace]
+[package]
+name = "unicornafl"
+version = "3.0.0"
+edition = "2021"
 
-members = [
-    "bindings/rust",
-]
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
+[dependencies]
+libafl_targets = {git = "https://github.com/wtdcode/LibAFL", branch = "ucafl", features = ["pointer_maps"]}
+libafl = {git = "https://github.com/wtdcode/LibAFL", branch = "ucafl"}
+libafl_bolts = {git = "https://github.com/wtdcode/LibAFL", branch = "ucafl"}
+serde ={ version = "1.0", features = ["derive"] }
+unicorn-engine = { git = "https://github.com/unicorn-engine/unicorn", branch = "dev", features = ["dynamic_linkage"] }
+log = "0.4"
+nix = { version = "0.29", features = ["signal"] }
+
+[lib]
+crate-type = ["cdylib"]
