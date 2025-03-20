@@ -76,12 +76,17 @@ pub extern "C" fn uc_afl_fuzz(
     if !input_file.is_null() {
         eprintln!("Input file (or @@) is no longer needed for unicornafl v3.0");
     }
+
     match child_fuzz(
         uc,
         persistent_iters,
         place_input_callback,
         validate_crash_callback,
-        unsafe { std::slice::from_raw_parts(exits, exit_count) }.to_vec(),
+        if exits.is_null() {
+            vec![]
+        } else {
+            unsafe { std::slice::from_raw_parts(exits, exit_count) }.to_vec()
+        },
         None,
         always_validate,
         true,
