@@ -1,4 +1,3 @@
-use std::path::PathBuf;
 
 use libafl::{
     executors::Executor,

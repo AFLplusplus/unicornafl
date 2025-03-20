@@ -18,8 +18,8 @@ use libafl_bolts::{
 use libafl_targets::EDGES_MAP_SIZE;
 use log::debug;
 use unicorn_engine::{
-    ffi::{uc_ctl, uc_emu_start, uc_handle, uc_query, uc_reg_read},
-    uc_error, Arch, ControlType, Mode, Query, RegisterARM, RegisterARM64, RegisterM68K,
+    ffi::{uc_ctl, uc_emu_start, uc_handle, uc_reg_read},
+    uc_error, Arch, ControlType, Mode, RegisterARM, RegisterARM64, RegisterM68K,
     RegisterMIPS, RegisterPPC, RegisterRISCV, RegisterS390X, RegisterSPARC, RegisterTRICORE,
     RegisterX86,
 };
