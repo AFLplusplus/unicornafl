@@ -11,7 +11,7 @@ libafl = {git = "https://github.com/wtdcode/LibAFL", branch = "ucafl"}
 libafl_bolts = {git = "https://github.com/wtdcode/LibAFL", branch = "ucafl"}
 
 serde ={ version = "1.0", features = ["derive"] }
-unicorn-engine = { git = "https://github.com/unicorn-engine/unicorn", branch = "dev", features = ["dynamic_linkage"] }
+unicorn-engine = { git = "https://github.com/unicorn-engine/unicorn", branch = "dev"}
 log = "0.4"
 nix = { version = "0.29", features = ["signal"] }
 env_logger = { version = "0.11", optional = true }
@@ -19,6 +19,7 @@ env_logger = { version = "0.11", optional = true }
 [features]
 default = ["log"]
 log = ["env_logger"]
+bindings = ["unicorn-engine/dynamic_linkage"]
 
 [[example]]
 name = "sample"
