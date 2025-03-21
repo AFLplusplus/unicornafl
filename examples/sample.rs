@@ -14,7 +14,6 @@ extern "C" fn place_input_cb(
     let mut uc = unsafe { Unicorn::from_handle(uc) }.expect("fail to create inner");
     let mut buf = [0; 8];
     let input = unsafe { std::slice::from_raw_parts(input, input_len) };
-    info!("Input is {:?}", input);
     if input.len() < 8 {
         // decline the input
         return false;

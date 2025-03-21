@@ -135,6 +135,9 @@ pub fn child_fuzz(
     if !input_file.is_null() && has_afl {
         warn!("Shared memory fuzzing is enabled and the input file is ignored!");
     }
+    if input_file.is_null() && !has_afl {
+        warn!("No input file is provided. We will run harness with zero inputs.");
+    }
     if has_afl || run_once_if_no_afl_present {
         let map_size = get_afl_map_size();
         unsafe {
