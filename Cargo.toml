@@ -17,8 +17,7 @@ nix = { version = "0.29", features = ["signal"] }
 env_logger = { version = "0.11", optional = true }
 
 [features]
-default = ["log"]
-log = ["env_logger"]
+default = []
 bindings = ["unicorn-engine/dynamic_linkage"]
 
 [[example]]
