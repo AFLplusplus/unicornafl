@@ -1,7 +1,4 @@
-use std::{
-    ffi::CString,
-    path::PathBuf,
-};
+use std::{ffi::CString, path::PathBuf};
 
 use libafl::{
     executors::Executor,

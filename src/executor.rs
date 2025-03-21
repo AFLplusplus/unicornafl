@@ -13,7 +13,6 @@ use libafl::{
 use libafl_bolts::{
     ownedref::{OwnedRef, OwnedSlice},
     tuples::{tuple_list, tuple_list_type, RefIndexable},
-    HasLen,
 };
 use libafl_targets::EDGES_MAP_PTR;
 use log::{trace, warn};
