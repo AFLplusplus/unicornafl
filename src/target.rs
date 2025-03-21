@@ -1,4 +1,8 @@
-use std::os::raw::c_void;
+use std::{
+    ffi::{c_char, CStr},
+    os::raw::c_void,
+    path::PathBuf,
+};
 
 use libafl::{
     corpus::{Corpus, InMemoryCorpus, Testcase},
@@ -13,12 +17,12 @@ use libafl::{
     Fuzzer, StdFuzzer,
 };
 use libafl_bolts::{
-    ownedref::OwnedRef,
+    ownedref::{OwnedRef, OwnedSlice},
     rands::StdRand,
     tuples::{tuple_list, Handle, Handled, MatchNameRef},
 };
-use libafl_targets::EDGES_MAP_SIZE;
-use log::{debug, trace, warn};
+use libafl_targets::{__afl_fuzz_len, EDGES_MAP_PTR, EDGES_MAP_SIZE, INPUT_LENGTH_PTR, INPUT_PTR, SHM_FUZZING};
+use log::{debug, info, trace, warn};
 use unicorn_engine::{
     ffi::{uc_ctl, uc_emu_start, uc_handle, uc_reg_read},
     uc_error, Arch, ControlType, Mode, RegisterARM, RegisterARM64, RegisterM68K, RegisterMIPS,
@@ -26,8 +30,9 @@ use unicorn_engine::{
 };
 
 use crate::{
-    executor::UnicornAflExecutor, harness::LegacyHarnessStage, uc_afl_cb_place_input_t,
-    uc_afl_cb_validate_crash_t, uc_afl_fuzz_cb_t, uc_afl_ret,
+    executor::{UnicornAflExecutor, UnsafeSliceInput},
+    harness::LegacyHarnessStage,
+    uc_afl_cb_place_input_t, uc_afl_cb_validate_crash_t, uc_afl_fuzz_cb_t, uc_afl_ret,
 };
 
 fn get_afl_map_size() -> u32 {
@@ -113,6 +118,7 @@ extern "C" fn dummy_uc_fuzz_callback(uc: uc_handle, _data: *mut c_void) -> uc_er
 
 pub fn child_fuzz(
     uc: uc_handle,
+    input_file: *const c_char,
     iters: u32,
     place_input_cb: uc_afl_cb_place_input_t,
     validate_crash_cb: Option<uc_afl_cb_validate_crash_t>,
@@ -123,15 +129,25 @@ pub fn child_fuzz(
     data: *mut c_void,
 ) -> Result<(), uc_afl_ret> {
     // Enable logging
+    #[cfg(feature = "env_logger")]
     env_logger::init();
+
     let has_afl = libafl_targets::map_input_shared_memory() && libafl_targets::map_shared_memory();
+    
     trace!("AFL detected: {}", has_afl);
+    if !input_file.is_null() && has_afl {
+        warn!("Shared memory fuzzing is enabled and the input file is ignored!");
+    }
     if has_afl || run_once {
         let map_size = get_afl_map_size();
-        unsafe { EDGES_MAP_SIZE = map_size as usize }
+        unsafe { 
+            EDGES_MAP_SIZE = map_size as usize;
+            SHM_FUZZING = 1;
+        }
         libafl_targets::start_forkserver();
         // Only child returns here
         let map_size = unsafe { EDGES_MAP_SIZE };
+        debug!("Map size is: {}", map_size);
         let mut executor = UnicornAflExecutor::new(
             uc,
             place_input_cb,
@@ -146,7 +162,9 @@ pub fn child_fuzz(
         let mut fb = BoolValueFeedback::new(&Handle::new("dumb_ob".into()));
         let mut sol = CrashFeedback::new();
         let mut corpus = InMemoryCorpus::new();
-        corpus.add(Testcase::new(BytesInput::new(vec![])))?;
+        corpus.add(Testcase::new(UnsafeSliceInput {
+            input: OwnedSlice::from(Vec::<u8>::new()),
+        }))?;
         let mut state = StdState::new(
             StdRand::new(),
             corpus,
@@ -160,7 +178,21 @@ pub fn child_fuzz(
         }));
         let sched = QueueScheduler::new();
         let iters = if run_once { 1 } else { iters };
-        let stage = LegacyHarnessStage::new(iters as usize, map_size);
+        let input_file = if has_afl {
+            None
+        } else {
+            if input_file.is_null() {
+                None
+            } else {
+                // legact usage
+                Some(PathBuf::from(
+                    unsafe { CStr::from_ptr(input_file) }
+                        .to_str()
+                        .map_err(|_| uc_afl_ret::UC_AFL_RET_FFI)?,
+                ))
+            }
+        };
+        let stage = LegacyHarnessStage::new(iters as usize, map_size, input_file);
         let mut stages = tuple_list!(stage);
         let mut fuzzer = StdFuzzer::new(sched, fb, sol);
 

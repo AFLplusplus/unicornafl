@@ -1,18 +1,24 @@
-use std::os::raw::c_void;
+use std::{
+    ffi::c_uchar,
+    hash::{Hash, Hasher},
+    ops::Deref,
+    os::raw::c_void,
+};
 
 use libafl::{
     executors::{Executor, ExitKind, HasObservers},
-    inputs::BytesInput,
+    inputs::{BytesInput, Input},
     observers::ValueObserver,
     state::HasExecutions,
 };
 use libafl_bolts::{
-    ownedref::OwnedRef,
+    ownedref::{OwnedRef, OwnedSlice},
     tuples::{tuple_list, tuple_list_type, RefIndexable},
     HasLen,
 };
 use libafl_targets::EDGES_MAP_PTR;
-use log::{debug, warn};
+use log::{debug, info, trace, warn};
+use serde::{Deserialize, Serialize};
 use unicorn_engine::{
     ffi::{uc_ctl, uc_handle, uc_hook, uc_hook_add, uc_hook_del},
     uc_error, ControlType,
@@ -21,6 +27,49 @@ use unicorn_engine::{
 use crate::{
     hash::afl_hash_ip, uc_afl_cb_place_input_t, uc_afl_cb_validate_crash_t, uc_afl_fuzz_cb_t,
 };
+
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct UnsafeSliceInput<'a> {
+    pub input: OwnedSlice<'a, u8>,
+}
+
+impl<'a> Deref for UnsafeSliceInput<'a> {
+    type Target = OwnedSlice<'a, u8>;
+    fn deref(&self) -> &Self::Target {
+        &self.input
+    }
+}
+
+impl<'a> Hash for UnsafeSliceInput<'a> {
+    fn hash<H: Hasher>(&self, state: &mut H) {
+        self.input.to_vec().hash(state);
+    }
+}
+
+impl<'a> UnsafeSliceInput<'a> {
+    pub fn to_bytes_input(&self) -> BytesInput {
+        BytesInput::new(self.input.to_vec())
+    }
+}
+
+impl<'a> Input for UnsafeSliceInput<'a> {
+    fn to_file<P>(&self, path: P) -> Result<(), libafl::Error>
+    where
+        P: AsRef<std::path::Path>,
+    {
+        self.to_bytes_input().to_file(path)
+    }
+
+    fn from_file<P>(path: P) -> Result<Self, libafl::Error>
+    where
+        P: AsRef<std::path::Path>,
+    {
+        let input = BytesInput::from_file(path)?;
+        Ok(Self {
+            input: OwnedSlice::from(input.into_inner()),
+        })
+    }
+}
 
 #[derive(Debug)]
 struct HookState {
@@ -37,7 +86,8 @@ unsafe fn update_coverage(idx: usize) {
 }
 
 unsafe fn update_with_prev(loc: u32, prev: u32) {
-    update_coverage((prev ^ loc) as usize);
+    let idx = prev ^ loc;
+    update_coverage(idx as usize);
 }
 
 #[no_mangle]
@@ -272,7 +322,7 @@ impl Drop for UnicornAflExecutor {
     }
 }
 
-impl<EM, S, Z> Executor<EM, BytesInput, S, Z> for UnicornAflExecutor
+impl<'a, EM, S, Z> Executor<EM, UnsafeSliceInput<'a>, S, Z> for UnicornAflExecutor
 where
     S: HasExecutions,
 {
@@ -281,7 +331,7 @@ where
         _fuzzer: &mut Z,
         state: &mut S,
         _mgr: &mut EM,
-        input: &BytesInput,
+        input: &UnsafeSliceInput<'a>,
     ) -> Result<ExitKind, libafl::Error> {
         let accepted = (self.place_input_cb)(
             self.uc,
@@ -292,13 +342,13 @@ where
         );
 
         if !accepted {
-            debug!("Input not accepted");
+            trace!("Input not accepted");
             return Ok(ExitKind::Ok);
         }
 
         let err = (self.fuzz_callback)(self.uc, self.data);
 
-        debug!("Child returns: {:?}", err);
+        trace!("Child returns: {:?}", err);
 
         if err != uc_error::OK || self.always_validate {
             if let Some(validate_cb) = self.validate_crash_cb {

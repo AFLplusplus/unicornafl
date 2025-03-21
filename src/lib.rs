@@ -1,5 +1,5 @@
 use std::{
-    ffi::c_uchar,
+    ffi::{c_uchar, CStr},
     os::raw::{c_char, c_void},
 };
 
@@ -24,6 +24,7 @@ pub enum uc_afl_ret {
     UC_AFL_RET_INVALID_UC,
     UC_AFL_RET_UC_ERR,
     UC_AFL_RET_LIBAFL,
+    UC_AFL_RET_FFI,
 }
 
 impl From<libafl::Error> for uc_afl_ret {
@@ -64,21 +65,18 @@ pub type uc_afl_fuzz_cb_t = extern "C" fn(uc: uc_handle, data: *mut c_void) -> u
 #[allow(non_camel_case_types)]
 pub extern "C" fn uc_afl_fuzz(
     uc: uc_handle,
-    input_file: *mut c_char,
+    input_file: *const c_char,
     place_input_callback: uc_afl_cb_place_input_t,
-    exits: *mut u64,
+    exits: *const u64,
     exit_count: usize,
     validate_crash_callback: Option<uc_afl_cb_validate_crash_t>,
     always_validate: bool,
     persistent_iters: u32,
     data: *mut c_void,
 ) -> uc_afl_ret {
-    if !input_file.is_null() {
-        eprintln!("Input file (or @@) is no longer needed for unicornafl v3.0");
-    }
-
     match child_fuzz(
         uc,
+        input_file,
         persistent_iters,
         place_input_callback,
         validate_crash_callback,
@@ -101,7 +99,7 @@ pub extern "C" fn uc_afl_fuzz(
 #[allow(non_camel_case_types)]
 pub extern "C" fn uc_afl_fuzz_custom(
     uc: uc_handle,
-    input_file: *mut c_char,
+    input_file: *const c_char,
     place_input_callback: uc_afl_cb_place_input_t,
     fuzz_callback: uc_afl_fuzz_cb_t,
     validate_crash_callback: Option<uc_afl_cb_validate_crash_t>,
@@ -109,11 +107,9 @@ pub extern "C" fn uc_afl_fuzz_custom(
     persistent_iters: u32,
     data: *mut c_void,
 ) -> uc_afl_ret {
-    if !input_file.is_null() {
-        eprintln!("Input file (or @@) is no longer needed for unicornafl v3.0");
-    }
     match child_fuzz(
         uc,
+        input_file,
         persistent_iters,
         place_input_callback,
         validate_crash_callback,

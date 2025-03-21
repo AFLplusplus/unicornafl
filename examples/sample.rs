@@ -13,6 +13,10 @@ extern "C" fn place_input_cb(
     let mut uc = unsafe { Unicorn::from_handle(uc) }.expect("fail to create inner");
     let mut buf = [0; 8];
     let input = unsafe { std::slice::from_raw_parts(input, input_len) };
+    if input.len() < 8 {
+        // decline the input
+        return false;
+    }
     let cp_len = input.len().min(8);
     buf[0..cp_len].copy_from_slice(input);
     let rdx = u64::from_le_bytes(buf);
@@ -29,9 +33,13 @@ fn main() {
     uc.mem_map(0x1000, 0x4000, Permission::all())
         .expect("fail to map");
     uc.mem_write(0x1000, code).expect("fail to write code");
+    let pc = 0x1000;
+    uc.reg_write(RegisterX86::RIP, pc)
+        .expect("fail to write pc");
     child_fuzz(
         uc.get_handle(),
-        1,
+        std::ptr::null(),
+        1, // This is not too effective but enough here for testing
         place_input_cb,
         None,
         vec![0x100b, 0x1011],

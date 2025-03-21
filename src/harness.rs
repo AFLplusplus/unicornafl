@@ -1,37 +1,52 @@
+use std::{os::unix::ffi::OsStrExt, path::PathBuf};
+
 use libafl::{
     executors::Executor,
     inputs::BytesInput,
     stages::{Restartable, Stage},
     Evaluator,
 };
+use libafl_bolts::ownedref::OwnedSlice;
 use libafl_targets::{EDGES_MAP_PTR, INPUT_LENGTH_PTR, INPUT_PTR};
+use log::{info, trace};
+use nix::{
+    libc::{mmap64, open, MAP_PRIVATE, O_RDONLY, PROT_READ, PROT_WRITE},
+    sys::stat::fstat,
+};
+
+use crate::executor::UnsafeSliceInput;
 
 #[derive(Debug)]
 pub struct LegacyHarnessStage {
     iters: usize,
     map_size: usize,
+    input_str: Option<PathBuf>,
 }
 
 impl LegacyHarnessStage {
-    pub fn new(iters: usize, map_size: usize) -> Self {
-        Self { iters, map_size }
+    pub fn new(iters: usize, map_size: usize, input_str: Option<PathBuf>) -> Self {
+        Self {
+            iters,
+            map_size,
+            input_str,
+        }
     }
 }
 
 impl<S> Restartable<S> for LegacyHarnessStage {
-    fn clear_progress(&mut self, state: &mut S) -> Result<(), libafl::Error> {
+    fn clear_progress(&mut self, _state: &mut S) -> Result<(), libafl::Error> {
         Ok(())
     }
 
-    fn should_restart(&mut self, state: &mut S) -> Result<bool, libafl::Error> {
+    fn should_restart(&mut self, _state: &mut S) -> Result<bool, libafl::Error> {
         Ok(true)
     }
 }
 
-impl<E, EM, S, Z> Stage<E, EM, S, Z> for LegacyHarnessStage
+impl<'a, E, EM, S, Z> Stage<E, EM, S, Z> for LegacyHarnessStage
 where
-    E: Executor<EM, BytesInput, S, Z>,
-    Z: Evaluator<E, EM, BytesInput, S>,
+    E: Executor<EM, UnsafeSliceInput<'a>, S, Z>,
+    Z: Evaluator<E, EM, UnsafeSliceInput<'a>, S>,
 {
     fn perform(
         &mut self,
@@ -51,16 +66,42 @@ where
                 }
             } else {
                 // Waiting for next input
-                nix::sys::signal::raise(nix::sys::signal::SIGSTOP).unwrap();
-                unsafe {
-                    std::ptr::write(EDGES_MAP_PTR, 1);
+                if self.input_str.is_none() {
+                    nix::sys::signal::raise(nix::sys::signal::SIGSTOP).unwrap();
+                    unsafe {
+                        std::ptr::write(EDGES_MAP_PTR, 1);
+                    }
                 }
             }
 
             // Wrap inputs
-            let input = unsafe {
-                let len = std::ptr::read(INPUT_LENGTH_PTR);
-                BytesInput::new(Vec::from_raw_parts(INPUT_PTR, len as usize, len as usize))
+            let input = if let Some(input) = self.input_str.as_ref() {
+                unsafe {
+                    let fd = open(input.as_os_str().as_bytes().as_ptr() as _, O_RDONLY);
+
+                    let stat = fstat(fd).map_err(|e| libafl::Error::unknown(e.to_string()))?;
+                    let ptr = mmap64(
+                        std::ptr::null_mut(),
+                        stat.st_size as usize,
+                        PROT_READ | PROT_WRITE,
+                        MAP_PRIVATE,
+                        fd,
+                        0,
+                    );
+                    if ptr.is_null() {
+                        return Err(libafl::Error::illegal_state("mmap"));
+                    }
+
+                    UnsafeSliceInput {
+                        input: OwnedSlice::from_raw_parts(ptr as _, stat.st_size as usize),
+                    }
+                }
+            } else {
+                UnsafeSliceInput {
+                    input: unsafe {
+                        OwnedSlice::from_raw_parts(INPUT_PTR, (*INPUT_LENGTH_PTR) as usize)
+                    },
+                }
             };
 
             let (ret, _) = fuzzer.evaluate_filtered(state, executor, manager, &input)?;
