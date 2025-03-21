@@ -1,4 +1,4 @@
-use std::ffi::{c_uchar, c_void, CStr, CString};
+use std::ffi::{c_uchar, c_void, CString};
 
 use log::info;
 use unicorn_engine::{ffi::uc_handle, Arch, Mode, Permission, RegisterX86, Unicorn};

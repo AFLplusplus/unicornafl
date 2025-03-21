@@ -1,6 +1,5 @@
 use std::{
-    ffi::{CStr, CString},
-    os::unix::ffi::OsStrExt,
+    ffi::CString,
     path::PathBuf,
 };
 
@@ -11,7 +10,6 @@ use libafl::{
 };
 use libafl_bolts::ownedref::OwnedSlice;
 use libafl_targets::{EDGES_MAP_PTR, INPUT_LENGTH_PTR, INPUT_PTR};
-use log::debug;
 use nix::{
     libc::{mmap64, open, MAP_PRIVATE, O_RDONLY, PROT_READ, PROT_WRITE},
     sys::stat::fstat,
