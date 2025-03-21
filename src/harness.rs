@@ -1,4 +1,8 @@
-use std::{os::unix::ffi::OsStrExt, path::PathBuf};
+use std::{
+    ffi::{CStr, CString},
+    os::unix::ffi::OsStrExt,
+    path::PathBuf,
+};
 
 use libafl::{
     executors::Executor,
@@ -7,6 +11,7 @@ use libafl::{
 };
 use libafl_bolts::ownedref::OwnedSlice;
 use libafl_targets::{EDGES_MAP_PTR, INPUT_LENGTH_PTR, INPUT_PTR};
+use log::debug;
 use nix::{
     libc::{mmap64, open, MAP_PRIVATE, O_RDONLY, PROT_READ, PROT_WRITE},
     sys::stat::fstat,
@@ -75,7 +80,18 @@ where
             // Wrap inputs
             let input = if let Some(input) = self.input_str.as_ref() {
                 unsafe {
-                    let fd = open(input.as_os_str().as_bytes().as_ptr() as _, O_RDONLY);
+                    let fpath =
+                        CString::new(input.to_str().ok_or(libafl::Error::invalid_corpus(
+                            format!("invalid path {:?}", input.as_os_str()),
+                        ))?)
+                        .unwrap(); // to_str has checked so
+                    let fd = open(fpath.as_ptr(), O_RDONLY);
+                    if fd == -1 {
+                        return Err(libafl::Error::invalid_corpus(format!(
+                            "invalid path {:?}",
+                            input.as_os_str()
+                        )));
+                    }
 
                     let stat = fstat(fd).map_err(|e| libafl::Error::unknown(e.to_string()))?;
                     let ptr = mmap64(

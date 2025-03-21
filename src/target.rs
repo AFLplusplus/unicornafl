@@ -1,5 +1,5 @@
 use std::{
-    ffi::{c_char, CStr},
+    ffi::{c_char, CStr, CString},
     os::raw::c_void,
     path::PathBuf,
 };
@@ -122,7 +122,7 @@ pub fn child_fuzz(
     exits: Vec<u64>,
     fuzz_callback: Option<uc_afl_fuzz_cb_t>,
     always_validate: bool,
-    run_once: bool,
+    run_once_if_no_afl_present: bool,
     data: *mut c_void,
 ) -> Result<(), uc_afl_ret> {
     // Enable logging
@@ -135,7 +135,7 @@ pub fn child_fuzz(
     if !input_file.is_null() && has_afl {
         warn!("Shared memory fuzzing is enabled and the input file is ignored!");
     }
-    if has_afl || run_once {
+    if has_afl || run_once_if_no_afl_present {
         let map_size = get_afl_map_size();
         unsafe {
             EDGES_MAP_SIZE = map_size as usize;
@@ -174,7 +174,7 @@ pub fn child_fuzz(
             debug!("{}", s);
         }));
         let sched = QueueScheduler::new();
-        let iters = if run_once { 1 } else { iters };
+        let iters = if run_once_if_no_afl_present { 1 } else { iters };
         let input_file = if has_afl {
             None
         } else {
