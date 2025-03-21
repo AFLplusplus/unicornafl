@@ -130,14 +130,14 @@ pub fn child_fuzz(
     env_logger::init();
 
     let has_afl = libafl_targets::map_input_shared_memory() && libafl_targets::map_shared_memory();
-    
+
     trace!("AFL detected: {}", has_afl);
     if !input_file.is_null() && has_afl {
         warn!("Shared memory fuzzing is enabled and the input file is ignored!");
     }
     if has_afl || run_once {
         let map_size = get_afl_map_size();
-        unsafe { 
+        unsafe {
             EDGES_MAP_SIZE = map_size as usize;
             SHM_FUZZING = 1;
         }
