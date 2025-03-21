@@ -7,22 +7,19 @@ use std::{
 use libafl::{
     corpus::{Corpus, InMemoryCorpus, Testcase},
     events::SimpleEventManager,
-    executors::HasObservers,
     feedbacks::{BoolValueFeedback, CrashFeedback},
-    inputs::BytesInput,
     monitors::SimpleMonitor,
-    observers::ValueObserver,
     schedulers::QueueScheduler,
     state::StdState,
     Fuzzer, StdFuzzer,
 };
 use libafl_bolts::{
-    ownedref::{OwnedRef, OwnedSlice},
+    ownedref::OwnedSlice,
     rands::StdRand,
-    tuples::{tuple_list, Handle, Handled, MatchNameRef},
+    tuples::{tuple_list, Handle},
 };
-use libafl_targets::{__afl_fuzz_len, EDGES_MAP_PTR, EDGES_MAP_SIZE, INPUT_LENGTH_PTR, INPUT_PTR, SHM_FUZZING};
-use log::{debug, info, trace, warn};
+use libafl_targets::{EDGES_MAP_SIZE, SHM_FUZZING};
+use log::{debug, trace, warn};
 use unicorn_engine::{
     ffi::{uc_ctl, uc_emu_start, uc_handle, uc_reg_read},
     uc_error, Arch, ControlType, Mode, RegisterARM, RegisterARM64, RegisterM68K, RegisterMIPS,

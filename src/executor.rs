@@ -1,5 +1,4 @@
 use std::{
-    ffi::c_uchar,
     hash::{Hash, Hasher},
     ops::Deref,
     os::raw::c_void,
@@ -17,7 +16,7 @@ use libafl_bolts::{
     HasLen,
 };
 use libafl_targets::EDGES_MAP_PTR;
-use log::{debug, info, trace, warn};
+use log::{trace, warn};
 use serde::{Deserialize, Serialize};
 use unicorn_engine::{
     ffi::{uc_ctl, uc_handle, uc_hook, uc_hook_add, uc_hook_del},

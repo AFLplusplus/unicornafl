@@ -2,13 +2,11 @@ use std::{os::unix::ffi::OsStrExt, path::PathBuf};
 
 use libafl::{
     executors::Executor,
-    inputs::BytesInput,
     stages::{Restartable, Stage},
     Evaluator,
 };
 use libafl_bolts::ownedref::OwnedSlice;
 use libafl_targets::{EDGES_MAP_PTR, INPUT_LENGTH_PTR, INPUT_PTR};
-use log::{info, trace};
 use nix::{
     libc::{mmap64, open, MAP_PRIVATE, O_RDONLY, PROT_READ, PROT_WRITE},
     sys::stat::fstat,
