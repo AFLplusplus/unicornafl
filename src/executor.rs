@@ -1,7 +1,6 @@
 use std::{
     hash::{Hash, Hasher},
     ops::Deref,
-    os::raw::c_void,
 };
 
 use libafl::{
@@ -17,14 +16,9 @@ use libafl_bolts::{
 use libafl_targets::EDGES_MAP_PTR;
 use log::{trace, warn};
 use serde::{Deserialize, Serialize};
-use unicorn_engine::{
-    ffi::{uc_ctl, uc_handle, uc_hook, uc_hook_add, uc_hook_del},
-    uc_error, ControlType,
-};
+use unicorn_engine::{uc_error, TcgOpCode, TcgOpFlag, UcHookId, Unicorn};
 
-use crate::{
-    hash::afl_hash_ip, uc_afl_cb_place_input_t, uc_afl_cb_validate_crash_t, uc_afl_fuzz_cb_t,
-};
+use crate::hash::afl_hash_ip;
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct UnsafeSliceInput<'a> {
@@ -75,6 +69,51 @@ struct HookState {
     map_size: u32,
 }
 
+fn get_afl_map_size() -> u32 {
+    std::env::var("AFL_MAP_SIZE")
+        .ok()
+        .map(|sz| u32::from_str_radix(&sz, 10).ok())
+        .flatten()
+        .unwrap_or(1 << 16) // MAP_SIZE
+}
+
+/// Data persisted during fuzzing. You can use `uc.get_data()`[Unicorn::get_data]
+/// and `uc.get_data_mut()`[Unicorn::get_data_mut] to access this data in callbacks
+/// and hooks during fuzzing.
+///
+/// You can create a default fuzz data by [`UnicornFuzzData::default()`] if you don't
+/// want any custom data.
+#[derive(Debug)]
+pub struct UnicornFuzzData<D> {
+    hook_state: HookState,
+    /// User-defined data.
+    pub user_data: D,
+}
+
+impl<D> UnicornFuzzData<D> {
+    pub(crate) fn map_size(&self) -> u32 {
+        self.hook_state.map_size
+    }
+}
+
+impl Default for UnicornFuzzData<()> {
+    fn default() -> Self {
+        Self::new(())
+    }
+}
+
+impl<D> UnicornFuzzData<D> {
+    pub fn new(user_data: D) -> Self {
+        Self {
+            hook_state: HookState {
+                prev_loc: 0,
+                map_size: get_afl_map_size(),
+            },
+            user_data,
+        }
+    }
+}
+
 unsafe fn update_coverage(idx: usize) {
     unsafe {
         let loc = EDGES_MAP_PTR.byte_add(idx);
@@ -88,9 +127,12 @@ unsafe fn update_with_prev(loc: u32, prev: u32) {
     update_coverage(idx as usize);
 }
 
-#[no_mangle]
-extern "C" fn hook_code_coverage(_uc: uc_handle, address: u64, _size: u32, data: *mut c_void) {
-    let state: &mut HookState = unsafe { (data as *mut HookState).as_mut().unwrap() };
+fn hook_code_coverage<'a, D: 'a>(
+    uc: &mut Unicorn<'a, UnicornFuzzData<D>>,
+    address: u64,
+    _size: u32,
+) {
+    let state = &mut uc.get_data_mut().hook_state;
     let cur_loc = afl_hash_ip(address) & (state.map_size - 1);
 
     unsafe { update_with_prev(cur_loc, state.prev_loc) };
@@ -139,16 +181,14 @@ fn hook_sub_impl_64(cur_loc: u32, prev_loc: u32, arg1: u64, arg2: u64) {
     }
 }
 
-#[no_mangle]
-extern "C" fn hook_opcode_cmpcov(
-    _uc: uc_handle,
+fn hook_opcode_cmpcov<'a, D: 'a>(
+    uc: &mut Unicorn<'a, UnicornFuzzData<D>>,
     address: u64,
     arg1: u64,
     arg2: u64,
-    size: u32,
-    data: *mut c_void,
+    size: usize,
 ) {
-    let state: &mut HookState = unsafe { (data as *mut HookState).as_mut().unwrap() };
+    let state = &mut uc.get_data_mut().hook_state;
     let mut cur_loc = afl_hash_ip(address) & (state.map_size - 1);
 
     if size >= 64 {
@@ -169,124 +209,102 @@ extern "C" fn hook_opcode_cmpcov(
     }
 }
 
-#[derive(Debug)]
-pub struct UnicornAflExecutor {
-    uc: uc_handle,
-    place_input_cb: uc_afl_cb_place_input_t,
-    validate_crash_cb: Option<uc_afl_cb_validate_crash_t>,
-    fuzz_callback: uc_afl_fuzz_cb_t,
+/// Executor for unicorn
+pub struct UnicornAflExecutor<'a, D, FI, FV, FC>
+where
+    D: 'a,
+    FI: FnMut(&mut Unicorn<'a, UnicornFuzzData<D>>, &[u8], u64) -> bool + 'a,
+    FV: FnMut(&mut Unicorn<'a, UnicornFuzzData<D>>, Result<(), uc_error>, &[u8], u64) -> bool + 'a,
+    FC: FnMut(&mut Unicorn<'a, UnicornFuzzData<D>>) -> Result<(), uc_error> + 'a,
+{
+    uc: Unicorn<'a, UnicornFuzzData<D>>,
+    /// Place the generated input into unicorn's memory.
+    ///
+    /// Return false if the generated input is not acceptable
+    place_input_cb: FI,
+    /// Return true if the crash is valid after validation
+    validate_crash_cb: FV,
+    /// The real procedure to kick unicorn engine start
+    fuzz_callback: FC,
+    /// Whether the `validate_crash_cb` is invoked everytime regardless of
+    /// the execution result.
+    ///
+    /// If false, only execution failure will lead to the callback.
     always_validate: bool,
-    data: *mut c_void,
-    _state: Box<HookState>,
-    block_hook: uc_hook,
-    cmp_hook: uc_hook,
-    sub_hook: uc_hook,
+    /// Stored for deleting hook when dropping
+    block_hook: UcHookId,
+    /// Stored for deleting hook when dropping
+    sub_hook: UcHookId,
     dumb_ob: tuple_list_type!(ValueObserver<'static, bool>),
 }
 
-impl UnicornAflExecutor {
+impl<'a, D, FI, FV, FC> UnicornAflExecutor<'a, D, FI, FV, FC>
+where
+    D: 'a,
+    FI: FnMut(&mut Unicorn<'a, UnicornFuzzData<D>>, &[u8], u64) -> bool + 'a,
+    FV: FnMut(&mut Unicorn<'a, UnicornFuzzData<D>>, Result<(), uc_error>, &[u8], u64) -> bool + 'a,
+    FC: FnMut(&mut Unicorn<'a, UnicornFuzzData<D>>) -> Result<(), uc_error> + 'a,
+{
+    /// Create a new executor
     pub fn new(
-        uc: uc_handle,
-        place_input_cb: uc_afl_cb_place_input_t,
-        validate_crash_cb: Option<uc_afl_cb_validate_crash_t>,
-        fuzz_callback: uc_afl_fuzz_cb_t,
+        mut uc: Unicorn<'a, UnicornFuzzData<D>>,
+        place_input_cb: FI,
+        validate_crash_cb: FV,
+        fuzz_callback: FC,
         always_validate: bool,
         exits: Vec<u64>,
-        map_size: u32,
-        data: *mut c_void,
     ) -> Result<Self, uc_error> {
-        let mut block_hook = std::ptr::null_mut();
-        let mut cmp_hook = std::ptr::null_mut();
-        let mut sub_hook = std::ptr::null_mut();
-        let mut state = Box::new(HookState {
-            prev_loc: 0,
-            map_size,
-        });
-        unsafe {
+        if !exits.is_empty() {
             // Enable exits if requested
-            if exits.len() > 0 {
-                let ret = uc_ctl(
-                    uc,
-                    ControlType::UC_CTL_IO_WRITE as u32 | ControlType::UC_CTL_UC_USE_EXITS as u32,
-                    1u32,
-                );
-                if ret != uc_error::OK {
-                    warn!("Fail to enable exits due to {:?}", ret);
-                    return Err(ret);
-                }
-                let ret = uc_ctl(
-                    uc,
-                    ControlType::UC_CTL_IO_WRITE as u32 | ControlType::UC_CTL_UC_EXITS as u32,
-                    exits.as_ptr(),
-                    exits.len(),
-                );
-                if ret != uc_error::OK {
-                    warn!("Fail to write exits due to {:?}", ret);
-                    return Err(ret);
-                }
-            }
-
-            let ret = uc_hook_add(
-                uc,
-                &mut block_hook,
-                unicorn_engine::HookType::BLOCK,
-                hook_code_coverage as _,
-                state.as_mut() as *mut HookState as _,
-                1,
-                0,
-            );
-            if ret != uc_error::OK {
-                warn!("Fail to add block hooks due to {:?}", ret);
-                return Err(ret);
-            }
-            let ret = uc_hook_add(
-                uc,
-                &mut cmp_hook,
-                unicorn_engine::HookType::TCG_OPCODE,
-                hook_opcode_cmpcov as _,
-                state.as_mut() as *mut HookState as _,
-                1,
-                0,
-                unicorn_engine::TcgOp::SUB,
-                unicorn_engine::TcgOpFlag::CMP,
-            );
-            if ret != uc_error::OK {
-                warn!("Fail to add cmp hooks due to {:?}", ret);
-                return Err(ret);
-            }
-            let ret = uc_hook_add(
-                uc,
-                &mut sub_hook,
-                unicorn_engine::HookType::TCG_OPCODE,
-                hook_opcode_cmpcov as _,
-                state.as_mut() as *mut HookState as _,
-                1,
-                0,
-                unicorn_engine::TcgOp::SUB,
-                unicorn_engine::TcgOpFlag::DIRECT,
-            );
-            if ret != uc_error::OK {
-                warn!("Fail to add sub hooks due to {:?}", ret);
-                return Err(ret);
-            }
+            uc.ctl_exits_enable().inspect_err(|ret| {
+                warn!("Fail to enable exits due to {ret:?}");
+            })?;
+            uc.ctl_set_exits(&exits).inspect_err(|ret| {
+                warn!("Fail to write exits due to {ret:?}");
+            })?;
         }
+
+        let block_hook = uc
+            .add_block_hook(1, 0, |uc, address, size| {
+                hook_code_coverage(uc, address, size);
+            })
+            .inspect_err(|ret| {
+                warn!("Fail to add block hooks due to {ret:?}");
+            })?;
+        let sub_hook = uc
+            .add_tcg_hook(
+                TcgOpCode::SUB,
+                TcgOpFlag::CMP | TcgOpFlag::DIRECT,
+                1,
+                0,
+                |uc, address, arg1, arg2, size| {
+                    hook_opcode_cmpcov(uc, address, arg1, arg2, size);
+                },
+            )
+            .inspect_err(|ret| {
+                warn!("Fail to add cmp and sub hooks due to {ret:?}");
+            })?;
+
         Ok(Self {
             uc,
             place_input_cb,
             validate_crash_cb,
             fuzz_callback,
             always_validate,
-            data,
-            _state: state,
             block_hook,
-            cmp_hook,
             sub_hook,
             dumb_ob: tuple_list!(ValueObserver::new("dumb_ob", OwnedRef::Owned(false.into()))),
         })
     }
 }
 
-impl HasObservers for UnicornAflExecutor {
+impl<'a, D, FI, FV, FC> HasObservers for UnicornAflExecutor<'a, D, FI, FV, FC>
+where
+    D: 'a,
+    FI: FnMut(&mut Unicorn<'a, UnicornFuzzData<D>>, &[u8], u64) -> bool + 'a,
+    FV: FnMut(&mut Unicorn<'a, UnicornFuzzData<D>>, Result<(), uc_error>, &[u8], u64) -> bool + 'a,
+    FC: FnMut(&mut Unicorn<'a, UnicornFuzzData<D>>) -> Result<(), uc_error> + 'a,
+{
     type Observers = tuple_list_type!(ValueObserver<'static, bool>);
     fn observers(&self) -> libafl_bolts::tuples::RefIndexable<&Self::Observers, Self::Observers> {
         RefIndexable::from(&self.dumb_ob)
@@ -299,28 +317,31 @@ impl HasObservers for UnicornAflExecutor {
     }
 }
 
-impl Drop for UnicornAflExecutor {
+impl<'a, D, FI, FV, FC> Drop for UnicornAflExecutor<'a, D, FI, FV, FC>
+where
+    D: 'a,
+    FI: FnMut(&mut Unicorn<'a, UnicornFuzzData<D>>, &[u8], u64) -> bool + 'a,
+    FV: FnMut(&mut Unicorn<'a, UnicornFuzzData<D>>, Result<(), uc_error>, &[u8], u64) -> bool + 'a,
+    FC: FnMut(&mut Unicorn<'a, UnicornFuzzData<D>>) -> Result<(), uc_error> + 'a,
+{
     fn drop(&mut self) {
-        unsafe {
-            let ret = uc_hook_del(self.uc, self.block_hook);
-            if ret != uc_error::OK {
-                warn!("Fail to uninstall block hook due to {:?}", ret)
-            }
-            let ret = uc_hook_del(self.uc, self.cmp_hook);
-            if ret != uc_error::OK {
-                warn!("Fail to uninstall cmp tcg opcode hook due to {:?}", ret);
-            }
-            let ret = uc_hook_del(self.uc, self.sub_hook);
-            if ret != uc_error::OK {
-                warn!("Fail to uninstall sub tcg opcode hook due to {:?}", ret);
-            }
+        if let Err(ret) = self.uc.remove_hook(self.block_hook) {
+            warn!("Fail to uninstall block hook due to {ret:?}");
+        }
+        if let Err(ret) = self.uc.remove_hook(self.sub_hook) {
+            warn!("Fail to uninstall cmp and sub tcg opcode hook due to {ret:?}");
         }
     }
 }
 
-impl<'a, EM, S, Z> Executor<EM, UnsafeSliceInput<'a>, S, Z> for UnicornAflExecutor
+impl<'a, 'b, EM, S, Z, D, FI, FV, FC> Executor<EM, UnsafeSliceInput<'a>, S, Z>
+    for UnicornAflExecutor<'b, D, FI, FV, FC>
 where
     S: HasExecutions,
+    D: 'b,
+    FI: FnMut(&mut Unicorn<'b, UnicornFuzzData<D>>, &[u8], u64) -> bool + 'b,
+    FV: FnMut(&mut Unicorn<'b, UnicornFuzzData<D>>, Result<(), uc_error>, &[u8], u64) -> bool + 'b,
+    FC: FnMut(&mut Unicorn<'b, UnicornFuzzData<D>>) -> Result<(), uc_error> + 'b,
 {
     fn run_target(
         &mut self,
@@ -329,36 +350,19 @@ where
         _mgr: &mut EM,
         input: &UnsafeSliceInput<'a>,
     ) -> Result<ExitKind, libafl::Error> {
-        let accepted = (self.place_input_cb)(
-            self.uc,
-            input.as_ref().as_ptr(),
-            input.len(),
-            *state.executions(),
-            self.data,
-        );
+        let accepted = (self.place_input_cb)(&mut self.uc, input.as_ref(), *state.executions());
 
         if !accepted {
             trace!("Input not accepted");
             return Ok(ExitKind::Ok);
         }
 
-        let err = (self.fuzz_callback)(self.uc, self.data);
+        let err = (self.fuzz_callback)(&mut self.uc);
 
-        trace!("Child returns: {:?}", err);
+        trace!("Child returns: {err:?}");
 
-        if err != uc_error::OK || self.always_validate {
-            if let Some(validate_cb) = self.validate_crash_cb {
-                if (validate_cb)(
-                    self.uc,
-                    err,
-                    input.as_ref().as_ptr(),
-                    input.len(),
-                    *state.executions(),
-                    self.data,
-                ) {
-                    return Ok(ExitKind::Crash);
-                }
-            } else if err != uc_error::OK {
+        if err.is_err() || self.always_validate {
+            if (self.validate_crash_cb)(&mut self.uc, err, input.as_ref(), *state.executions()) {
                 return Ok(ExitKind::Crash);
             }
         }
