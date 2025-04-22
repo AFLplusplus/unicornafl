@@ -1,8 +1,4 @@
-use std::{
-    ffi::{c_char, CStr},
-    os::raw::c_void,
-    path::PathBuf,
-};
+use std::path::PathBuf;
 
 use libafl::{
     corpus::{Corpus, InMemoryCorpus, Testcase},
@@ -20,110 +16,53 @@ use libafl_bolts::{
 };
 use libafl_targets::{EDGES_MAP_SIZE, SHM_FUZZING};
 use log::{debug, trace, warn};
-use unicorn_engine::{
-    ffi::{uc_ctl, uc_emu_start, uc_handle, uc_reg_read},
-    uc_error, Arch, ControlType, Mode, RegisterARM, RegisterARM64, RegisterM68K, RegisterMIPS,
-    RegisterPPC, RegisterRISCV, RegisterS390X, RegisterSPARC, RegisterTRICORE, RegisterX86,
-};
+use unicorn_engine::{uc_error, Arch, RegisterARM, Unicorn};
 
 use crate::{
-    executor::{UnicornAflExecutor, UnsafeSliceInput},
+    executor::{UnicornAflExecutor, UnicornFuzzData, UnsafeSliceInput},
     harness::LegacyHarnessStage,
-    uc_afl_cb_place_input_t, uc_afl_cb_validate_crash_t, uc_afl_fuzz_cb_t, uc_afl_ret,
+    uc_afl_ret,
 };
 
-fn get_afl_map_size() -> u32 {
-    std::env::var("AFL_MAP_SIZE")
-        .ok()
-        .map(|sz| u32::from_str_radix(&sz, 10).ok())
-        .flatten()
-        .unwrap_or(1 << 16) // MAP_SIZE
-}
+/// Dummy fuzz callback if user don't specify their own callback
+pub fn dummy_uc_fuzz_callback<'a, D: 'a>(
+    uc: &mut Unicorn<'a, UnicornFuzzData<D>>,
+) -> Result<(), uc_error> {
+    let arch = uc.get_arch();
 
-#[no_mangle]
-extern "C" fn dummy_uc_fuzz_callback(uc: uc_handle, _data: *mut c_void) -> uc_error {
-    let mut arch = 0i32;
-    let ret = unsafe {
-        uc_ctl(
-            uc,
-            ControlType::UC_CTL_UC_ARCH as u32 | ControlType::UC_CTL_IO_READ as u32,
-            &mut arch,
-        )
-    };
-    if ret != uc_error::OK {
-        return ret;
-    }
-
-    let mut mode = 0i32;
-    let ret = unsafe {
-        uc_ctl(
-            uc,
-            ControlType::UC_CTL_UC_MODE as u32 | ControlType::UC_CTL_IO_READ as u32,
-            &mut mode,
-        )
-    };
-    if ret != uc_error::OK {
-        return ret;
-    }
-
-    let mut pc = 0u64;
-    let ret = if arch == Arch::X86 as i32 {
-        if mode == Mode::MODE_32.bits() {
-            unsafe { uc_reg_read(uc, RegisterX86::EIP as i32, &mut pc as *mut u64 as _) }
-        } else if mode == Mode::MODE_16.bits() {
-            unsafe { uc_reg_read(uc, RegisterX86::IP as i32, &mut pc as *mut u64 as _) }
-        } else {
-            unsafe { uc_reg_read(uc, RegisterX86::RIP as i32, &mut pc as *mut u64 as _) }
-        }
-    } else if arch == Arch::ARM as i32 {
-        let mut cpsr = 0u64;
-        let ret = unsafe { uc_reg_read(uc, RegisterARM::CPSR as i32, &mut cpsr as *mut u64 as _) };
-        if ret != uc_error::OK {
-            return ret;
-        }
-        let ret = unsafe { uc_reg_read(uc, RegisterARM::PC as i32, &mut pc as *mut u64 as _) };
+    let mut pc = uc.pc_read()?;
+    if arch == Arch::ARM {
+        let cpsr = uc.reg_read(RegisterARM::CPSR)?;
         if cpsr & 0x20 == 1 {
             pc |= 1;
         }
-        ret
-    } else if arch == Arch::RISCV as i32 {
-        unsafe { uc_reg_read(uc, RegisterRISCV::PC as i32, &mut pc as *mut u64 as _) }
-    } else if arch == Arch::MIPS as i32 {
-        unsafe { uc_reg_read(uc, RegisterMIPS::PC as i32, &mut pc as *mut u64 as _) }
-    } else if arch == Arch::PPC as i32 {
-        unsafe { uc_reg_read(uc, RegisterPPC::PC as i32, &mut pc as *mut u64 as _) }
-    } else if arch == Arch::SPARC as i32 {
-        unsafe { uc_reg_read(uc, RegisterSPARC::PC as i32, &mut pc as *mut u64 as _) }
-    } else if arch == Arch::M68K as i32 {
-        unsafe { uc_reg_read(uc, RegisterM68K::PC as i32, &mut pc as *mut u64 as _) }
-    } else if arch == Arch::S390X as i32 {
-        unsafe { uc_reg_read(uc, RegisterS390X::PC as i32, &mut pc as *mut u64 as _) }
-    } else if arch == Arch::ARM64 as i32 {
-        unsafe { uc_reg_read(uc, RegisterARM64::PC as i32, &mut pc as *mut u64 as _) }
-    } else if arch == Arch::TRICORE as i32 {
-        unsafe { uc_reg_read(uc, RegisterTRICORE::PC as i32, &mut pc as *mut u64 as _) }
-    } else {
-        uc_error::ARCH
-    };
-
-    if ret != uc_error::OK {
-        return ret;
     }
 
-    unsafe { uc_emu_start(uc, pc, 0, 0, 0) }
+    uc.emu_start(pc, 0, 0, 0)
 }
 
-pub fn child_fuzz(
-    uc: uc_handle,
-    input_file: *const c_char,
+/// Dummy crash validation callback if user don't specify their own callback
+pub fn dummy_uc_validate_crash_callback<'a, D: 'a>(
+    _uc: &mut Unicorn<'a, UnicornFuzzData<D>>,
+    unicorn_result: Result<(), uc_error>,
+    _input: &[u8],
+    _persistent_round: u64,
+) -> bool {
+    unicorn_result.is_err()
+}
+
+/// Internal entrypoint for fuzzing
+pub fn child_fuzz<'a, D: 'a>(
+    uc: Unicorn<'a, UnicornFuzzData<D>>,
+    input_file: Option<PathBuf>,
     iters: u32,
-    place_input_cb: uc_afl_cb_place_input_t,
-    validate_crash_cb: Option<uc_afl_cb_validate_crash_t>,
+    place_input_cb: impl FnMut(&mut Unicorn<'a, UnicornFuzzData<D>>, &[u8], u64) -> bool + 'a,
+    validate_crash_cb: impl FnMut(&mut Unicorn<'a, UnicornFuzzData<D>>, Result<(), uc_error>, &[u8], u64) -> bool
+        + 'a,
+    fuzz_callback: impl FnMut(&mut Unicorn<'a, UnicornFuzzData<D>>) -> Result<(), uc_error> + 'a,
     exits: Vec<u64>,
-    fuzz_callback: Option<uc_afl_fuzz_cb_t>,
     always_validate: bool,
     run_once_if_no_afl_present: bool,
-    data: *mut c_void,
 ) -> Result<(), uc_afl_ret> {
     // Enable logging
     #[cfg(feature = "env_logger")]
@@ -132,14 +71,14 @@ pub fn child_fuzz(
     let has_afl = libafl_targets::map_input_shared_memory() && libafl_targets::map_shared_memory();
 
     trace!("AFL detected: {}", has_afl);
-    if !input_file.is_null() && has_afl {
+    if !input_file.is_none() && has_afl {
         warn!("Shared memory fuzzing is enabled and the input file is ignored!");
     }
-    if input_file.is_null() && !has_afl {
+    if input_file.is_none() && !has_afl {
         warn!("No input file is provided. We will run harness with zero inputs.");
     }
     if has_afl || run_once_if_no_afl_present {
-        let map_size = get_afl_map_size();
+        let map_size = uc.get_data().map_size();
         unsafe {
             EDGES_MAP_SIZE = map_size as usize;
             SHM_FUZZING = 1;
@@ -152,11 +91,9 @@ pub fn child_fuzz(
             uc,
             place_input_cb,
             validate_crash_cb,
-            fuzz_callback.unwrap_or(dummy_uc_fuzz_callback),
+            fuzz_callback,
             always_validate,
             exits,
-            map_size as u32,
-            data,
         )?;
 
         let mut fb = BoolValueFeedback::new(&Handle::new("dumb_ob".into()));
@@ -178,20 +115,7 @@ pub fn child_fuzz(
         }));
         let sched = QueueScheduler::new();
         let iters = if run_once_if_no_afl_present { 1 } else { iters };
-        let input_file = if has_afl {
-            None
-        } else {
-            if input_file.is_null() {
-                None
-            } else {
-                // legact usage
-                Some(PathBuf::from(
-                    unsafe { CStr::from_ptr(input_file) }
-                        .to_str()
-                        .map_err(|_| uc_afl_ret::UC_AFL_RET_FFI)?,
-                ))
-            }
-        };
+        let input_file = if has_afl { None } else { input_file };
         let stage = LegacyHarnessStage::new(iters as usize, map_size, input_file);
         let mut stages = tuple_list!(stage);
         let mut fuzzer = StdFuzzer::new(sched, fb, sol);

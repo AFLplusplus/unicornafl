@@ -1,18 +1,14 @@
-use std::ffi::{c_uchar, c_void, CString};
+use std::path::PathBuf;
 
-use unicorn_engine::{ffi::uc_handle, Arch, Mode, Permission, RegisterX86, Unicorn};
-use unicornafl::target::child_fuzz;
+use unicorn_engine::{Arch, Mode, Prot, RegisterX86, Unicorn};
+use unicornafl::{afl_fuzz, executor::UnicornFuzzData};
 
-extern "C" fn place_input_cb(
-    uc: uc_handle,
-    input: *const c_uchar,
-    input_len: usize,
+fn place_input_cb<'a, D: 'a>(
+    uc: &mut Unicorn<'a, UnicornFuzzData<D>>,
+    input: &[u8],
     _persistent_round: u64,
-    _data: *mut c_void,
 ) -> bool {
-    let mut uc = unsafe { Unicorn::from_handle(uc) }.expect("fail to create inner");
     let mut buf = [0; 8];
-    let input = unsafe { std::slice::from_raw_parts(input, input_len) };
     if input.len() < 8 {
         // decline the input
         return false;
@@ -28,30 +24,23 @@ extern "C" fn place_input_cb(
 
 fn main() {
     let input_file = std::env::args().into_iter().skip(1).nth(0);
-    let mut uc = Unicorn::new(Arch::X86, Mode::MODE_64).expect("fail to open uc");
+    let mut uc = Unicorn::new_with_data(Arch::X86, Mode::MODE_64, UnicornFuzzData::default())
+        .expect("fail to open uc");
     // ks.asm("mov rax, rdx; cmp rax, 0x114514; je die; xor rax, rax; die: mov rax, [rax]; xor rax, rax")
     let code = b"\x48\x89\xd0\x48\x3d\x14\x45\x11\x00\x74\x03\x48\x31\xc0\x48\x8b\x00\x48\x31\xc0";
-    uc.mem_map(0x1000, 0x4000, Permission::all())
-        .expect("fail to map");
+    uc.mem_map(0x1000, 0x4000, Prot::ALL).expect("fail to map");
     uc.mem_write(0x1000, code).expect("fail to write code");
     let pc = 0x1000;
     uc.reg_write(RegisterX86::RIP, pc)
         .expect("fail to write pc");
-    let input_file = input_file.map(|t| CString::new(t).expect("fail to CString"));
-    child_fuzz(
-        uc.get_handle(),
-        input_file
-            .as_ref()
-            .map(|t| t.as_ptr())
-            .unwrap_or(std::ptr::null()),
-        1, // This is not too effective but enough here for testing
+    let input_file = input_file.map(|t| PathBuf::from(t));
+    afl_fuzz(
+        uc,
+        input_file,
         place_input_cb,
-        None,
         vec![0x100b, 0x1011],
-        None,
         false,
-        true,
-        std::ptr::null_mut(),
+        1,
     )
     .expect("fail to fuzz?")
 }
