@@ -235,6 +235,8 @@ where
     block_hook: UcHookId,
     /// Stored for deleting hook when dropping
     sub_hook: UcHookId,
+    /// Stored for deleting hook when dropping
+    cmp_hook: UcHookId,
     dumb_ob: tuple_list_type!(ValueObserver<'static, bool>),
 }
 
@@ -274,7 +276,7 @@ where
         let sub_hook = uc
             .add_tcg_hook(
                 TcgOpCode::SUB,
-                TcgOpFlag::CMP | TcgOpFlag::DIRECT,
+                TcgOpFlag::DIRECT,
                 1,
                 0,
                 |uc, address, arg1, arg2, size| {
@@ -282,7 +284,20 @@ where
                 },
             )
             .inspect_err(|ret| {
-                warn!("Fail to add cmp and sub hooks due to {ret:?}");
+                warn!("Fail to add sub hooks due to {ret:?}");
+            })?;
+        let cmp_hook = uc
+            .add_tcg_hook(
+                TcgOpCode::SUB,
+                TcgOpFlag::CMP,
+                1,
+                0,
+                |uc, address, arg1, arg2, size| {
+                    hook_opcode_cmpcov(uc, address, arg1, arg2, size);
+                },
+            )
+            .inspect_err(|ret| {
+                warn!("Fail to add cmp hooks due to {ret:?}");
             })?;
 
         Ok(Self {
@@ -293,6 +308,7 @@ where
             always_validate,
             block_hook,
             sub_hook,
+            cmp_hook,
             dumb_ob: tuple_list!(ValueObserver::new("dumb_ob", OwnedRef::Owned(false.into()))),
         })
     }
@@ -329,7 +345,10 @@ where
             warn!("Fail to uninstall block hook due to {ret:?}");
         }
         if let Err(ret) = self.uc.remove_hook(self.sub_hook) {
-            warn!("Fail to uninstall cmp and sub tcg opcode hook due to {ret:?}");
+            warn!("Fail to uninstall sub tcg opcode hook due to {ret:?}");
+        }
+        if let Err(ret) = self.uc.remove_hook(self.cmp_hook) {
+            warn!("Fail to uninstall cmp tcg opcode hook due to {ret:?}");
         }
     }
 }
