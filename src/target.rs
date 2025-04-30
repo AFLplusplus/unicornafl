@@ -114,7 +114,11 @@ pub fn child_fuzz<'a, D: 'a>(
             debug!("{}", s);
         }));
         let sched = QueueScheduler::new();
-        let iters = if run_once_if_no_afl_present { 1 } else { iters };
+        let iters = if !has_afl && run_once_if_no_afl_present {
+            1
+        } else {
+            iters
+        };
         let input_file = if has_afl { None } else { input_file };
         let stage = LegacyHarnessStage::new(iters as usize, map_size, input_file);
         let mut stages = tuple_list!(stage);
