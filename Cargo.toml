@@ -6,9 +6,9 @@ edition = "2021"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-libafl_targets = {git = "https://github.com/wtdcode/LibAFL", branch = "ucafl", features = ["pointer_maps"]}
-libafl = {git = "https://github.com/wtdcode/LibAFL", branch = "ucafl"}
-libafl_bolts = {git = "https://github.com/wtdcode/LibAFL", branch = "ucafl"}
+libafl_targets = { git = "https://github.com/AFLplusplus/LibAFL", features = ["pointer_maps", "forkserver"] }
+libafl = { git = "https://github.com/AFLplusplus/LibAFL" }
+libafl_bolts = { git = "https://github.com/AFLplusplus/LibAFL" }
 
 serde ={ version = "1.0", features = ["derive"] }
 unicorn-engine = { git = "https://github.com/unicorn-engine/unicorn", branch = "dev"}
