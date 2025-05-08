@@ -1,11 +1,11 @@
 use std::path::PathBuf;
 
-use libafl_targets::{__afl_map_size, EDGES_MAP_PTR, SHM_FUZZING};
+use libafl_targets::{__afl_map_size, cmps::CMPLOG_ENABLED, EDGES_MAP_PTR, SHM_FUZZING};
 use log::{debug, error, trace, warn};
 use unicorn_engine::{uc_error, Arch, RegisterARM, Unicorn};
 
 use crate::{
-    executor::{UnicornAflExecutor, UnicornAflExecutorHook, UnicornFuzzData},
+    executor::{CmpPolicy, UnicornAflExecutor, UnicornAflExecutorHook, UnicornFuzzData},
     uc_afl_ret,
 };
 
@@ -79,7 +79,43 @@ pub fn child_fuzz<'a, D: 'a>(
             SHM_FUZZING = 1;
         }
         debug!("Map size is: {map_size}");
-        let executor = UnicornAflExecutor::new(uc, (), callbacks, always_validate, exits)?;
+
+        // The following code will handle CMPLOG and CMPCOV envs
+        //
+        // In AFL++, the cmplog shared memory id env will always set if
+        // users specify "-c" option to `afl-fuzz` in commandline, no
+        // matter whether it is invoking the cmplog_binary or normal binary. See
+        // https://github.com/AFLplusplus/AFLplusplus/blob/c340a022e2546488c15f85593d0f37e30eeaab3a/src/afl-sharedmem.c#L321
+        //
+        // But only for cmplog binaries, AFL++ will set ___AFL_EINS_ZWEI_POLIZEI___, see
+        // https://github.com/AFLplusplus/AFLplusplus/blob/c340a022e2546488c15f85593d0f37e30eeaab3a/src/afl-fuzz-cmplog.c#L34
+        //
+        // As a result, we check both env vars, and users can pass the same unicornafl
+        // binary as both normal binary and cmplog binary (use `-c 0` in `afl-fuzz` cmdline).
+        //
+        // The `CMPLOG_ENABLED` controls whether the underlined `__libafl_targets_cmplog_instructions`
+        // will take effect.
+        let cmp_policy;
+        let has_cmplog = std::env::var("___AFL_EINS_ZWEI_POLIZEI___").is_ok()
+            && libafl_targets::map_cmplog_shared_memory().is_ok();
+        let has_cmpcov = std::env::var("UNICORN_AFL_CMPCOV").is_ok();
+        if has_cmplog {
+            if has_cmpcov {
+                warn!("CMPLOG and CMPCOV turned on at the same time!");
+                warn!("I'll turn off CMPCOV.");
+            }
+            unsafe {
+                CMPLOG_ENABLED = 1;
+            }
+            cmp_policy = CmpPolicy::Cmplog;
+        } else if has_cmpcov {
+            cmp_policy = CmpPolicy::Cmpcov;
+        } else {
+            cmp_policy = CmpPolicy::None;
+        }
+
+        let executor =
+            UnicornAflExecutor::new(uc, (), callbacks, always_validate, exits, cmp_policy)?;
         let mut forkserver_parent = crate::forkserver::UnicornAflForkserverParent::new(executor);
         libafl_targets::start_forkserver(&mut forkserver_parent)?;
         let mut executor = forkserver_parent.executor;

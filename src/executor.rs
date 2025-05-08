@@ -9,7 +9,7 @@ use libafl::{
     state::HasExecutions,
 };
 use libafl_bolts::tuples::RefIndexable;
-use libafl_targets::EDGES_MAP_PTR;
+use libafl_targets::{CMPLOG_MAP_W, EDGES_MAP_PTR};
 use log::{error, trace, warn};
 use unicorn_engine::{uc_error, TcgOpCode, TcgOpFlag, UcHookId, Unicorn};
 
@@ -155,7 +155,7 @@ fn hook_opcode_cmpcov<'a, D: 'a>(
     arg2: u64,
     size: usize,
 ) {
-    let state = &mut uc.get_data_mut().hook_state;
+    let state = &uc.get_data().hook_state;
     let mut cur_loc = afl_hash_ip(address) & (state.map_size - 1);
 
     if size >= 64 {
@@ -173,6 +173,28 @@ fn hook_opcode_cmpcov<'a, D: 'a>(
             cur_loc -= 2;
         }
         hook_sub_impl_16(cur_loc, state.prev_loc, arg1, arg2);
+    }
+}
+
+fn hook_opcode_cmplog<'a, D: 'a>(
+    uc: &mut Unicorn<'a, UnicornFuzzData<D>>,
+    address: u64,
+    arg1: u64,
+    arg2: u64,
+    size: usize,
+) {
+    let state = &uc.get_data().hook_state;
+    let cur_loc = afl_hash_ip(address) & (state.map_size - 1);
+    let k = cur_loc as usize & (CMPLOG_MAP_W - 1);
+    let shape = match size {
+        16 => 1,
+        32 => 3,
+        64 => 7,
+        _ => 0,
+    };
+
+    unsafe {
+        libafl_targets::cmps::__libafl_targets_cmplog_instructions(k, shape, arg1, arg2);
     }
 }
 
@@ -265,6 +287,22 @@ where
     }
 }
 
+/// Policy to deal with CMP and SUB instructions
+pub enum CmpPolicy {
+    /// Use Redqueen algorithm
+    ///
+    /// To use this policy, users should first setup [`CMPLOG_MAP_PTR`][libafl_targets::cmps::CMPLOG_MAP_PTR]
+    /// by methods like [`map_cmplog_shared_memory`][libafl_targets::map_cmplog_shared_memory]
+    Cmplog,
+    /// Use CMPCOV algorithm
+    ///
+    /// To use this policy, users should first setup [`EDGES_MAP_PTR`][libafl_targets::EDGES_MAP_PTR]
+    /// by methods like [`map_shared_memory`][libafl_targets::map_shared_memory].
+    Cmpcov,
+    /// Do nothing
+    None,
+}
+
 /// Executor for unicorn afl fuzzing. Can be used in both forkserver mode
 /// and LibAFL.
 pub struct UnicornAflExecutor<'a, D, OT, H>
@@ -283,9 +321,9 @@ where
     /// Stored for deleting hook when dropping
     block_hook: UcHookId,
     /// Stored for deleting hook when dropping
-    sub_hook: UcHookId,
+    sub_hook: Option<UcHookId>,
     /// Stored for deleting hook when dropping
-    cmp_hook: UcHookId,
+    cmp_hook: Option<UcHookId>,
     /// Stored for deleting hook when dropping
     new_tb_hook: UcHookId,
     /// Callback hooks
@@ -304,14 +342,15 @@ where
         callbacks: H,
         always_validate: bool,
         exits: Vec<u64>,
+        cmp_policy: CmpPolicy,
     ) -> Result<Self, uc_error> {
         if !exits.is_empty() {
             // Enable exits if requested
             uc.ctl_exits_enable().inspect_err(|ret| {
-                warn!("Fail to enable exits due to {ret:?}");
+                warn!("Fail to enable exits due to {ret}");
             })?;
             uc.ctl_set_exits(&exits).inspect_err(|ret| {
-                warn!("Fail to write exits due to {ret:?}");
+                warn!("Fail to write exits due to {ret}");
             })?;
         }
 
@@ -320,34 +359,76 @@ where
                 hook_code_coverage(uc, address, size);
             })
             .inspect_err(|ret| {
-                warn!("Fail to add block hooks due to {ret:?}");
+                warn!("Fail to add block hooks due to {ret}");
             })?;
-        let sub_hook = uc
-            .add_tcg_hook(
-                TcgOpCode::SUB,
-                TcgOpFlag::DIRECT,
-                1,
-                0,
-                |uc, address, arg1, arg2, size| {
-                    hook_opcode_cmpcov(uc, address, arg1, arg2, size);
-                },
-            )
-            .inspect_err(|ret| {
-                warn!("Fail to add sub hooks due to {ret:?}");
-            })?;
-        let cmp_hook = uc
-            .add_tcg_hook(
-                TcgOpCode::SUB,
-                TcgOpFlag::CMP,
-                1,
-                0,
-                |uc, address, arg1, arg2, size| {
-                    hook_opcode_cmpcov(uc, address, arg1, arg2, size);
-                },
-            )
-            .inspect_err(|ret| {
-                warn!("Fail to add cmp hooks due to {ret:?}");
-            })?;
+        let sub_hook;
+        let cmp_hook;
+        match cmp_policy {
+            CmpPolicy::Cmplog => {
+                sub_hook = Some(
+                    uc.add_tcg_hook(
+                        TcgOpCode::SUB,
+                        TcgOpFlag::DIRECT,
+                        1,
+                        0,
+                        |uc, address, arg1, arg2, size| {
+                            hook_opcode_cmplog(uc, address, arg1, arg2, size);
+                        },
+                    )
+                    .inspect_err(|ret| {
+                        warn!("Fail to add sub hooks due to {ret}");
+                    })?,
+                );
+                cmp_hook = Some(
+                    uc.add_tcg_hook(
+                        TcgOpCode::SUB,
+                        TcgOpFlag::CMP,
+                        1,
+                        0,
+                        |uc, address, arg1, arg2, size| {
+                            hook_opcode_cmplog(uc, address, arg1, arg2, size);
+                        },
+                    )
+                    .inspect_err(|ret| {
+                        warn!("Fail to add cmp hooks due to {ret}");
+                    })?,
+                );
+            }
+            CmpPolicy::Cmpcov => {
+                sub_hook = Some(
+                    uc.add_tcg_hook(
+                        TcgOpCode::SUB,
+                        TcgOpFlag::DIRECT,
+                        1,
+                        0,
+                        |uc, address, arg1, arg2, size| {
+                            hook_opcode_cmpcov(uc, address, arg1, arg2, size);
+                        },
+                    )
+                    .inspect_err(|ret| {
+                        warn!("Fail to add sub hooks due to {ret}");
+                    })?,
+                );
+                cmp_hook = Some(
+                    uc.add_tcg_hook(
+                        TcgOpCode::SUB,
+                        TcgOpFlag::CMP,
+                        1,
+                        0,
+                        |uc, address, arg1, arg2, size| {
+                            hook_opcode_cmpcov(uc, address, arg1, arg2, size);
+                        },
+                    )
+                    .inspect_err(|ret| {
+                        warn!("Fail to add cmp hooks due to {ret}");
+                    })?,
+                );
+            }
+            CmpPolicy::None => {
+                sub_hook = None;
+                cmp_hook = None;
+            }
+        }
         let new_tb_hook = uc
             .add_edge_gen_hook(1, 0, |uc, cur_tb, _| {
                 if let Some(child_pipe_w) = &uc.get_data_mut().child_pipe_w {
@@ -368,7 +449,7 @@ where
                 }
             })
             .inspect_err(|ret| {
-                warn!("Fail to add edge gen hooks due to {ret:?}");
+                warn!("Fail to add edge gen hooks due to {ret}");
             })?;
 
         Ok(Self {
@@ -445,16 +526,20 @@ where
 {
     fn drop(&mut self) {
         if let Err(ret) = self.uc.remove_hook(self.block_hook) {
-            warn!("Fail to uninstall block hook due to {ret:?}");
+            warn!("Fail to uninstall block hook due to {ret}");
         }
-        if let Err(ret) = self.uc.remove_hook(self.sub_hook) {
-            warn!("Fail to uninstall sub tcg opcode hook due to {ret:?}");
+        if let Some(sub_hook) = self.sub_hook.take() {
+            if let Err(ret) = self.uc.remove_hook(sub_hook) {
+                warn!("Fail to uninstall sub tcg opcode hook due to {ret}");
+            }
         }
-        if let Err(ret) = self.uc.remove_hook(self.cmp_hook) {
-            warn!("Fail to uninstall cmp tcg opcode hook due to {ret:?}");
+        if let Some(cmp_hook) = self.cmp_hook.take() {
+            if let Err(ret) = self.uc.remove_hook(cmp_hook) {
+                warn!("Fail to uninstall cmp tcg opcode hook due to {ret}");
+            }
         }
         if let Err(ret) = self.uc.remove_hook(self.new_tb_hook) {
-            warn!("Fail to uninstall edge gen hook due to {ret:?}");
+            warn!("Fail to uninstall edge gen hook due to {ret}");
         }
     }
 }
