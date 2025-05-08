@@ -98,8 +98,7 @@ pub fn child_fuzz<'a, D: 'a>(
             error!("Fuzzing fails with error from libafl: {e}");
         }
     } else {
-        // Run with libafl directly
-        unimplemented!("You should use UnicornAflExecutor directly to compose your fuzzer")
+        // TODO: Run with libafl directly
     }
     Ok(())
 }
