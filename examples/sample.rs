@@ -14,7 +14,7 @@ fn place_input_cb<'a, D: 'a>(
         return false;
     }
     let cp_len = input.len().min(8);
-    buf[0..cp_len].copy_from_slice(input);
+    buf[0..cp_len].copy_from_slice(&input[0..cp_len]);
     let rdx = u64::from_le_bytes(buf);
     uc.reg_write(RegisterX86::RDX, rdx)
         .expect("Fail to write reg");
@@ -23,7 +23,7 @@ fn place_input_cb<'a, D: 'a>(
 }
 
 fn main() {
-    let input_file = std::env::args().into_iter().skip(1).nth(0);
+    let input_file = std::env::args().nth(1);
     let mut uc = Unicorn::new_with_data(Arch::X86, Mode::MODE_64, UnicornFuzzData::default())
         .expect("fail to open uc");
     // ks.asm("mov rax, rdx; cmp rax, 0x114514; je die; xor rax, rax; die: mov rax, [rax]; xor rax, rax")
@@ -33,7 +33,7 @@ fn main() {
     let pc = 0x1000;
     uc.reg_write(RegisterX86::RIP, pc)
         .expect("fail to write pc");
-    let input_file = input_file.map(|t| PathBuf::from(t));
+    let input_file = input_file.map(PathBuf::from);
     afl_fuzz(
         uc,
         input_file,

@@ -4,10 +4,11 @@ use std::{
     path::PathBuf,
 };
 
-use executor::UnicornFuzzData;
+use executor::{UnicornAflExecutorCustomHook, UnicornAflExecutorHook, UnicornFuzzData};
 use unicorn_engine::{uc_error, unicorn_const::uc_engine, Unicorn};
 
 pub mod executor;
+mod forkserver;
 pub mod harness;
 pub mod hash;
 pub mod target;
@@ -64,12 +65,6 @@ pub type uc_afl_fuzz_cb_t = extern "C" fn(uc: *mut uc_engine, data: *mut c_void)
 
 /// Customized afl fuzz routine entrypoint for Rust user.
 ///
-/// If you want to use default crash validation callback, pass
-/// [`dummy_uc_validate_crash_callback`][target::dummy_uc_validate_crash_callback].
-///
-/// If you want to use default fuzz callback, pass
-/// [`dummy_uc_fuzz_callback`][target::dummy_uc_fuzz_callback].
-///
 /// `exits` means instruction addresses that stop the execution. You can pass
 /// an empty vec here if there is not explicit exit.
 ///
@@ -81,10 +76,7 @@ pub type uc_afl_fuzz_cb_t = extern "C" fn(uc: *mut uc_engine, data: *mut c_void)
 pub fn afl_fuzz_custom<'a, D: 'a>(
     uc: Unicorn<'a, UnicornFuzzData<D>>,
     input_file: Option<PathBuf>,
-    place_input_cb: impl FnMut(&mut Unicorn<'a, UnicornFuzzData<D>>, &[u8], u64) -> bool + 'a,
-    validate_crash_cb: impl FnMut(&mut Unicorn<'a, UnicornFuzzData<D>>, Result<(), uc_error>, &[u8], u64) -> bool
-        + 'a,
-    fuzz_callback: impl FnMut(&mut Unicorn<'a, UnicornFuzzData<D>>) -> Result<(), uc_error> + 'a,
+    callbacks: impl UnicornAflExecutorHook<'a, D>,
     exits: Vec<u64>,
     always_validate: bool,
     persistent_iters: u32,
@@ -93,9 +85,7 @@ pub fn afl_fuzz_custom<'a, D: 'a>(
         uc,
         input_file,
         persistent_iters,
-        place_input_cb,
-        validate_crash_cb,
-        fuzz_callback,
+        callbacks,
         exits,
         always_validate,
         true,
@@ -116,9 +106,11 @@ pub fn afl_fuzz<'a, D: 'a>(
     afl_fuzz_custom(
         uc,
         input_file,
-        place_input_cb,
-        target::dummy_uc_validate_crash_callback,
-        target::dummy_uc_fuzz_callback,
+        UnicornAflExecutorCustomHook::new(
+            place_input_cb,
+            target::dummy_uc_validate_crash_callback,
+            target::dummy_uc_fuzz_callback,
+        ),
         exits,
         always_validate,
         persistent_iters,
@@ -184,6 +176,7 @@ pub extern "C" fn uc_afl_fuzz_custom(
 // This is due to the fact that two closure have different types even if
 // their signature is the same. As a result, we must split the invocation
 // to avoid checking the emptyness inside every round.
+#[expect(clippy::too_many_arguments)]
 fn uc_afl_fuzz_internal(
     uc_handle: *mut uc_engine,
     input_file: *const c_char,
@@ -266,9 +259,7 @@ fn uc_afl_fuzz_internal(
         (Some(validate_crash_cb), Some(fuzz_cb)) => afl_fuzz_custom(
             uc,
             input_file,
-            place_input_cb,
-            validate_crash_cb,
-            fuzz_cb,
+            UnicornAflExecutorCustomHook::new(place_input_cb, validate_crash_cb, fuzz_cb),
             exits,
             always_validate,
             persistent_iters,
@@ -276,9 +267,11 @@ fn uc_afl_fuzz_internal(
         (Some(validate_crash_cb), None) => afl_fuzz_custom(
             uc,
             input_file,
-            place_input_cb,
-            validate_crash_cb,
-            target::dummy_uc_fuzz_callback,
+            UnicornAflExecutorCustomHook::new(
+                place_input_cb,
+                validate_crash_cb,
+                target::dummy_uc_fuzz_callback,
+            ),
             exits,
             always_validate,
             persistent_iters,
@@ -286,9 +279,11 @@ fn uc_afl_fuzz_internal(
         (None, Some(fuzz_cb)) => afl_fuzz_custom(
             uc,
             input_file,
-            place_input_cb,
-            target::dummy_uc_validate_crash_callback,
-            fuzz_cb,
+            UnicornAflExecutorCustomHook::new(
+                place_input_cb,
+                target::dummy_uc_validate_crash_callback,
+                fuzz_cb,
+            ),
             exits,
             always_validate,
             persistent_iters,
@@ -296,9 +291,11 @@ fn uc_afl_fuzz_internal(
         (None, None) => afl_fuzz_custom(
             uc,
             input_file,
-            place_input_cb,
-            target::dummy_uc_validate_crash_callback,
-            target::dummy_uc_fuzz_callback,
+            UnicornAflExecutorCustomHook::new(
+                place_input_cb,
+                target::dummy_uc_validate_crash_callback,
+                target::dummy_uc_fuzz_callback,
+            ),
             exits,
             always_validate,
             persistent_iters,
