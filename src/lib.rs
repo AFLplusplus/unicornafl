@@ -72,14 +72,15 @@ pub type uc_afl_fuzz_cb_t = extern "C" fn(uc: *mut uc_engine, data: *mut c_void)
 /// regardless of the result of execution; Otherwise, only failed execution will
 /// invoke such callback.
 ///
-/// `persistent_iters` is the number of persistent execution rounds.
+/// `persistent_iters` is the number of persistent execution rounds. If it is `None`,
+/// then the loop will be infinite
 pub fn afl_fuzz_custom<'a, D: 'a>(
     uc: Unicorn<'a, UnicornFuzzData<D>>,
     input_file: Option<PathBuf>,
     callbacks: impl UnicornAflExecutorHook<'a, D>,
     exits: Vec<u64>,
     always_validate: bool,
-    persistent_iters: u32,
+    persistent_iters: Option<u64>,
 ) -> Result<(), uc_afl_ret> {
     target::child_fuzz(
         uc,
@@ -101,7 +102,7 @@ pub fn afl_fuzz<'a, D: 'a>(
     place_input_cb: impl FnMut(&mut Unicorn<'a, UnicornFuzzData<D>>, &[u8], u64) -> bool + 'a,
     exits: Vec<u64>,
     always_validate: bool,
-    persistent_iters: u32,
+    persistent_iters: Option<u64>,
 ) -> Result<(), uc_afl_ret> {
     afl_fuzz_custom(
         uc,
@@ -128,7 +129,7 @@ pub extern "C" fn uc_afl_fuzz(
     exit_count: usize,
     validate_crash_callback: Option<uc_afl_cb_validate_crash_t>,
     always_validate: bool,
-    persistent_iters: u32,
+    persistent_iters: u64,
     data: *mut c_void,
 ) -> uc_afl_ret {
     uc_afl_fuzz_internal(
@@ -155,7 +156,7 @@ pub extern "C" fn uc_afl_fuzz_custom(
     fuzz_callback: uc_afl_fuzz_cb_t,
     validate_crash_callback: Option<uc_afl_cb_validate_crash_t>,
     always_validate: bool,
-    persistent_iters: u32,
+    persistent_iters: u64,
     data: *mut c_void,
 ) -> uc_afl_ret {
     uc_afl_fuzz_internal(
@@ -186,7 +187,7 @@ fn uc_afl_fuzz_internal(
     fuzz_callback: Option<uc_afl_fuzz_cb_t>,
     validate_crash_callback: Option<uc_afl_cb_validate_crash_t>,
     always_validate: bool,
-    persistent_iters: u32,
+    persistent_iters: u64,
     data: *mut c_void,
 ) -> uc_afl_ret {
     let fuzz_data = UnicornFuzzData::new(data);
@@ -253,6 +254,12 @@ fn uc_afl_fuzz_internal(
         vec![]
     } else {
         unsafe { std::slice::from_raw_parts(exits, exit_count) }.to_vec()
+    };
+
+    let persistent_iters = if persistent_iters == 0 {
+        None
+    } else {
+        Some(persistent_iters)
     };
 
     let res = match (validate_crash_cb, fuzz_cb) {

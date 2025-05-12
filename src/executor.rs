@@ -287,7 +287,7 @@ where
     /// Stored for deleting hook when dropping
     cmp_hook: UcHookId,
     /// Stored for deleting hook when dropping
-    new_tb_hook: UcHookId,
+    new_tb_hook: Option<UcHookId>,
     /// Callback hooks
     callbacks: H,
 }
@@ -304,6 +304,7 @@ where
         callbacks: H,
         always_validate: bool,
         exits: Vec<u64>,
+        infinite_loop: bool,
     ) -> Result<Self, uc_error> {
         if !exits.is_empty() {
             // Enable exits if requested
@@ -348,28 +349,33 @@ where
             .inspect_err(|ret| {
                 warn!("Fail to add cmp hooks due to {ret:?}");
             })?;
-        let new_tb_hook = uc
-            .add_edge_gen_hook(1, 0, |uc, cur_tb, _| {
-                if let Some(child_pipe_w) = &uc.get_data_mut().child_pipe_w {
-                    if crate::forkserver::write_u32_to_fd(
-                        child_pipe_w,
-                        crate::forkserver::afl_child_ret::TSL_REQUEST,
-                    )
-                    .is_err()
-                    {
-                        error!("Error writing TSL REQUEST");
-                        return;
+        let new_tb_hook = if infinite_loop {
+            None
+        } else {
+            Some(
+                uc.add_edge_gen_hook(1, 0, |uc, cur_tb, _| {
+                    if let Some(child_pipe_w) = &uc.get_data_mut().child_pipe_w {
+                        if crate::forkserver::write_u32_to_fd(
+                            child_pipe_w,
+                            crate::forkserver::afl_child_ret::TSL_REQUEST,
+                        )
+                        .is_err()
+                        {
+                            error!("Error writing TSL REQUEST");
+                            return;
+                        }
+                        #[expect(clippy::needless_return)]
+                        if crate::forkserver::write_u64_to_fd(child_pipe_w, cur_tb.pc).is_err() {
+                            error!("Error writing TSL REQUEST pc");
+                            return;
+                        }
                     }
-                    #[expect(clippy::needless_return)]
-                    if crate::forkserver::write_u64_to_fd(child_pipe_w, cur_tb.pc).is_err() {
-                        error!("Error writing TSL REQUEST pc");
-                        return;
-                    }
-                }
-            })
-            .inspect_err(|ret| {
-                warn!("Fail to add edge gen hooks due to {ret:?}");
-            })?;
+                })
+                .inspect_err(|ret| {
+                    warn!("Fail to add edge gen hooks due to {ret:?}");
+                })?,
+            )
+        };
 
         Ok(Self {
             uc,
@@ -453,8 +459,10 @@ where
         if let Err(ret) = self.uc.remove_hook(self.cmp_hook) {
             warn!("Fail to uninstall cmp tcg opcode hook due to {ret:?}");
         }
-        if let Err(ret) = self.uc.remove_hook(self.new_tb_hook) {
-            warn!("Fail to uninstall edge gen hook due to {ret:?}");
+        if let Some(new_tb_hook) = self.new_tb_hook.take() {
+            if let Err(ret) = self.uc.remove_hook(new_tb_hook) {
+                warn!("Fail to uninstall edge gen hook due to {ret:?}");
+            }
         }
     }
 }
