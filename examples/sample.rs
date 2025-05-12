@@ -40,7 +40,7 @@ fn main() {
         place_input_cb,
         vec![0x100b, 0x1011],
         false,
-        1,
+        Some(1),
     )
     .expect("fail to fuzz?")
 }

@@ -298,21 +298,24 @@ where
     H: UnicornAflExecutorHook<'a, D>,
 {
     /// Create a new executor
+    ///
+    /// * `always_validate`: Whether call validate callback even if this round does not lead to crash
+    /// * `cache_tb`: Whether enable TB-cache, which is useful if not in infinite loop
     pub fn new(
         mut uc: Unicorn<'a, UnicornFuzzData<D>>,
         observers: OT,
         callbacks: H,
         always_validate: bool,
         exits: Vec<u64>,
-        infinite_loop: bool,
+        cache_tb: bool,
     ) -> Result<Self, uc_error> {
         if !exits.is_empty() {
             // Enable exits if requested
             uc.ctl_exits_enable().inspect_err(|ret| {
-                warn!("Fail to enable exits due to {ret:?}");
+                warn!("Fail to enable exits due to {ret}");
             })?;
             uc.ctl_set_exits(&exits).inspect_err(|ret| {
-                warn!("Fail to write exits due to {ret:?}");
+                warn!("Fail to write exits due to {ret}");
             })?;
         }
 
@@ -321,7 +324,7 @@ where
                 hook_code_coverage(uc, address, size);
             })
             .inspect_err(|ret| {
-                warn!("Fail to add block hooks due to {ret:?}");
+                warn!("Fail to add block hooks due to {ret}");
             })?;
         let sub_hook = uc
             .add_tcg_hook(
@@ -334,7 +337,7 @@ where
                 },
             )
             .inspect_err(|ret| {
-                warn!("Fail to add sub hooks due to {ret:?}");
+                warn!("Fail to add sub hooks due to {ret}");
             })?;
         let cmp_hook = uc
             .add_tcg_hook(
@@ -347,9 +350,9 @@ where
                 },
             )
             .inspect_err(|ret| {
-                warn!("Fail to add cmp hooks due to {ret:?}");
+                warn!("Fail to add cmp hooks due to {ret}");
             })?;
-        let new_tb_hook = if infinite_loop {
+        let new_tb_hook = if cache_tb {
             None
         } else {
             Some(
@@ -372,7 +375,7 @@ where
                     }
                 })
                 .inspect_err(|ret| {
-                    warn!("Fail to add edge gen hooks due to {ret:?}");
+                    warn!("Fail to add edge gen hooks due to {ret}");
                 })?,
             )
         };
@@ -451,17 +454,17 @@ where
 {
     fn drop(&mut self) {
         if let Err(ret) = self.uc.remove_hook(self.block_hook) {
-            warn!("Fail to uninstall block hook due to {ret:?}");
+            warn!("Fail to uninstall block hook due to {ret}");
         }
         if let Err(ret) = self.uc.remove_hook(self.sub_hook) {
-            warn!("Fail to uninstall sub tcg opcode hook due to {ret:?}");
+            warn!("Fail to uninstall sub tcg opcode hook due to {ret}");
         }
         if let Err(ret) = self.uc.remove_hook(self.cmp_hook) {
-            warn!("Fail to uninstall cmp tcg opcode hook due to {ret:?}");
+            warn!("Fail to uninstall cmp tcg opcode hook due to {ret}");
         }
         if let Some(new_tb_hook) = self.new_tb_hook.take() {
             if let Err(ret) = self.uc.remove_hook(new_tb_hook) {
-                warn!("Fail to uninstall edge gen hook due to {ret:?}");
+                warn!("Fail to uninstall edge gen hook due to {ret}");
             }
         }
     }
