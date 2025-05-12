@@ -42,7 +42,7 @@ pub fn dummy_uc_validate_crash_callback<'a, D: 'a>(
 pub fn child_fuzz<'a, D: 'a>(
     uc: Unicorn<'a, UnicornFuzzData<D>>,
     input_file: Option<PathBuf>,
-    iters: u32,
+    iters: Option<u64>,
     callbacks: impl UnicornAflExecutorHook<'a, D>,
     exits: Vec<u64>,
     always_validate: bool,
@@ -114,21 +114,26 @@ pub fn child_fuzz<'a, D: 'a>(
             cmp_policy = CmpPolicy::None;
         }
 
-        let executor =
-            UnicornAflExecutor::new(uc, (), callbacks, always_validate, exits, cmp_policy)?;
-        let mut forkserver_parent = crate::forkserver::UnicornAflForkserverParent::new(executor);
-        libafl_targets::start_forkserver(&mut forkserver_parent)?;
-        let mut executor = forkserver_parent.executor;
-
         let iters = if !has_afl && run_once_if_no_afl_present {
-            1
+            Some(1)
         } else {
             iters
         };
+
+        let executor = UnicornAflExecutor::new(
+            uc,
+            (),
+            callbacks,
+            always_validate,
+            exits,
+            iters.is_none(),
+            cmp_policy,
+        )?;
+        let mut forkserver_parent = crate::forkserver::UnicornAflForkserverParent::new(executor);
+        libafl_targets::start_forkserver(&mut forkserver_parent)?;
+        let mut executor = forkserver_parent.executor;
         let input_file = if has_afl { None } else { input_file };
-        if let Err(e) =
-            crate::harness::forkserver_run_harness(&mut executor, input_file, iters as usize)
-        {
+        if let Err(e) = crate::harness::forkserver_run_harness(&mut executor, input_file, iters) {
             // The error cannot be propagated since we are in child process now.
             // So just log.
             error!("Fuzzing fails with error from libafl: {e}");
