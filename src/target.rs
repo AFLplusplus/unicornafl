@@ -126,7 +126,7 @@ pub fn child_fuzz<'a, D: 'a>(
             callbacks,
             always_validate,
             exits,
-            iters.is_none(),
+            iters.is_some(),
             cmp_policy,
         )?;
         let mut forkserver_parent = crate::forkserver::UnicornAflForkserverParent::new(executor);

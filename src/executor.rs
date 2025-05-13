@@ -319,12 +319,20 @@ where
     /// If false, only execution failure will lead to the callback.
     always_validate: bool,
     /// Stored for deleting hook when dropping
-    block_hook: UcHookId,
+    ///
+    /// None if in CMPLOG mode, which does not require coverage feedback
+    block_hook: Option<UcHookId>,
     /// Stored for deleting hook when dropping
+    ///
+    /// None if user does not specify CMPLOG nor CMPCOV
     sub_hook: Option<UcHookId>,
     /// Stored for deleting hook when dropping
+    ///
+    /// None if user does not specify CMPLOG nor CMPCOV
     cmp_hook: Option<UcHookId>,
     /// Stored for deleting hook when dropping
+    ///
+    /// None if in infinite persistent mode, which does not TB cache
     new_tb_hook: Option<UcHookId>,
     /// Callback hooks
     callbacks: H,
@@ -358,13 +366,18 @@ where
             })?;
         }
 
-        let block_hook = uc
-            .add_block_hook(1, 0, |uc, address, size| {
-                hook_code_coverage(uc, address, size);
-            })
-            .inspect_err(|ret| {
-                warn!("Fail to add block hooks due to {ret}");
-            })?;
+        let block_hook = if matches!(cmp_policy, CmpPolicy::Cmplog) {
+            None
+        } else {
+            Some(
+                uc.add_block_hook(1, 0, |uc, address, size| {
+                    hook_code_coverage(uc, address, size);
+                })
+                .inspect_err(|ret| {
+                    warn!("Fail to add block hooks due to {ret}");
+                })?,
+            )
+        };
         let sub_hook;
         let cmp_hook;
         match cmp_policy {
@@ -434,8 +447,6 @@ where
             }
         }
         let new_tb_hook = if cache_tb {
-            None
-        } else {
             Some(
                 uc.add_edge_gen_hook(1, 0, |uc, cur_tb, _| {
                     if let Some(child_pipe_w) = &uc.get_data_mut().child_pipe_w {
@@ -459,6 +470,8 @@ where
                     warn!("Fail to add edge gen hooks due to {ret}");
                 })?,
             )
+        } else {
+            None
         };
 
         Ok(Self {
@@ -534,8 +547,10 @@ where
     D: 'a,
 {
     fn drop(&mut self) {
-        if let Err(ret) = self.uc.remove_hook(self.block_hook) {
-            warn!("Fail to uninstall block hook due to {ret}");
+        if let Some(block_hook) = self.block_hook.take() {
+            if let Err(ret) = self.uc.remove_hook(block_hook) {
+                warn!("Fail to uninstall block hook due to {ret}");
+            }
         }
         if let Some(sub_hook) = self.sub_hook.take() {
             if let Err(ret) = self.uc.remove_hook(sub_hook) {
