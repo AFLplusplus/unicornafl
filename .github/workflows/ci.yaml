@@ -15,7 +15,7 @@ jobs:
 
     - name: '🛠️ Set up dependency of AFL++'
       run: |
-        apt update && apt install -y llvm-16-dev clang-16 build-essential\
+        sudo apt update && sudo apt install -y llvm-16-dev clang-16 build-essential\
         libtool libtool-bin libglib2.0-dev python3 make cmake automake meson ninja-build bison flex &&\
         update-alternatives --install /usr/bin/clang clang /usr/bin/clang-16 0 && \
         update-alternatives --install /usr/bin/clang++ clang++ /usr/bin/clang++-16 0
