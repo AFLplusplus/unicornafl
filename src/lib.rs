@@ -1,11 +1,11 @@
 use std::{
-    ffi::{c_uchar, CStr},
+    ffi::{CStr, c_uchar},
     os::raw::{c_char, c_void},
     path::PathBuf,
 };
 
 use executor::{UnicornAflExecutorCustomHook, UnicornAflExecutorHook, UnicornFuzzData};
-use unicorn_engine::{uc_error, unicorn_const::uc_engine, Unicorn};
+use unicorn_engine::{Unicorn, uc_error, unicorn_const::uc_engine};
 
 pub mod executor;
 mod forkserver;
@@ -119,7 +119,7 @@ pub fn afl_fuzz<'a, D: 'a>(
 }
 
 /// Fuzzing entrypoint for FFI
-#[no_mangle]
+#[unsafe(no_mangle)]
 #[allow(non_camel_case_types)]
 pub extern "C" fn uc_afl_fuzz(
     uc_handle: *mut uc_engine,
@@ -147,7 +147,7 @@ pub extern "C" fn uc_afl_fuzz(
 }
 
 /// Custom fuzzing entrypoint for FFI
-#[no_mangle]
+#[unsafe(no_mangle)]
 #[allow(non_camel_case_types)]
 pub extern "C" fn uc_afl_fuzz_custom(
     uc_handle: *mut uc_engine,
