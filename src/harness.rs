@@ -59,8 +59,10 @@ where
     let input = if let Some(input) = input_path.as_ref() {
         input_str = std::fs::read(input)?;
         input_str.as_slice()
-    } else {
+    } else if unsafe {!INPUT_PTR.is_null() && !INPUT_LENGTH_PTR.is_null()} {
         unsafe { std::slice::from_raw_parts(INPUT_PTR, (*INPUT_LENGTH_PTR) as usize) }
+    } else {
+        return Err(libafl::Error::empty("no input given"));
     };
 
     let exit_kind = executor.execute_internal(input, persistent_round)?;
