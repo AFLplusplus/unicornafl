@@ -2,7 +2,7 @@ use std::path::PathBuf;
 
 use libafl::executors::ExitKind;
 use libafl_targets::{EDGES_MAP_PTR, INPUT_LENGTH_PTR, INPUT_PTR};
-use log::error;
+use log::{error, trace};
 
 use crate::executor::{UnicornAflExecutor, UnicornAflExecutorHook};
 
@@ -66,12 +66,13 @@ where
     };
 
     let exit_kind = executor.execute_internal(input, persistent_round)?;
-
     let msg = if matches!(exit_kind, ExitKind::Ok) {
-        crate::forkserver::afl_child_ret::NEXT
+        crate::forkserver::afl_child_ret::FOUND_CRASH
     } else {
         crate::forkserver::afl_child_ret::FOUND_CRASH
     };
+
+    trace!("Sending back msg to parent(unicornafl) =  {:?}", msg);
     if let Some(child_pipe_w) = &executor.uc.get_data().child_pipe_w {
         if crate::forkserver::write_u32_to_fd(child_pipe_w, msg).is_err() {
             error!("[!] Error writing to parent pipe. Parent dead?");

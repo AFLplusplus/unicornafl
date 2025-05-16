@@ -52,6 +52,11 @@ pub fn child_fuzz<'a, D: 'a>(
     #[cfg(feature = "env_logger")]
     env_logger::init();
 
+    // Dump all environments
+    for (env, val) in std::env::vars_os() {
+        trace!("{:?}={:?}", env, val);
+    }
+
     let has_afl = libafl_targets::map_input_shared_memory().is_ok()
         && libafl_targets::map_shared_memory().is_ok();
 

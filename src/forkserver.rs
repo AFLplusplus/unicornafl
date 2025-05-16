@@ -185,7 +185,6 @@ where
         // If we stopped the child in persistent mode, but there was a race
         // condition and afl-fuzz already issued SIGKILL, write off the old
         // process.
-
         if self.last_child_ret != afl_child_ret::EXITED && was_killed {
             error!("Child was killed by AFL in the meantime.");
 
@@ -197,6 +196,7 @@ where
             }
         }
 
+        trace!("Spawn a child, last: {:?}", &self.last_child_ret);
         if self.last_child_ret == afl_child_ret::EXITED {
             // Child dead. Establish new a channel with child to grab
             // translation commands. We'll read from child_pipe_r,
@@ -213,6 +213,7 @@ where
             self.parent_pipe_r = Some(parent_pipe_r);
             self.parent_pipe_w = Some(parent_pipe_w);
 
+            trace!("Going to fork a new child!");
             // Create a clone of our process.
             let fork_result = (unsafe { libafl_bolts::os::fork() }).inspect_err(|_| {
                 error!("[!] Could not fork");
