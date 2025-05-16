@@ -1,0 +1,25 @@
+name: Crate 📦 Distribution
+
+on:
+  push:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    name: Build
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: '🛠️ Set up Rust'
+      uses: dtolnay/rust-toolchain@stable
+
+    - name: '🚧 Cargo test'
+      run: |
+        cargo test
+
+    - name: '📦 Cargo Publish'
+      if: startsWith(github.ref, 'refs/tags')
+      env:
+        TOKEN: ${{ secrets.CRATES_IO_KEY }}
+      run: |
+        cargo login $TOKEN && cargo test && cargo publish
