@@ -106,7 +106,10 @@ fn hook_code_coverage<'a, D: 'a>(
 ) {
     let state = &mut uc.get_data_mut().hook_state;
     let cur_loc = afl_hash_ip(address) & (state.map_size - 1);
-    trace!("Coverage address={} prev={} cur_loc={}", address, state.prev_loc, cur_loc);
+    trace!(
+        "Coverage address={} prev={} cur_loc={}",
+        address, state.prev_loc, cur_loc
+    );
     unsafe { update_with_prev(cur_loc, state.prev_loc) };
     state.prev_loc = cur_loc >> 1;
 }
@@ -163,7 +166,10 @@ fn hook_opcode_cmpcov<'a, D: 'a>(
     let state = &uc.get_data().hook_state;
     let mut cur_loc = afl_hash_ip(address) & (state.map_size - 1);
 
-    trace!("Compcov address={} arg1={} arg2={} size={} cur_loc={}", address, arg1, arg2, size, cur_loc);
+    trace!(
+        "Compcov address={} arg1={} arg2={} size={} cur_loc={}",
+        address, arg1, arg2, size, cur_loc
+    );
     if size >= 64 {
         if cur_loc + 8 >= state.map_size {
             cur_loc -= 8;
@@ -292,7 +298,6 @@ where
         (self.fuzz_callback)(uc)
     }
 }
-
 
 #[derive(Debug, Clone, Copy)]
 /// Policy to deal with CMP and SUB instructions

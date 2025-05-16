@@ -4,7 +4,10 @@ use libafl::executors::ExitKind;
 use libafl_targets::{EDGES_MAP_PTR, INPUT_LENGTH_PTR, INPUT_PTR};
 use log::{error, trace};
 
-use crate::{executor::{UnicornAflExecutor, UnicornAflExecutorHook}, forkserver::afl_child_ret::ChildRet};
+use crate::{
+    executor::{UnicornAflExecutor, UnicornAflExecutorHook},
+    forkserver::afl_child_ret::ChildRet,
+};
 
 /// Harness loop for forkserver mode
 pub fn forkserver_run_harness<'a, D, OT, H>(
@@ -19,7 +22,12 @@ where
     let mut first_pass = true;
     if let Some(iters) = iters {
         for persistent_round in 0..iters {
-            let mut child_ret = forkserver_run_harness_once(executor, &input_path, &mut first_pass, persistent_round)?;
+            let mut child_ret = forkserver_run_harness_once(
+                executor,
+                &input_path,
+                &mut first_pass,
+                persistent_round,
+            )?;
             if persistent_round == iters - 1 {
                 // We are at last round, tell parent we will die
                 child_ret = crate::forkserver::afl_child_ret::EXITED;
@@ -36,7 +44,12 @@ where
     } else {
         let mut persistent_round = 0u64;
         loop {
-            let child_ret = forkserver_run_harness_once(executor, &input_path, &mut first_pass, persistent_round)?;
+            let child_ret = forkserver_run_harness_once(
+                executor,
+                &input_path,
+                &mut first_pass,
+                persistent_round,
+            )?;
             persistent_round = persistent_round.wrapping_add(1);
             trace!("Sending back msg to parent(unicornafl) = {:?}", child_ret);
             if let Some(child_pipe_w) = &executor.uc.get_data().child_pipe_w {
@@ -76,7 +89,7 @@ where
     let input = if let Some(input) = input_path.as_ref() {
         input_str = std::fs::read(input)?;
         input_str.as_slice()
-    } else if unsafe {!INPUT_PTR.is_null() && !INPUT_LENGTH_PTR.is_null()} {
+    } else if unsafe { !INPUT_PTR.is_null() && !INPUT_LENGTH_PTR.is_null() } {
         unsafe { std::slice::from_raw_parts(INPUT_PTR, (*INPUT_LENGTH_PTR) as usize) }
     } else {
         return Err(libafl::Error::empty("no input given"));
