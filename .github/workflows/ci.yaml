@@ -13,9 +13,35 @@ jobs:
     - name: '🛠️ Set up Rust'
       uses: dtolnay/rust-toolchain@stable
 
+    - name: '🛠️ Set up dependency of AFL++'
+      run: |
+        apt update && apt install -y llvm-16-dev clang-16 build-essential\
+        libtool libtool-bin libglib2.0-dev python3 make cmake automake meson ninja-build bison flex &&\
+        update-alternatives --install /usr/bin/clang clang /usr/bin/clang-16 0 && \
+        update-alternatives --install /usr/bin/clang++ clang++ /usr/bin/clang++-16 0
+
     - name: '🚧 Cargo test'
       run: |
         cargo test
+
+    - name: '🚧 Build sample'
+      run: |
+        cargo build --release --example sample --features env_logger
+
+    - name: '🚧 AFLplusplus Setup'
+      run: |
+        git clone https://github.com/AFLplusplus/AFLplusplus && cd AFLplusplus && git checkout dev &&\
+        make -j4 afl-fuzz
+    
+    - name: '🚧 Fuzz for 5 minutes'
+      run: |
+        mkdir /tmp/input && echo 'a' > /tmp/input/a &&
+        AFL_NO_UI=1 AFL_I_DONT_CARE_ABOUT_MISSING_CRASHES=1 AFL_SKIP_CPUFREQ=1 UNICORN_AFL_CMPCOV=1\
+        ./AFLplusplus/afl-fuzz -i /tmp/input -o /tmp/output -b 1 -g 8 -G 8 -V 300 -- ./target/release/examples/sample @@
+    
+    - name: "🚧 Check if we find the crash"
+      run: |
+        [ "$(find /tmp/output/default/crashes/ -type f | wc -l)" -eq 0 ] && exit 1
 
     - name: '📦 Cargo Publish'
       if: startsWith(github.ref, 'refs/tags')
