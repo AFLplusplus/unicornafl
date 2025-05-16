@@ -107,7 +107,7 @@ fn hook_code_coverage<'a, D: 'a>(
     let state = &mut uc.get_data_mut().hook_state;
     let cur_loc = afl_hash_ip(address) & (state.map_size - 1);
     trace!(
-        "Coverage address={} prev={} cur_loc={}",
+        "Coverage address={:x} prev={:x} cur_loc={:x}",
         address, state.prev_loc, cur_loc
     );
     unsafe { update_with_prev(cur_loc, state.prev_loc) };
@@ -167,7 +167,7 @@ fn hook_opcode_cmpcov<'a, D: 'a>(
     let mut cur_loc = afl_hash_ip(address) & (state.map_size - 1);
 
     trace!(
-        "Compcov address={} arg1={} arg2={} size={} cur_loc={}",
+        "Compcov address={:x} arg1={:x} arg2={:x} size={} cur_loc={:x}",
         address, arg1, arg2, size, cur_loc
     );
     if size >= 64 {
