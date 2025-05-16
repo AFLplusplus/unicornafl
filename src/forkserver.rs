@@ -64,6 +64,11 @@ pub(crate) mod afl_child_ret {
     /// This will never be sent from child to parent. Instead, this is a phantom
     /// state used for forkserver parent state management.
     pub(crate) const EXITED: ChildRet = 3;
+    /// The child process found a crash, and is the last execution of one persistent loop.
+    ///
+    /// This is used for indicating the parent that it should not expect the child is in
+    /// persistent loop any more.
+    pub(crate) const FOUND_CRASH_AND_EXITED: ChildRet = 4;
 }
 
 type AflChildRet = afl_child_ret::ChildRet;
@@ -136,6 +141,7 @@ where
             if child_msg == afl_child_ret::NEXT
                 || child_msg == afl_child_ret::FOUND_CRASH
                 || child_msg == afl_child_ret::EXITED
+                || child_msg == afl_child_ret::FOUND_CRASH_AND_EXITED
             {
                 break child_msg;
             } else if child_msg == afl_child_ret::TSL_REQUEST {
@@ -151,7 +157,7 @@ where
                 }
             } else {
                 error!("Unexpected response by child! {child_msg}. Please report this as bug for unicornafl.
-    Expected one of {{AFL_CHILD_NEXT: {}, AFL_CHILD_FOUND_CRASH: {}, AFL_CHILD_TSL_REQUEST: {}}}.", afl_child_ret::NEXT, afl_child_ret::FOUND_CRASH, afl_child_ret::TSL_REQUEST);
+    Expected one of {{AFL_CHILD_NEXT: {}, AFL_CHILD_FOUND_CRASH: {}, AFL_CHILD_TSL_REQUEST: {}, AFL_CHILD_EXITED: {}, AFL_CHILD_FOUND_CRASH_AND_EXITED: {}}}.", afl_child_ret::NEXT, afl_child_ret::FOUND_CRASH, afl_child_ret::TSL_REQUEST, afl_child_ret::EXITED, afl_child_ret::FOUND_CRASH_AND_EXITED);
             }
         };
 
@@ -162,6 +168,23 @@ where
                 Ok(0)
             }
             afl_child_ret::FOUND_CRASH => {
+                // WIFSIGNALED(wifsignaled) == 1 -> tells AFL the child crashed
+                // (even though it's still alive for persistent mode)
+                Ok(self.wifsignaled)
+            }
+            afl_child_ret::FOUND_CRASH_AND_EXITED => {
+                if unsafe {
+                    nix::libc::waitpid(
+                        *self.last_child_pid.as_ref().unwrap(),
+                        std::ptr::null_mut(),
+                        0,
+                    )
+                } < 0
+                {
+                    // Zombie Child could not be collected. Scary!
+                    error!("[!] The child's exit code could not be determined.");
+                    return Err(libafl::Error::illegal_state("waitpid"));
+                }
                 // WIFSIGNALED(wifsignaled) == 1 -> tells AFL the child crashed
                 // (even though it's still alive for persistent mode)
                 Ok(self.wifsignaled)
