@@ -1,4 +1,7 @@
-use std::os::fd::{AsFd, AsRawFd, OwnedFd};
+use std::{
+    io::{PipeReader, PipeWriter},
+    os::fd::{AsFd, AsRawFd},
+};
 
 use libafl_bolts::os::{ChildHandle, ForkResult};
 use libafl_targets::ForkserverParent;
@@ -77,10 +80,10 @@ where
     /// indicates that it is the child process, and parent is useless anymore (the
     /// owned resources have been transferred to the executor itself).
     pub(crate) executor: UnicornAflExecutor<'a, D, OT, H>,
-    child_pipe_r: Option<OwnedFd>,
-    child_pipe_w: Option<OwnedFd>,
-    parent_pipe_r: Option<OwnedFd>,
-    parent_pipe_w: Option<OwnedFd>,
+    child_pipe_r: Option<PipeReader>,
+    child_pipe_w: Option<PipeWriter>,
+    parent_pipe_r: Option<PipeReader>,
+    parent_pipe_w: Option<PipeWriter>,
     last_child_pid: Option<i32>,
     last_child_ret: AflChildRet,
     old_sigchld_handler: Option<SigHandler>,
@@ -198,13 +201,13 @@ where
             // Child dead. Establish new a channel with child to grab
             // translation commands. We'll read from child_pipe_r,
             // child will write to child_pipe_w.
-            let (child_pipe_r, child_pipe_w) = nix::unistd::pipe().inspect_err(|_| {
+            let (child_pipe_r, child_pipe_w) = std::io::pipe().inspect_err(|_| {
                 error!("[!] Error creating pipe to child");
             })?;
             // The re-assignment will close the previously-unclosed pipe ends
             self.child_pipe_r = Some(child_pipe_r);
             self.child_pipe_w = Some(child_pipe_w);
-            let (parent_pipe_r, parent_pipe_w) = nix::unistd::pipe().inspect_err(|_| {
+            let (parent_pipe_r, parent_pipe_w) = std::io::pipe().inspect_err(|_| {
                 error!("[!] Error creating pipe to parent");
             })?;
             self.parent_pipe_r = Some(parent_pipe_r);

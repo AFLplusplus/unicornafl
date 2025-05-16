@@ -1,8 +1,8 @@
 use std::path::PathBuf;
 
-use libafl_targets::{__afl_map_size, cmps::CMPLOG_ENABLED, EDGES_MAP_PTR, SHM_FUZZING};
+use libafl_targets::{__afl_map_size, EDGES_MAP_PTR, SHM_FUZZING, cmps::CMPLOG_ENABLED};
 use log::{debug, error, trace, warn};
-use unicorn_engine::{uc_error, Arch, RegisterARM, Unicorn};
+use unicorn_engine::{Arch, RegisterARM, Unicorn, uc_error};
 
 use crate::{
     executor::{CmpPolicy, UnicornAflExecutor, UnicornAflExecutorHook, UnicornFuzzData},

@@ -1,6 +1,9 @@
 //! Executor to conduct unicorn afl fuzzing in one execution round.
 
-use std::{marker::PhantomData, os::fd::OwnedFd};
+use std::{
+    io::{PipeReader, PipeWriter},
+    marker::PhantomData,
+};
 
 use libafl::{
     executors::{Executor, ExitKind, HasObservers},
@@ -11,7 +14,7 @@ use libafl::{
 use libafl_bolts::tuples::RefIndexable;
 use libafl_targets::{CMPLOG_MAP_W, EDGES_MAP_PTR};
 use log::{error, trace, warn};
-use unicorn_engine::{uc_error, TcgOpCode, TcgOpFlag, UcHookId, Unicorn};
+use unicorn_engine::{TcgOpCode, TcgOpFlag, UcHookId, Unicorn, uc_error};
 
 use crate::hash::afl_hash_ip;
 
@@ -39,9 +42,9 @@ fn get_afl_map_size() -> u32 {
 pub struct UnicornFuzzData<D> {
     hook_state: HookState,
     /// Store write side to child pipe. Closed when dropping
-    pub(crate) child_pipe_w: Option<OwnedFd>,
+    pub(crate) child_pipe_w: Option<PipeWriter>,
     /// Store read side to parent pipe. Closed when dropping
-    pub(crate) parent_pipe_r: Option<OwnedFd>,
+    pub(crate) parent_pipe_r: Option<PipeReader>,
     /// User-defined data.
     pub user_data: D,
 }
@@ -91,7 +94,9 @@ unsafe fn update_coverage(idx: usize) {
 
 unsafe fn update_with_prev(loc: u32, prev: u32) {
     let idx = prev ^ loc;
-    update_coverage(idx as usize);
+    unsafe {
+        update_coverage(idx as usize);
+    }
 }
 
 fn hook_code_coverage<'a, D: 'a>(
