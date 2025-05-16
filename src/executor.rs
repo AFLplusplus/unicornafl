@@ -205,8 +205,13 @@ fn hook_opcode_cmplog<'a, D: 'a>(
         _ => 0,
     };
 
+    trace!(
+        "Complog address={} arg1={} arg2={} size={} shape={} cur_loc={} k={}",
+        address, arg1, arg2, size, shape, cur_loc, k
+    );
+
     unsafe {
-        libafl_targets::cmps::__libafl_targets_cmplog_instructions(k, shape, arg1, arg2);
+        libafl_targets::cmps::__libafl_targets_cmplog_instructions_extended(k, shape, arg1, arg2);
     }
 }
 
