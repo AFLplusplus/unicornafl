@@ -4,7 +4,7 @@ use libafl::executors::ExitKind;
 use libafl_targets::{EDGES_MAP_PTR, INPUT_LENGTH_PTR, INPUT_PTR};
 use log::{error, trace};
 
-use crate::executor::{UnicornAflExecutor, UnicornAflExecutorHook};
+use crate::{executor::{UnicornAflExecutor, UnicornAflExecutorHook}, forkserver::afl_child_ret::ChildRet};
 
 /// Harness loop for forkserver mode
 pub fn forkserver_run_harness<'a, D, OT, H>(
@@ -19,14 +19,31 @@ where
     let mut first_pass = true;
     if let Some(iters) = iters {
         for persistent_round in 0..iters {
-            forkserver_run_harness_once(executor, &input_path, &mut first_pass, persistent_round)?;
+            let mut child_ret = forkserver_run_harness_once(executor, &input_path, &mut first_pass, persistent_round)?;
+            if persistent_round == iters - 1 {
+                // We are at last round, tell parent we will die
+                child_ret = crate::forkserver::afl_child_ret::EXITED;
+            }
+
+            trace!("Sending back msg to parent(unicornafl) = {:?}", child_ret);
+            if let Some(child_pipe_w) = &executor.uc.get_data().child_pipe_w {
+                if crate::forkserver::write_u32_to_fd(child_pipe_w, child_ret).is_err() {
+                    error!("[!] Error writing to parent pipe. Parent dead?");
+                }
+            }
         }
         Ok(())
     } else {
         let mut persistent_round = 0u64;
         loop {
-            forkserver_run_harness_once(executor, &input_path, &mut first_pass, persistent_round)?;
+            let child_ret = forkserver_run_harness_once(executor, &input_path, &mut first_pass, persistent_round)?;
             persistent_round = persistent_round.wrapping_add(1);
+            trace!("Sending back msg to parent(unicornafl) = {:?}", child_ret);
+            if let Some(child_pipe_w) = &executor.uc.get_data().child_pipe_w {
+                if crate::forkserver::write_u32_to_fd(child_pipe_w, child_ret).is_err() {
+                    error!("[!] Error writing to parent pipe. Parent dead?");
+                }
+            }
         }
     }
 }
@@ -38,7 +55,7 @@ fn forkserver_run_harness_once<'a, D, OT, H>(
     input_path: &Option<PathBuf>,
     first_pass: &mut bool,
     persistent_round: u64,
-) -> Result<(), libafl::Error>
+) -> Result<ChildRet, libafl::Error>
 where
     D: 'a,
     H: UnicornAflExecutorHook<'a, D>,
@@ -67,17 +84,10 @@ where
 
     let exit_kind = executor.execute_internal(input, persistent_round)?;
     let msg = if matches!(exit_kind, ExitKind::Ok) {
-        crate::forkserver::afl_child_ret::FOUND_CRASH
+        crate::forkserver::afl_child_ret::NEXT
     } else {
         crate::forkserver::afl_child_ret::FOUND_CRASH
     };
 
-    trace!("Sending back msg to parent(unicornafl) =  {:?}", msg);
-    if let Some(child_pipe_w) = &executor.uc.get_data().child_pipe_w {
-        if crate::forkserver::write_u32_to_fd(child_pipe_w, msg).is_err() {
-            error!("[!] Error writing to parent pipe. Parent dead?");
-        }
-    }
-
-    Ok(())
+    Ok(msg)
 }

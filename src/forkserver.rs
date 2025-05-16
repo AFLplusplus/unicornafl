@@ -133,7 +133,7 @@ where
 
             trace!("Get a child_msg={child_msg}");
 
-            if child_msg == afl_child_ret::NEXT || child_msg == afl_child_ret::FOUND_CRASH {
+            if child_msg == afl_child_ret::NEXT || child_msg == afl_child_ret::FOUND_CRASH || child_msg == afl_child_ret::EXITED {
                 break child_msg;
             } else if child_msg == afl_child_ret::TSL_REQUEST {
                 let Ok(pc) = read_u64_from_fd(child_pipe_r) else {
@@ -164,6 +164,8 @@ where
                 Ok(self.wifsignaled)
             }
             afl_child_ret::EXITED => {
+                // Tell parent(unicornafl) to fork a new child.
+                self.last_child_ret = afl_child_ret::EXITED;
                 // If child exited, get and relay exit status to parent through waitpid
                 let mut status = 0i32;
                 if unsafe {
