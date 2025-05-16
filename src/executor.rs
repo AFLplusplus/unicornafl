@@ -13,7 +13,7 @@ use libafl::{
 };
 use libafl_bolts::tuples::RefIndexable;
 use libafl_targets::{CMPLOG_MAP_W, EDGES_MAP_PTR};
-use log::{error, trace, warn};
+use log::{debug, error, trace, warn};
 use unicorn_engine::{TcgOpCode, TcgOpFlag, UcHookId, Unicorn, uc_error};
 
 use crate::hash::afl_hash_ip;
@@ -106,7 +106,7 @@ fn hook_code_coverage<'a, D: 'a>(
 ) {
     let state = &mut uc.get_data_mut().hook_state;
     let cur_loc = afl_hash_ip(address) & (state.map_size - 1);
-
+    trace!("Coverage address={} prev={} cur_loc={}", address, state.prev_loc, cur_loc);
     unsafe { update_with_prev(cur_loc, state.prev_loc) };
     state.prev_loc = cur_loc >> 1;
 }
@@ -163,6 +163,7 @@ fn hook_opcode_cmpcov<'a, D: 'a>(
     let state = &uc.get_data().hook_state;
     let mut cur_loc = afl_hash_ip(address) & (state.map_size - 1);
 
+    trace!("Compcov address={} arg1={} arg2={} size={} cur_loc={}", address, arg1, arg2, size, cur_loc);
     if size >= 64 {
         if cur_loc + 8 >= state.map_size {
             cur_loc -= 8;
@@ -292,6 +293,8 @@ where
     }
 }
 
+
+#[derive(Debug, Clone, Copy)]
 /// Policy to deal with CMP and SUB instructions
 pub enum CmpPolicy {
     /// Use Redqueen algorithm
@@ -374,6 +377,7 @@ where
         let block_hook = if matches!(cmp_policy, CmpPolicy::Cmplog) {
             None
         } else {
+            trace!("Adding block hook");
             Some(
                 uc.add_block_hook(1, 0, |uc, address, size| {
                     hook_code_coverage(uc, address, size);
@@ -385,6 +389,7 @@ where
         };
         let sub_hook;
         let cmp_hook;
+        debug!("Our cmp policy is {:?}", &cmp_policy);
         match cmp_policy {
             CmpPolicy::Cmplog => {
                 sub_hook = Some(
