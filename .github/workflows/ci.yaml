@@ -42,7 +42,7 @@ jobs:
     
     - name: "🚧 Check if we find the crash"
       run: |
-        bash -c '"$(find ./output/default/crashes/ -type f | wc -l)" -eq 0'
+        bash -c '[ "$(find ./output/default/crashes/ -type f | wc -l)" -eq 0 ]'
 
     - name: '📦 Cargo Publish'
       if: startsWith(github.ref, 'refs/tags')
