@@ -44,10 +44,10 @@ jobs:
       run: |
         ls ./output/default/crashes/
         if [ "$(find ./output/default/crashes/ -type f | wc -l)" -eq 0 ]; then
-            exit 0;
-        else
             cat ./output/default/fuzzer_stats
             exit 1;
+        else
+            exit 0;
         fi
 
     - name: '📦 Cargo Publish'
