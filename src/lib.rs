@@ -1,3 +1,4 @@
+#[allow(unused_imports)]
 use std::{
     ffi::{CStr, c_uchar},
     os::raw::{c_char, c_void},
@@ -314,3 +315,8 @@ fn uc_afl_fuzz_internal(
         Err(err) => err,
     }
 }
+
+#[cfg(feature = "bindings")]
+pub mod bindings;
+#[cfg(feature = "bindings")]
+pub use bindings::*;

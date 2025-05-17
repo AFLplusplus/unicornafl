@@ -16,10 +16,16 @@ unicorn-engine = { git = "https://github.com/unicorn-engine/unicorn", branch = "
 log = "0.4"
 nix = { version = "0.29", features = ["signal"] }
 env_logger = { version = "0.11", optional = true }
+pyo3 = { version = "0.24.0", features = ["extension-module"], optional = true}
+pyo3-log = { version = "0.12.2", optional = true}
 
 [features]
 default = []
-bindings = ["unicorn-engine/dynamic_linkage"]
+bindings = ["unicorn-engine/dynamic_linkage", "pyo3", "pyo3-log", "env_logger"]
+
+[lib]
+name = "unicornafl"
+crate-type = ["cdylib", "rlib"] # For python
 
 [[example]]
 name = "sample"
