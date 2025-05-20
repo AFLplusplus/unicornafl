@@ -46,8 +46,14 @@ jobs:
 
     - name: '🚧 Fuzz 4-byte cmplog for 5 minutes'
       run: |
-        AFL_BENCH_UNTIL_CRASH=1 AFL_NO_UI=1 AFL_I_DONT_CARE_ABOUT_MISSING_CRASHES=1 AFL_SKIP_CPUFREQ=1 UNICORN_AFL_CMPCOV=1 \
         ./AFLplusplus/afl-fuzz -i ./input -o ./output-4 -b 1 -g 4 -G 4 -V 300 -c 0 -- ./target/release/examples/sample @@
+      env:
+        AFL_BENCH_UNTIL_CRASH: 1
+        AFL_NO_CRASH_README: 1
+        AFL_NO_UI: 1
+        AFL_I_DONT_CARE_ABOUT_MISSING_CRASHES: 1
+        AFL_SKIP_CPUFREQ: 1
+        UNICORN_AFL_CMPCOV: 1
 
     - name: "🚧 Check if we find the crash"
       run: |
@@ -64,8 +70,14 @@ jobs:
 
     - name: '🚧 Fuzz 8-byte cmplog for 5 minutes'
       run: |
-        AFL_BENCH_UNTIL_CRASH=1 AFL_NO_UI=1 AFL_I_DONT_CARE_ABOUT_MISSING_CRASHES=1 AFL_SKIP_CPUFREQ=1 UNICORN_AFL_CMPCOV=1 \
         ./AFLplusplus/afl-fuzz -i ./input -o ./output-8 -b 1 -g 8 -G 8 -V 300 -c 0 -- ./target/release/examples/sample @@
+      env:
+        AFL_BENCH_UNTIL_CRASH: 1
+        AFL_NO_CRASH_README: 1
+        AFL_NO_UI: 1
+        AFL_I_DONT_CARE_ABOUT_MISSING_CRASHES: 1
+        AFL_SKIP_CPUFREQ: 1
+        UNICORN_AFL_CMPCOV: 1
     
     - name: "🚧 Check if we find the crash"
       run: |
