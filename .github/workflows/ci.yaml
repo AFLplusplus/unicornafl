@@ -28,29 +28,54 @@ jobs:
       run: |
         cargo build --release --example sample --features env_logger
 
+    - name: '🚧 AFLplusplus Checkout'
+      uses: actions/checkout@v4
+      with:
+        repository: 'AFLplusplus/AFLplusplus'
+        ref: 'dev'
+        path: 'AFLplusplus'
+
     - name: '🚧 AFLplusplus Setup'
       run: |
-        git clone https://github.com/AFLplusplus/AFLplusplus && cd AFLplusplus && git checkout dev &&\
+        cd AFLplusplus &&\
         make -j4 afl-fuzz
-    
-    - name: '🚧 Fuzz for 5 minutes'
+
+    - name: '🚧 Prepare fuzz resources'
       run: |
-        mkdir ./input && echo 'a' > ./input/a &&
-        AFL_NO_UI=1 AFL_I_DONT_CARE_ABOUT_MISSING_CRASHES=1 AFL_SKIP_CPUFREQ=1 UNICORN_AFL_CMPCOV=1 \
-        ./AFLplusplus/afl-fuzz -i ./input -o ./output -b 1 -g 4 -G 4 -V 15 -c ./target/release/examples/sample -- ./target/release/examples/sample @@ &&\
-        ls ./output/default/crashes
+        mkdir ./input && echo 'a' > ./input/a
+
+    - name: '🚧 Fuzz 4-byte cmplog for 5 minutes'
+      run: |
+        AFL_BENCH_UNTIL_CRASH=1 AFL_NO_UI=1 AFL_I_DONT_CARE_ABOUT_MISSING_CRASHES=1 AFL_SKIP_CPUFREQ=1 UNICORN_AFL_CMPCOV=1 \
+        ./AFLplusplus/afl-fuzz -i ./input -o ./output-4 -b 1 -g 4 -G 4 -V 300 -c 0 -- ./target/release/examples/sample @@
+
+    - name: "🚧 Check if we find the crash"
+      run: |
+        ls ./output-4/default/crashes/
+        if [ "$(find ./output-4/default/crashes/ -type f | wc -l)" -eq 0 ]; then
+            cat ./output-4/default/fuzzer_stats
+            exit 1;
+        else
+            if ! [ "$(grep "stab" ./output-4/default/fuzzer_stats | awk '{print $3}')" = '100.00%' ]; then
+              cat ./output-4/default/fuzzer_stats
+              exit 2;
+            fi
+        fi
+
+    - name: '🚧 Fuzz 8-byte cmplog for 5 minutes'
+      run: |
+        AFL_BENCH_UNTIL_CRASH=1 AFL_NO_UI=1 AFL_I_DONT_CARE_ABOUT_MISSING_CRASHES=1 AFL_SKIP_CPUFREQ=1 UNICORN_AFL_CMPCOV=1 \
+        ./AFLplusplus/afl-fuzz -i ./input -o ./output-8 -b 1 -g 8 -G 8 -V 300 -c 0 -- ./target/release/examples/sample @@
     
     - name: "🚧 Check if we find the crash"
       run: |
-        ls ./output/default/crashes/
-        if [ "$(find ./output/default/crashes/ -type f | wc -l)" -eq 0 ]; then
-            cat ./output/default/fuzzer_stats
+        ls ./output-8/default/crashes/
+        if [ "$(find ./output-8/default/crashes/ -type f | wc -l)" -eq 0 ]; then
+            cat ./output-8/default/fuzzer_stats
             exit 1;
         else
-            if [ "$(grep "stab" ./output/default/fuzzer_stats | awk '{print $3}')" -eq '100.00%' ]; then
-              exit 0;
-            else
-              cat ./output/default/fuzzer_stats
+            if ! [ "$(grep "stab" ./output-8/default/fuzzer_stats | awk '{print $3}')" = '100.00%' ]; then
+              cat ./output-8/default/fuzzer_stats
               exit 2;
             fi
         fi
