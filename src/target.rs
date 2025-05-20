@@ -1,5 +1,6 @@
 use std::path::PathBuf;
 
+use libafl_bolts::shmem::{ShMemProvider, StdShMemProvider};
 use libafl_targets::{__afl_map_size, EDGES_MAP_PTR, SHM_FUZZING, cmps::CMPLOG_ENABLED};
 use log::{debug, error, trace, warn};
 use unicorn_engine::{Arch, RegisterARM, Unicorn, uc_error};
@@ -57,8 +58,10 @@ pub fn child_fuzz<'a, D: 'a>(
         trace!("{:?}={:?}", env, val);
     }
 
-    let has_afl = libafl_targets::map_input_shared_memory().is_ok()
-        && libafl_targets::map_shared_memory().is_ok();
+    let mut shmem_provider = StdShMemProvider::new()?;
+
+    let has_afl = libafl_targets::map_input_shared_memory(&mut shmem_provider).is_ok()
+        && libafl_targets::map_shared_memory(&mut shmem_provider).is_ok();
 
     trace!("AFL detected: {has_afl}");
     if input_file.is_some() && has_afl {
@@ -102,7 +105,7 @@ pub fn child_fuzz<'a, D: 'a>(
         // will take effect.
         let cmp_policy;
         let has_cmplog = std::env::var("___AFL_EINS_ZWEI_POLIZEI___").is_ok()
-            && libafl_targets::map_cmplog_shared_memory().is_ok();
+            && libafl_targets::map_cmplog_shared_memory(&mut shmem_provider).is_ok();
         let has_cmpcov = std::env::var("UNICORN_AFL_CMPCOV").is_ok();
         if has_cmplog {
             if has_cmpcov {
