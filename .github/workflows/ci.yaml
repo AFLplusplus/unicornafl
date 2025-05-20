@@ -44,9 +44,9 @@ jobs:
       run: |
         mkdir ./input && echo 'a' > ./input/a
 
-    - name: '🚧 Fuzz 4-byte cmplog for 5 minutes'
+    - name: '🚧 Fuzz 4-byte cmplog for 60 seconds'
       run: |
-        ./AFLplusplus/afl-fuzz -i ./input -o ./output-4 -b 1 -g 4 -G 4 -V 300 -c 0 -- ./target/release/examples/sample @@
+        ./AFLplusplus/afl-fuzz -i ./input -o ./output-4 -b 1 -g 4 -G 4 -V 60 -c 0 -- ./target/release/examples/sample @@
       env:
         AFL_BENCH_UNTIL_CRASH: 1
         AFL_NO_CRASH_README: 1
@@ -68,9 +68,9 @@ jobs:
             fi
         fi
 
-    - name: '🚧 Fuzz 8-byte cmplog for 5 minutes'
+    - name: '🚧 Fuzz 8-byte cmplog for 60 seconds'
       run: |
-        ./AFLplusplus/afl-fuzz -i ./input -o ./output-8 -b 1 -g 8 -G 8 -V 300 -c 0 -- ./target/release/examples/sample @@ true
+        ./AFLplusplus/afl-fuzz -i ./input -o ./output-8 -b 1 -g 8 -G 8 -V 60 -c 0 -- ./target/release/examples/sample @@ true
       env:
         AFL_BENCH_UNTIL_CRASH: 1
         AFL_NO_CRASH_README: 1
