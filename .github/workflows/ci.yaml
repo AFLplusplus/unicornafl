@@ -70,7 +70,7 @@ jobs:
 
     - name: '🚧 Fuzz 8-byte cmplog for 5 minutes'
       run: |
-        ./AFLplusplus/afl-fuzz -i ./input -o ./output-8 -b 1 -g 8 -G 8 -V 300 -c 0 -- ./target/release/examples/sample @@
+        ./AFLplusplus/afl-fuzz -i ./input -o ./output-8 -b 1 -g 8 -G 8 -V 300 -c 0 -- ./target/release/examples/sample @@ true
       env:
         AFL_BENCH_UNTIL_CRASH: 1
         AFL_NO_CRASH_README: 1
