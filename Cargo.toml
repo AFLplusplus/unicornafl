@@ -7,9 +7,9 @@ rust-version = "1.87"
 
 [dependencies]
 libafl_targets = { git = "https://github.com/AFLplusplus/LibAFL", features = [
-    "pointer_maps", "forkserver", "cmplog", "cmplog_extended_instrumentation"], rev = "aa20712" }
-libafl = { git = "https://github.com/AFLplusplus/LibAFL", rev = "aa20712"}
-libafl_bolts = { git = "https://github.com/AFLplusplus/LibAFL", rev = "aa20712"}
+    "pointer_maps", "forkserver", "cmplog", "cmplog_extended_instrumentation"] }
+libafl = { git = "https://github.com/AFLplusplus/LibAFL" }
+libafl_bolts = { git = "https://github.com/AFLplusplus/LibAFL" }
 
 serde ={ version = "1.0", features = ["derive"] }
 unicorn-engine = { git = "https://github.com/unicorn-engine/unicorn", branch = "dev"}
