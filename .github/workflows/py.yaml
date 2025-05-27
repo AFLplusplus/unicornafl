@@ -1,0 +1,134 @@
+name: PyPI 📦 Distribution
+
+on:
+  push:
+  pull_request:
+
+# https://github.com/Cryptex-github/ril-py/blob/main/.github/workflows/py-binding.yml
+jobs:
+  build:
+    runs-on: ${{ matrix.config.os }}
+    name: ${{ matrix.config.name }}
+    strategy:
+      fail-fast: false
+      matrix:
+        config:
+          - { 
+              os: ubuntu-latest, 
+              arch: x64, 
+              python-ver: '3.8', 
+              name: 'manylinux2014_x86_64'
+            }
+          - { 
+              os: ubuntu-latest,
+              arch: x32,
+              python-ver: '3.8',
+              name: 'manylinux2014_i686'
+            }
+          - { 
+              os: ubuntu-latest,
+              arch: x64,
+              python-ver: '3.8',
+              name: 'sdist'
+            }
+          # - { 
+          #     os: macos-latest,
+          #     arch: x64,
+          #     python-ver: '3.8',
+          #     name: 'macos_x86_64'
+          #   }
+    steps:
+    - name: set up python
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.9'
+
+    - name: set up rust
+      uses: dtolnay/rust-toolchain@stable
+      with:
+        toolchain: stable
+      
+    - name: Setup Rust cache
+      uses: Swatinem/rust-cache@v2
+      with:
+        key: ${{ matrix.alt_arch_name }}
+
+    - name: Get pip cache dir
+      id: pip-cache
+      if: matrix.os != 'windows-latest'
+      run: |
+        echo "dir=$(pip cache dir)" >> $GITHUB_OUTPUT
+    
+    - name: Cache python dependencies
+      uses: actions/cache@v3
+      with:
+        path: ${{ steps.pip-cache.outputs.dir || steps.pip-cache-win.outputs.dir }}
+        key: ${{ runner.os }}-pip-${{ matrix.python-version }}
+  
+    - name: install python dependencies
+      run: pip install -U setuptools wheel twine cibuildwheel platformdirs
+
+    - name: Display cibuildwheel cache dir
+      id: cibuildwheel-cache
+      run: |
+        from platformdirs import user_cache_path
+        import os
+
+        with open(os.getenv('GITHUB_OUTPUT'), 'w') as f:
+          f.write(f"dir={str(user_cache_path(appname='cibuildwheel', appauthor='pypa'))}")
+      shell: python
+
+    - name: Cache cibuildwheel tools
+      uses: actions/cache@v3
+      with:
+        path: ${{ steps.cibuildwheel-cache.outputs.dir }}
+        key: ${{ runner.os }}-cibuildwheel-${{ matrix.python-version }}
+
+    - name: build sdist
+      if: matrix.os == 'ubuntu' && matrix.python-version == 'cp310'
+      run: |
+        pip install maturin build
+        python -m build --sdist -o wheelhouse
+
+    - name: build ${{ matrix.platform || matrix.os }} binaries
+      run: cibuildwheel --output-dir wheelhouse
+      env:
+        CIBW_BUILD: '${{ matrix.python-version }}-*'
+        # rust doesn't seem to be available for musl linux on i686
+        CIBW_SKIP: '*-musllinux_i686'
+        # we build for "alt_arch_name" if it exists, else 'auto'
+        CIBW_ARCHS: ${{ matrix.alt_arch_name || 'auto' }}
+        CIBW_ENVIRONMENT: 'PATH="$HOME/.cargo/bin:$PATH" CARGO_TERM_COLOR="always"'
+        CIBW_ENVIRONMENT_WINDOWS: 'PATH="$UserProfile\.cargo\bin;$PATH"'
+        CIBW_BEFORE_BUILD: rustup show
+        CIBW_BEFORE_BUILD_LINUX: >
+          curl https://sh.rustup.rs -sSf | sh -s -- --default-toolchain=stable --profile=minimal -y &&
+          rustup show
+        CIBW_TEST_COMMAND: 'pytest {project}/test'
+        CIBW_TEST_REQUIRES: pytest requests
+        CIBW_TEST_SKIP: '*-macosx_arm64 *-macosx_universal2:arm64'
+        CIBW_BUILD_VERBOSITY: 1
+
+    - run: ${{ matrix.ls || 'ls -lh' }} wheelhouse/
+
+    - name: '📤 Upload artifact'
+      uses: actions/upload-artifact@v4
+      with:
+        name: wheels
+        path: wheelhouse/
+
+  publish:
+    needs: [build]
+    runs-on: ubuntu-latest
+    if: startsWith(github.ref, 'refs/tags')
+    steps:
+      - uses: actions/download-artifact@v2
+        with:
+          name: artifact
+          path: dist
+
+      - name: '📦 Publish distribution to PyPI'
+        uses: pypa/gh-action-pypi-publish@master
+        with:
+          user: __token__
+          password: ${{ secrets.pypi_pass }}
