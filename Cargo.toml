@@ -6,10 +6,11 @@ rust-version = "1.87"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
+# Unreleased 0.15.3
 libafl_targets = { git = "https://github.com/AFLplusplus/LibAFL", features = [
-    "pointer_maps", "forkserver", "cmplog", "cmplog_extended_instrumentation"] }
-libafl = { git = "https://github.com/AFLplusplus/LibAFL" }
-libafl_bolts = { git = "https://github.com/AFLplusplus/LibAFL" }
+    "pointer_maps", "forkserver", "cmplog", "cmplog_extended_instrumentation"], rev = "d5ecf7304dbd377df94d08aed658199eed2956af"}
+libafl = { git = "https://github.com/AFLplusplus/LibAFL", rev = "d5ecf7304dbd377df94d08aed658199eed2956af"}
+libafl_bolts = { git = "https://github.com/AFLplusplus/LibAFL", rev = "d5ecf7304dbd377df94d08aed658199eed2956af"}
 
 serde ={ version = "1.0", features = ["derive"] }
 unicorn-engine = { git = "https://github.com/unicorn-engine/unicorn", branch = "dev"}
