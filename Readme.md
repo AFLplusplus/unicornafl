@@ -53,9 +53,10 @@ die:
 xor rax, rax;
 ```
 
-We artifically make our harness stops at any of the `xor rax, rax` instruction. Therefore, if `rax==0x114514` is true, our harness will have an unmapped read error, which will be captured by `unicornafl` as a crash. Start fuzzing by:
+We artifically make our harness stops at any of the `xor rax, rax` instruction. Therefore, if `rax==0x114514` is true, our harness will have an unmapped read error, which will be captured by `unicornafl` as a crash. Otherwise, it just stops without any crashes. You could start fuzzing by:
 
 ```bash
+cargo build --example sample --release
 # assume AFL++ is installed
 afl-fuzz -i ./input -o ./output-8 -b 1 -g 8 -G 8 -V 60 -c 0 -- ./target/release/examples/sample @@ true
 ```
