@@ -8,6 +8,7 @@ fn place_input_cb<'a>(
     input: &[u8],
     _persistent_round: u64,
 ) -> bool {
+    // The mode we specified in the command line
     let do_x86_64 = uc.get_data().user_data;
     if do_x86_64 {
         let mut buf = [0; 8];
@@ -38,6 +39,7 @@ fn place_input_cb<'a>(
 
 fn main() {
     let input_file = std::env::args().nth(1);
+    // If we have a second arguments, solve 8 bytes magic intead, which is more difficult.
     let do_x86_64 = std::env::args().nth(2).is_some();
 
     let mut uc = if do_x86_64 {
@@ -49,7 +51,7 @@ fn main() {
     };
 
     let code = if do_x86_64 {
-        // 8 bytes
+        // 8 bytes magic
         // ks.asm("mov rax, rdx; cmp rax, 0x114514; je die; xor rax, rax; die: mov rax, [rax]; xor rax, rax")
         b"\x48\x89\xd0\x48\x3d\x14\x45\x11\x00\x74\x03\x48\x31\xc0\x48\x8b\x00\x48\x31\xc0".to_vec()
     } else {
