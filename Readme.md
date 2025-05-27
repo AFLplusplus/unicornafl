@@ -18,8 +18,7 @@ unicornafl = {git = "https://github.com/AFLplusplus/unicornafl", branch = "main"
 
 ### Python
 
-As usual, do `pip install unicornafl`.
-
+At this moment, manual building is required (see below) but we will soon release wheels.
 
 ## Build
 
