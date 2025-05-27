@@ -1,12 +1,9 @@
 # UnicornAFL
 
-The project builds a bridge between AFL++ and unicorn engine.
-You can fuzz unicorn targets using python, rust, and C.
+UnicornAFL is a bridge between AFL++ and the [unicorn engine](https://github.com/unicorn-engine/unicorn). Generally, it allows you to fuzz any machine code in a few setups, with coverage, cmpcov, and cmplog support.
 
-Check out [the examples](https://github.com/AFLplusplus/AFLplusplus/tree/stable/unicorn_mode/samples) in AFLplusplus/unicorn_mode
+Starting from v3.0.0, unicornafl is fully rewritten with `libafl_targets` in Rust though we still provide Python and C bindings.
 
-TODO:
+## Example
 
-- [] Python/C bindings
-- [] cmplog support
-- [] libafl upstream
+We provide a sample harness at [the examples](https://github.com/AFLplusplus/AFLplusplus/tree/stable/unicorn_mode/samples). We also have CI to test this for every commit and release.
