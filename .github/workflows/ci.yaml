@@ -99,3 +99,19 @@ jobs:
         TOKEN: ${{ secrets.CRATES_IO_KEY }}
       run: |
         cargo login $TOKEN && cargo test && cargo publish
+
+  fmt-check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Cargo fmt
+        run: cargo fmt --check
+
+  fmt-toml-check:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Install taplo
+        run: cargo install taplo
+      - uses: actions/checkout@v4
+      - name: Run taplo
+        run: taplo format --check
