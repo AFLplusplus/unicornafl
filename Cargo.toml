@@ -6,7 +6,6 @@ rust-version = "1.87"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-# Unreleased 0.15.3
 libafl_targets = { version = "0.15.3", features = [
   "pointer_maps",
   "forkserver",
