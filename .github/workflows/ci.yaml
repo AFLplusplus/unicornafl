@@ -111,7 +111,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Install taplo
-        run: cargo install taplo
+        run: cargo install taplo-cli --locked
       - uses: actions/checkout@v4
       - name: Run taplo
         run: taplo format --check
