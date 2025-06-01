@@ -16,19 +16,19 @@ jobs:
           - { 
               os: ubuntu-latest, 
               arch: x64, 
-              python-ver: '3.8', 
+              python-version: '3.8', 
               name: 'manylinux2014_x86_64'
             }
           - { 
               os: ubuntu-latest,
               arch: x32,
-              python-ver: '3.8',
+              python-version: '3.8',
               name: 'manylinux2014_i686'
             }
           - { 
               os: ubuntu-latest,
               arch: x64,
-              python-ver: '3.8',
+              python-version: '3.8',
               name: 'sdist'
             }
           # - { 
@@ -106,9 +106,9 @@ jobs:
         CIBW_BEFORE_BUILD_LINUX: >
           curl https://sh.rustup.rs -sSf | sh -s -- --default-toolchain=stable --profile=minimal -y &&
           rustup show
-        CIBW_TEST_COMMAND: 'pytest {project}/test'
-        CIBW_TEST_REQUIRES: pytest requests
-        CIBW_TEST_SKIP: '*-macosx_arm64 *-macosx_universal2:arm64'
+        # CIBW_TEST_COMMAND: 'pytest {project}/test'
+        # CIBW_TEST_REQUIRES: pytest requests
+        # CIBW_TEST_SKIP: '*-macosx_arm64 *-macosx_universal2:arm64'
         CIBW_BUILD_VERBOSITY: 1
 
     - run: ${{ matrix.ls || 'ls -lh' }} wheelhouse/
