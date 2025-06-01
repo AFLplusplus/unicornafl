@@ -22,7 +22,7 @@ At this moment, manual building is required (see below) but we will soon release
 
 ### C/C++
 
-After building this repo, you could link the generated shared library with included C/C++ header file in [include/unicornafl.h](./include/unicornafl.h).
+After building this repo, you could link the generated static archive or shared library with included C/C++ header file in [include/unicornafl.h](./include/unicornafl.h).
 
 ## Build
 
@@ -68,4 +68,4 @@ This shall find the crash instantly, thanks to the `cmplog` integration.
 
 ## Migration
 
-There should be nothing special migrating from unicornafl v2.x to unicornafl v3.x, execpt the way integrating with AFL++. If your harness builds and statically links against unicornafl directly, there is no longer needed for the unicorn mode with AFL++. However, for Python users with `libunicornafl.so` dynamically linked, unicorn mode (`-U` option) is still needed for `afl-fuzz` command line.
+There should be nothing special migrating from unicornafl v2.x to unicornafl v3.x, execpt the way integrating with AFL++. If your harness builds and statically links against unicornafl directly, there is no longer needed for the unicorn mode with AFL++. However, if you are using Python, or using C/C++ with `libunicornafl.so` dynamically linked, unicorn mode (`-U` option) is still needed for `afl-fuzz` command line.
