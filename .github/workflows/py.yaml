@@ -38,6 +38,8 @@ jobs:
           #     name: 'macos_x86_64'
           #   }
     steps:
+    - uses: actions/checkout@v4
+
     - name: set up python
       uses: actions/setup-python@v4
       with:
