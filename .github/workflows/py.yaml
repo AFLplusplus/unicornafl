@@ -94,7 +94,7 @@ jobs:
     - name: build ${{ matrix.config.platform || matrix.config.os }} binaries
       run: cibuildwheel --output-dir wheelhouse
       env:
-        CIBW_BUILD: '${{ matrix.config.python-version }}-{{ matrix.config.name }}'
+        CIBW_BUILD: '${{ matrix.config.python-version }}-${{ matrix.config.name }}'
         # rust doesn't seem to be available for musl linux on i686
         CIBW_SKIP: '*-musllinux_i686'
         # we build for "alt_arch_name" if it exists, else 'auto'
