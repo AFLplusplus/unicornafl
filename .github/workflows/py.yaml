@@ -53,11 +53,11 @@ jobs:
     - name: Setup Rust cache
       uses: Swatinem/rust-cache@v2
       with:
-        key: ${{ matrix.alt_arch_name }}
+        key: ${{ matrix.config.alt_arch_name }}
 
     - name: Get pip cache dir
       id: pip-cache
-      if: matrix.os != 'windows-latest'
+      if: matrix.config.os != 'windows-latest'
       run: |
         echo "dir=$(pip cache dir)" >> $GITHUB_OUTPUT
     
@@ -65,7 +65,7 @@ jobs:
       uses: actions/cache@v3
       with:
         path: ${{ steps.pip-cache.outputs.dir || steps.pip-cache-win.outputs.dir }}
-        key: ${{ runner.os }}-pip-${{ matrix.python-version }}
+        key: ${{ runner.os }}-pip-${{ matrix.config.python-version }}
   
     - name: install python dependencies
       run: pip install -U setuptools wheel twine cibuildwheel platformdirs
@@ -84,22 +84,22 @@ jobs:
       uses: actions/cache@v3
       with:
         path: ${{ steps.cibuildwheel-cache.outputs.dir }}
-        key: ${{ runner.os }}-cibuildwheel-${{ matrix.python-version }}
+        key: ${{ runner.os }}-cibuildwheel-${{ matrix.config.python-version }}
 
     - name: build sdist
-      if: matrix.os == 'ubuntu' && matrix.python-version == 'cp310'
+      if: matrix.config.os == 'ubuntu' && matrix.config.python-version == 'cp310'
       run: |
         pip install maturin build
         python -m build --sdist -o wheelhouse
 
-    - name: build ${{ matrix.platform || matrix.os }} binaries
+    - name: build ${{ matrix.config.platform || matrix.config.os }} binaries
       run: cibuildwheel --output-dir wheelhouse
       env:
-        CIBW_BUILD: '${{ matrix.python-version }}-*'
+        CIBW_BUILD: '${{ matrix.config.python-version }}-*'
         # rust doesn't seem to be available for musl linux on i686
         CIBW_SKIP: '*-musllinux_i686'
         # we build for "alt_arch_name" if it exists, else 'auto'
-        CIBW_ARCHS: ${{ matrix.alt_arch_name || 'auto' }}
+        CIBW_ARCHS: ${{ matrix.config.alt_arch_name || 'auto' }}
         CIBW_ENVIRONMENT: 'PATH="$HOME/.cargo/bin:$PATH" CARGO_TERM_COLOR="always"'
         CIBW_ENVIRONMENT_WINDOWS: 'PATH="$UserProfile\.cargo\bin;$PATH"'
         CIBW_BEFORE_BUILD: rustup show
@@ -111,7 +111,7 @@ jobs:
         # CIBW_TEST_SKIP: '*-macosx_arm64 *-macosx_universal2:arm64'
         CIBW_BUILD_VERBOSITY: 1
 
-    - run: ${{ matrix.ls || 'ls -lh' }} wheelhouse/
+    - run: ${{ matrix.config.ls || 'ls -lh' }} wheelhouse/
 
     - name: '📤 Upload artifact'
       uses: actions/upload-artifact@v4
