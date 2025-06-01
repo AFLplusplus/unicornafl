@@ -16,13 +16,19 @@ unicornafl = { git = "https://github.com/AFLplusplus/unicornafl", branch = "main
 
 `main` is used here because `unicorn` is not released yet. We will make it ready shortly.
 
+For more details, please refer to [Rust usage](./docs/rust-usage.md).
+
 ### Python
 
 At this moment, manual building is required (see below) but we will soon release wheels.
 
+For more details, please refer to [Python usage](./docs/python-usage.md).
+
 ### C/C++
 
 After building this repo, you could link the generated static archive or shared library with included C/C++ header file in [include/unicornafl.h](./include/unicornafl.h).
+
+For more details, please refer to [C/C++ usage](./docs/c-usage.md).
 
 ## Build
 
@@ -37,7 +43,7 @@ cargo build --release
 For python bindings, we have:
 
 ```bash
-maturin build
+maturin build --release
 ```
 
 ## Example && Minimal Tutorial
@@ -65,6 +71,8 @@ afl-fuzz -i ./input -o ./output-8 -b 1 -g 8 -G 8 -V 60 -c 0 -- ./target/release/
 ```
 
 This shall find the crash instantly, thanks to the `cmplog` integration.
+
+For more details, please refer to [Fuzzing using UnicornAFL](./docs/fuzzing.md).
 
 ## Migration
 
