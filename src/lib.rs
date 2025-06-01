@@ -102,7 +102,6 @@ pub fn afl_fuzz<'a, D: 'a>(
     input_file: Option<PathBuf>,
     place_input_cb: impl FnMut(&mut Unicorn<'a, UnicornFuzzData<D>>, &[u8], u64) -> bool + 'a,
     exits: Vec<u64>,
-    always_validate: bool,
     persistent_iters: Option<u64>,
 ) -> Result<(), uc_afl_ret> {
     afl_fuzz_custom(
@@ -114,7 +113,7 @@ pub fn afl_fuzz<'a, D: 'a>(
             target::dummy_uc_fuzz_callback,
         ),
         exits,
-        always_validate,
+        false,
         persistent_iters,
     )
 }

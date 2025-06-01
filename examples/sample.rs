@@ -75,5 +75,5 @@ fn main() {
     };
 
     let input_file = input_file.map(PathBuf::from);
-    afl_fuzz(uc, input_file, place_input_cb, exits, false, Some(1)).expect("fail to fuzz?")
+    afl_fuzz(uc, input_file, place_input_cb, exits, Some(1)).expect("fail to fuzz?")
 }
