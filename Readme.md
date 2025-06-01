@@ -11,7 +11,7 @@ Starting from v3.0.0, unicornafl is fully rewritten with `libafl_targets` in Rus
 To use `unicornafl` as a library, just add this to your `Cargo.toml`
 
 ```toml
-unicornafl = {git = "https://github.com/AFLplusplus/unicornafl", branch = "main"}
+unicornafl = { git = "https://github.com/AFLplusplus/unicornafl", branch = "main" }
 ```
 
 `main` is used here because `unicorn` is not released yet. We will make it ready shortly.
@@ -19,6 +19,10 @@ unicornafl = {git = "https://github.com/AFLplusplus/unicornafl", branch = "main"
 ### Python
 
 At this moment, manual building is required (see below) but we will soon release wheels.
+
+### C/C++
+
+After building this repo, you could link the generated shared library with included C/C++ header file in [include/unicornafl.h](./include/unicornafl.h).
 
 ## Build
 
@@ -64,4 +68,4 @@ This shall find the crash instantly, thanks to the `cmplog` integration.
 
 ## Migration
 
-There should be nothing special migrating from unicornafl v2.x to unicornafl v3.x, execpt the way integrating with `AFL++`. If your harness builds and statically links against unicornafl directly, there is no longer needed for the unicorn mode with `AFL++`. However, for Python users with `libunicornafl.so` dynamically linked, unicorn mode is still needed for `AFL++` command line.
+There should be nothing special migrating from unicornafl v2.x to unicornafl v3.x, execpt the way integrating with AFL++. If your harness builds and statically links against unicornafl directly, there is no longer needed for the unicorn mode with AFL++. However, for Python users with `libunicornafl.so` dynamically linked, unicorn mode (`-U` option) is still needed for `afl-fuzz` command line.
