@@ -98,8 +98,8 @@ jobs:
         CIBW_ENVIRONMENT_WINDOWS: 'PATH="$UserProfile\.cargo\bin;$PATH"'
         # These are needed for Unicorn and cbindgen
         CIBW_BEFORE_ALL: >
-          apt-get update && apt-get install -y build-essential llvm-16-dev clang-16 \
-          libtool libtool-bin libglib2.0-dev make cmake automake meson ninja-build bison flex
+          yum install llvm llvm-devel clang clang-devel libtool glib2-devel \
+          make cmake automake meson ninja-build bison flex
         CIBW_BEFORE_BUILD: rustup show
         CIBW_BEFORE_BUILD_LINUX: >
           curl https://sh.rustup.rs -sSf | sh -s -- --default-toolchain=stable --profile=minimal -y &&
