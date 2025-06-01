@@ -29,7 +29,7 @@ bindings = ["unicorn-engine/dynamic_linkage", "pyo3", "pyo3-log", "env_logger"]
 
 [lib]
 name = "unicornafl"
-crate-type = ["cdylib", "rlib"] # For python
+crate-type = ["cdylib", "staticlib", "rlib"] # For python
 
 [[example]]
 name = "sample"
