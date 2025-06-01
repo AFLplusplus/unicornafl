@@ -25,12 +25,6 @@ jobs:
               python-version: 'cp38',
               name: 'manylinux2014_i686'
             }
-          - { 
-              os: ubuntu-latest,
-              arch: x64,
-              python-version: 'cp38',
-              name: 'sdist'
-            }
           # - { 
           #     os: macos-latest,
           #     arch: x64,
@@ -39,6 +33,11 @@ jobs:
           #   }
     steps:
     - uses: actions/checkout@v4
+
+    - name: '🛠️ Set up dependency of Unicorn'
+      run: |
+        sudo apt update && sudo apt install -y build-essential \
+        libtool libtool-bin libglib2.0-dev make cmake automake meson ninja-build bison flex
 
     - name: set up python
       uses: actions/setup-python@v4
@@ -87,7 +86,7 @@ jobs:
         key: ${{ runner.os }}-cibuildwheel-${{ matrix.config.python-version }}
 
     - name: build sdist
-      if: matrix.config.os == 'ubuntu' && matrix.config.python-version == 'cp310'
+      if: matrix.config.os == 'ubuntu-latest' && matrix.config.python-version == 'cp38'
       run: |
         pip install maturin build
         python -m build --sdist -o wheelhouse
@@ -95,7 +94,7 @@ jobs:
     - name: build ${{ matrix.config.platform || matrix.config.os }} binaries
       run: cibuildwheel --output-dir wheelhouse
       env:
-        CIBW_BUILD: '${{ matrix.config.python-version }}-*'
+        CIBW_BUILD: '${{ matrix.config.python-version }}-{{ matrix.config.name }}'
         # rust doesn't seem to be available for musl linux on i686
         CIBW_SKIP: '*-musllinux_i686'
         # we build for "alt_arch_name" if it exists, else 'auto'
