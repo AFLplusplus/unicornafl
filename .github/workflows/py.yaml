@@ -16,19 +16,19 @@ jobs:
           - { 
               os: ubuntu-latest, 
               arch: x64, 
-              python-version: '3.8', 
+              python-version: 'cp38', 
               name: 'manylinux2014_x86_64'
             }
           - { 
               os: ubuntu-latest,
               arch: x32,
-              python-version: '3.8',
+              python-version: 'cp38',
               name: 'manylinux2014_i686'
             }
           - { 
               os: ubuntu-latest,
               arch: x64,
-              python-version: '3.8',
+              python-version: 'cp38',
               name: 'sdist'
             }
           # - { 
