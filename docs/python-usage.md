@@ -96,6 +96,12 @@ If you want to use a forked Unicorn or Unicorn in remote Git server, you should 
 unicorn-engine = { git = "http://my/own/unicorn/fork" }
 ```
 
+### Linking
+
+To use UnicornAFL and Unicorn at the same time, you should make sure that the Unicorn version that UnicornAFL uses is consistent with the Unicorn version of Unicorn Python package. Then you can import Unicorn package and UnicornAFL package at the same time.
+
+When building the Python binding, we dynamically link the Unicorn shared library. As a result, using UnicornAFL and Unicorn package at the same time will be OK as long as the Unicorn version does not conflict.
+
 ### Debugging
 
 Inside UnicornAFL, there are many logs could be used for debugging. To enable logging, you should compile this repo using
