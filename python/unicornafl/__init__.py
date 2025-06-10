@@ -1,3 +1,8 @@
+# Compatibility and ensure we use the unicorn library from the unicorn bindings
+from unicorn import *
+
+# Now we load unicornafl.abi3.so and since we already loaded libunicorn.so by 
+# unicorn bindings, we won't load a duplicate one.
 from unicornafl.unicornafl import uc_afl_fuzz as uc_afl_fuzz_impl
 from unicornafl.unicornafl import uc_afl_fuzz_custom as uc_afl_fuzz_custom_impl
 from unicornafl.unicornafl import UC_AFL_RET_OK, \
@@ -12,8 +17,7 @@ from unicornafl.unicornafl import UC_AFL_RET_OK, \
     UC_AFL_RET_FFI
 import ctypes
 from typing import Any, Callable, List
-# Compatibility
-from unicorn import *
+
 
 UC_AFL_PLACE_INPUT_CB = ctypes.CFUNCTYPE(
     ctypes.c_bool, ctypes.c_void_p, ctypes.c_void_p, ctypes.c_size_t, ctypes.c_uint32, ctypes.c_void_p

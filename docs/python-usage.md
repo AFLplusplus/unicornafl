@@ -72,35 +72,11 @@ Before using fuzzing APIs, you should create unicorn instance on your own. It sh
 
 ## Tips
 
-### Use a different version of Unicorn
+### Unicorn Linkage
 
-It should be noted that the internal of UnicornAFL depends heavily on some newest Unicorn APIs. As a result, older version of Unicorn may not work. However, if you want to use your own version of Unicorn, you should modify the `Cargo.toml` in this repo.
+Unlike the Rust bindings which statically links against Unicorn, UnicornAFL builds a shared object `unicornafl.abi3.so` which dynamically links against `libunicorn.so` provided by the Unicorn Python bindings.
 
-First, find the following line:
-
-```toml
-unicorn-engine = { git = "https://github.com/unicorn-engine/unicorn", branch = "dev" }
-```
-
-If you want to use a Unicorn in local filesystem, you should change this line to
-
-```toml
-unicorn-engine = { path = "/path/to/unicorn/bindings/rust" }
-```
-
-Note that the `bindings/rust` suffix is necessary.
-
-If you want to use a forked Unicorn or Unicorn in remote Git server, you should change this line to
-
-```toml
-unicorn-engine = { git = "http://my/own/unicorn/fork" }
-```
-
-### Linking
-
-To use UnicornAFL and Unicorn at the same time, you should make sure that the Unicorn version that UnicornAFL uses is consistent with the Unicorn version of Unicorn Python package. Then you can import Unicorn package and UnicornAFL package at the same time.
-
-When building the Python binding, we dynamically link the Unicorn shared library. As a result, using UnicornAFL and Unicorn package at the same time will be OK as long as the Unicorn version does not conflict.
+It is possible to use an alternate `libunicorn.so` by `LIBUNICORN_PATH` environment variable.
 
 ### Debugging
 
