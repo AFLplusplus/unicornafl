@@ -16,7 +16,7 @@ libafl = "0.15.3"
 libafl_bolts = "0.15.3"
 
 serde = { version = "1.0", features = ["derive"] }
-unicorn-engine = { git = "https://github.com/unicorn-engine/unicorn", branch = "dev", optional = true}
+unicorn-engine = { git = "https://github.com/unicorn-engine/unicorn", branch = "dev" }
 log = "0.4"
 nix = { version = "0.29", features = ["signal"] }
 env_logger = { version = "0.11", optional = true }
@@ -27,7 +27,7 @@ pyo3 = { version = "0.24.0", features = [
 pyo3-log = { version = "0.12.2", optional = true }
 
 [features]
-default = ["unicorn-engine"]
+default = []
 bindings = ["pyo3", "pyo3-log", "env_logger"]
 
 [lib]
