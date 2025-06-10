@@ -93,7 +93,7 @@ jobs:
         CIBW_ARCHS: ${{ matrix.config.alt_arch_name || 'auto' }}
         CIBW_ENVIRONMENT: 'PATH="$HOME/.cargo/bin:$PATH" CARGO_TERM_COLOR="always"'
         CIBW_ENVIRONMENT_WINDOWS: 'PATH="$UserProfile\.cargo\bin;$PATH"'
-        CIBW_ENVIRONMENT_LINUX: 'MATURIN_PEP517_ARGS="--compatibility manylinux_2_28"'
+        CIBW_ENVIRONMENT_LINUX: 'PATH="$HOME/.cargo/bin:$PATH" CARGO_TERM_COLOR="always" MATURIN_PEP517_ARGS="--compatibility manylinux_2_28"'
         # These are needed for Unicorn and cbindgen
         CIBW_BEFORE_ALL: >
           yum update -y && yum install -y clang clang-devel
