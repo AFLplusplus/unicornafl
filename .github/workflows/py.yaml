@@ -17,7 +17,7 @@ jobs:
               os: ubuntu-latest, 
               arch: x64, 
               python-version: 'cp38', 
-              name: 'Linux wheels',
+              name: 'manylinux_x86_64',
               alt_arch_name: x86_64
             }
 
