@@ -18,3 +18,4 @@ bindings = "pyo3"
 manifest-path = "Cargo.toml"
 features = ["bindings"]
 python-source = "python"
+compatibility = "manylinux_2_28"
