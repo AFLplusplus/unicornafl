@@ -16,7 +16,7 @@ from unicornafl.unicornafl import UC_AFL_RET_OK, \
     UC_AFL_RET_LIBAFL, \
     UC_AFL_RET_FFI
 import ctypes
-from typing import Any, Callable, List
+from typing import Any, Callable, List, Optional
 
 
 UC_AFL_PLACE_INPUT_CB = ctypes.CFUNCTYPE(
@@ -30,6 +30,9 @@ UC_AFL_VALIDATE_CRASH_CB = ctypes.CFUNCTYPE(
 UC_AFL_FUZZ_CALLBACK_CB = ctypes.CFUNCTYPE(
     ctypes.c_int, ctypes.c_void_p, ctypes.c_void_p
 )
+
+_data_dict = {}
+_data_idx = 0
 
 def _place_input_cb(uc, input, input_len, persistent_round, idx):
     cb, _, _, uc, data = _data_dict[idx]
@@ -94,7 +97,7 @@ class UcAflError(Exception):
 
 
 def uc_afl_fuzz(uc: Uc,
-                input_file: str,
+                input_file: Optional[str | bytes],
                 place_input_callback: Callable,
                 exits: List[int],
                 validate_crash_callback: Callable = None,
@@ -122,18 +125,26 @@ def uc_afl_fuzz(uc: Uc,
     cb2 = ctypes.cast(UC_AFL_VALIDATE_CRASH_CB(
         _validate_crash_cb), UC_AFL_VALIDATE_CRASH_CB)
 
+    if isinstance(input_file, str):
+        input_file = input_file.encode('utf-8')
+    if isinstance(input_file, bytes):
+        input_file = ctypes.cast(ctypes.c_char_p(input_file), ctypes.c_void_p).value
+    elif input_file is None:
+        input_file = 0
+    else:
+        raise TypeError("Input file should be string or bytes or None")
     err = uc_afl_fuzz_impl(
-        uc._uch,
-        input_file.encode("utf-8"),
-        cb1,
+        uc._uch.value,
+        input_file,
+        ctypes.cast(cb1, ctypes.c_void_p).value,
         ctypes.cast(
             exits_array, ctypes.c_void_p
-        ),
+        ).value,
         exits_len,
-        cb2,
+        ctypes.cast(cb2, ctypes.c_void_p).value,
         always_validate,
         persistent_iters,
-        ctypes.cast(idx, ctypes.c_void_p)
+        ctypes.cast(idx, ctypes.c_void_p).value
     )
     if err != UC_AFL_RET_OK:
         del _data_dict[idx]
@@ -144,7 +155,7 @@ def uc_afl_fuzz(uc: Uc,
     return err
 
 def uc_afl_fuzz_custom(uc: Uc,
-                       input_file: str,
+                       input_file: Optional[str | bytes],
                        place_input_callback: Callable,
                        fuzzing_callback: Callable,
                        validate_crash_callback: Callable = None,
@@ -169,12 +180,20 @@ def uc_afl_fuzz_custom(uc: Uc,
     cb3 = ctypes.cast(UC_AFL_FUZZ_CALLBACK_CB(
         _fuzz_callback_cb), UC_AFL_FUZZ_CALLBACK_CB)
 
+    if isinstance(input_file, str):
+        input_file = input_file.encode('utf-8')
+    if isinstance(input_file, bytes):
+        input_file = ctypes.cast(ctypes.c_char_p(input_file), ctypes.c_void_p).value
+    elif input_file is None:
+        input_file = 0
+    else:
+        raise TypeError("Input file should be string or bytes or None")
     err = uc_afl_fuzz_custom_impl(
-        uc._uch,
-        input_file.encode("utf-8"),
-        cb1,
-        cb3,
-        cb2,
+        uc._uch.value,
+        input_file,
+        ctypes.cast(cb1, ctypes.c_void_p).value,
+        ctypes.cast(cb3, ctypes.c_void_p).value,
+        ctypes.cast(cb2, ctypes.c_void_p).value,
         always_validate,
         persistent_iters,
         ctypes.cast(idx, ctypes.c_void_p)
