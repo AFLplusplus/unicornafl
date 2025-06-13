@@ -196,7 +196,7 @@ def uc_afl_fuzz_custom(uc: Uc,
         ctypes.cast(cb2, ctypes.c_void_p).value,
         always_validate,
         persistent_iters,
-        ctypes.cast(idx, ctypes.c_void_p)
+        ctypes.cast(idx, ctypes.c_void_p).value
     )
     
     if err != UC_AFL_RET_OK:
