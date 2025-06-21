@@ -127,7 +127,7 @@ def uc_afl_fuzz(uc: Uc,
 
     if isinstance(input_file, str):
         input_file = ctypes.create_string_buffer(input_file.encode('utf-8'))
-    if isinstance(input_file, bytes):
+    elif isinstance(input_file, bytes):
         input_file = ctypes.create_string_buffer(input_file)
     elif input_file is None:
         input_file = 0
@@ -182,7 +182,7 @@ def uc_afl_fuzz_custom(uc: Uc,
 
     if isinstance(input_file, str):
         input_file = ctypes.create_string_buffer(input_file.encode('utf-8'))
-    if isinstance(input_file, bytes):
+    elif isinstance(input_file, bytes):
         input_file = ctypes.create_string_buffer(input_file)
     elif input_file is None:
         input_file = 0
