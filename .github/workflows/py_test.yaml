@@ -1,0 +1,99 @@
+name: Crate 📦 Distribution
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    name: Build
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: '🛠️ Set up Rust'
+      uses: dtolnay/rust-toolchain@stable
+
+    - name: '🛠️ Set up Python'
+      uses: actions/setup-python@v5
+      with:
+        python-version: '3.11' 
+
+    - name: '🛠️ Set up dependency of AFL++'
+      run: |
+        sudo apt update && sudo apt install -y llvm-16-dev clang-16 build-essential \
+        libtool libtool-bin libglib2.0-dev python3 make cmake automake meson ninja-build bison flex &&\
+        sudo update-alternatives --install /usr/bin/clang clang /usr/bin/clang-16 0 && \
+        sudo update-alternatives --install /usr/bin/clang++ clang++ /usr/bin/clang++-16 0
+
+    - name: '🚧 Install Maturin'
+      run: |
+        python3 -m pip install maturin
+
+    - name: '🚧 Build Maturin Develop'
+      run: |
+        maturin develop
+
+    - name: '🚧 AFLplusplus Checkout'
+      uses: actions/checkout@v4
+      with:
+        repository: 'AFLplusplus/AFLplusplus'
+        ref: 'dev'
+        path: 'AFLplusplus'
+
+    - name: '🚧 AFLplusplus Setup'
+      run: |
+        cd AFLplusplus &&\
+        make -j4 afl-fuzz
+
+    - name: '🚧 Prepare fuzz resources'
+      run: |
+        mkdir ./input && echo 'a' > ./input/a
+
+    - name: '🚧 Fuzz 4-byte cmplog for 60 seconds'
+      run: |
+        ./AFLplusplus/afl-fuzz -i ./input -o ./output-4 -b 1 -g 4 -G 4 -V 60 -c 0 -U -- python3 examples/sample.py @@
+      env:
+        AFL_BENCH_UNTIL_CRASH: 1
+        AFL_NO_CRASH_README: 1
+        AFL_NO_UI: 1
+        AFL_I_DONT_CARE_ABOUT_MISSING_CRASHES: 1
+        AFL_SKIP_CPUFREQ: 1
+        UNICORN_AFL_CMPCOV: 1
+
+    - name: "🚧 Check if we find the crash"
+      run: |
+        ls ./output-4/default/crashes/
+        if [ "$(find ./output-4/default/crashes/ -type f | wc -l)" -eq 0 ]; then
+            cat ./output-4/default/fuzzer_stats
+            exit 1;
+        else
+            if ! [ "$(grep "stab" ./output-4/default/fuzzer_stats | awk '{print $3}')" = '100.00%' ]; then
+              cat ./output-4/default/fuzzer_stats
+              exit 2;
+            fi
+        fi
+
+    - name: '🚧 Fuzz 8-byte cmplog for 60 seconds'
+      run: |
+        ./AFLplusplus/afl-fuzz -i ./input -o ./output-8 -b 1 -g 8 -G 8 -V 60 -c 0 -- python3 examples/sample.py @@ true
+      env:
+        AFL_BENCH_UNTIL_CRASH: 1
+        AFL_NO_CRASH_README: 1
+        AFL_NO_UI: 1
+        AFL_I_DONT_CARE_ABOUT_MISSING_CRASHES: 1
+        AFL_SKIP_CPUFREQ: 1
+        UNICORN_AFL_CMPCOV: 1
+    
+    - name: "🚧 Check if we find the crash"
+      run: |
+        ls ./output-8/default/crashes/
+        if [ "$(find ./output-8/default/crashes/ -type f | wc -l)" -eq 0 ]; then
+            cat ./output-8/default/fuzzer_stats
+            exit 1;
+        else
+            if ! [ "$(grep "stab" ./output-8/default/fuzzer_stats | awk '{print $3}')" = '100.00%' ]; then
+              cat ./output-8/default/fuzzer_stats
+              exit 2;
+            fi
+        fi
