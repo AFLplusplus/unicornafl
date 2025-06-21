@@ -19,6 +19,9 @@ jobs:
       with:
         python-version: '3.11' 
 
+    - name: '🛠️ Have a venv'
+      run: python3 -m venv venv
+
     - name: '🛠️ Set up dependency of AFL++'
       run: |
         sudo apt update && sudo apt install -y llvm-16-dev clang-16 build-essential \
@@ -28,11 +31,11 @@ jobs:
 
     - name: '🚧 Install Maturin'
       run: |
-        python3 -m pip install maturin
+        source venv/bin/activate && python3 -m pip install maturin
 
     - name: '🚧 Build Maturin Develop'
       run: |
-        maturin develop
+        source venv/bin/activate && maturin develop
 
     - name: '🚧 AFLplusplus Checkout'
       uses: actions/checkout@v4
