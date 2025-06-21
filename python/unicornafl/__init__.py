@@ -126,9 +126,17 @@ def uc_afl_fuzz(uc: Uc,
         _validate_crash_cb), UC_AFL_VALIDATE_CRASH_CB)
 
     if isinstance(input_file, str):
-        input_file = ctypes.create_string_buffer(input_file.encode('utf-8'))
+        input_file = \
+            ctypes.cast(
+                ctypes.create_string_buffer(input_file.encode('utf-8')),
+                ctypes.c_void_p
+            ).value
     elif isinstance(input_file, bytes):
-        input_file = ctypes.create_string_buffer(input_file)
+        input_file = \
+           ctypes.cast(
+               ctypes.create_string_buffer(input_file),
+               ctypes.c_void_p
+           ).value
     elif input_file is None:
         input_file = 0
     else:
