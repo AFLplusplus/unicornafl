@@ -22,6 +22,9 @@ jobs:
     - name: '🛠️ Have a venv'
       run: python3 -m venv venv
 
+    - name: '🛠️ Install the latest Unicorn dev'
+      run: source venv/bin/activate && python3 -m pip install "git+https://github.com/unicorn-engine/unicorn@dev#subdirectory=bindings/python/" 
+
     - name: '🛠️ Set up dependency of AFL++'
       run: |
         sudo apt update && sudo apt install -y llvm-16-dev clang-16 build-essential \
