@@ -6,8 +6,23 @@ on:
 
 jobs:
   build:
-    runs-on: ubuntu-latest
-    name: Build
+    runs-on: ${{ matrix.config.os }}
+    name: ${{ matrix.config.name }} - ${{ matrix.config.name}}
+    strategy:
+      fail-fast: false
+      matrix:
+        config:
+          - { 
+              name: 'Test Rust',
+              os: 'ubuntu-latest'
+            }
+
+          - { 
+              os: macos-latest,
+              arch: x64,
+              python-ver: '3.8',
+              name: 'macos_x86_64'
+            }
     steps:
     - uses: actions/checkout@v4
 
@@ -94,7 +109,7 @@ jobs:
         fi
 
     - name: '📦 Cargo Publish'
-      if: startsWith(github.ref, 'refs/tags')
+      if: ${{ startsWith(github.ref, 'refs/tags') && contains(matrix.os, 'ubuntu') }}
       env:
         TOKEN: ${{ secrets.CRATES_IO_KEY }}
       run: |
