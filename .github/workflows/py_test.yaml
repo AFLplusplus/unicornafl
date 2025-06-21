@@ -1,4 +1,4 @@
-name: Crate 📦 Distribution
+name: Python Example Testing
 
 on:
   push:
