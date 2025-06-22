@@ -29,15 +29,15 @@ jobs:
       uses: dtolnay/rust-toolchain@stable
 
     - name: '🛠️ Set up dependency of AFL++ on Linux'
-      if: contains(matrix.os, 'ubuntu')
+      if: ${{ contains(matrix.os, 'ubuntu') }}
       run: |
         sudo apt update && sudo apt install -y llvm-16-dev clang-16 build-essential \
         libtool libtool-bin libglib2.0-dev python3 make cmake automake meson ninja-build bison flex &&\
         sudo update-alternatives --install /usr/bin/clang clang /usr/bin/clang-16 0 && \
         sudo update-alternatives --install /usr/bin/clang++ clang++ /usr/bin/clang++-16 0
     
-    - name: '🛠️ Set up dependency of AFL++'
-      if: contains(matrix.os, 'macos')
+    - name: '🛠️ Set up dependency of AFL++ on macOS'
+      if: ${{ contains(matrix.os, 'macos') }}
       run: |
         brew install wget git make cmake llvm gdb coreutils
 
