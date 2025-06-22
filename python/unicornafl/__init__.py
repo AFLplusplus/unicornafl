@@ -80,7 +80,7 @@ class UcAflError(Exception):
             UC_AFL_RET_FINISHED: "We forked before but now AFL is gone (time to quit)",
             UC_AFL_RET_CALLED_TWICE: "Forkserver already running. This may be an error.",
             UC_AFL_RET_ERROR: "Something went horribly wrong in the parent!",
-            UC_AFL_RET_FFI: "Unexpected FFI error, consider rerun with RUST_LOG=trace",
+            UC_AFL_RET_FFI: "Unexpected FFI error, probably the unicorn version unicornafl built is not the same as Python dependency, consider rerun with RUST_LOG=trace",
             UC_AFL_RET_LIBAFL: "Error in LibAFL, consider rerun with RUST_LOG=trace",
             UC_AFL_RET_INVALID_UC: "Invalid unicorn pointer.",
             UC_AFL_RET_UC_ERR: "Error from unicorn."
