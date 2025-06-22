@@ -38,7 +38,7 @@ jobs:
 
     - name: '🚧 Build Maturin Develop'
       run: |
-        source venv/bin/activate && maturin develop
+        source venv/bin/activate && maturin develop --release
 
     - name: '🚧 AFLplusplus Checkout'
       uses: actions/checkout@v4
