@@ -29,7 +29,7 @@ jobs:
       uses: dtolnay/rust-toolchain@stable
 
     - name: '🛠️ Set up dependency of AFL++ on Linux'
-      if: ${{ contains(matrix.conifg.os, 'ubuntu') }}
+      if: ${{ contains(matrix.config.os, 'ubuntu') }}
       run: |
         sudo apt update && sudo apt install -y llvm-16-dev clang-16 build-essential \
         libtool libtool-bin libglib2.0-dev python3 make cmake automake meson ninja-build bison flex &&\
@@ -37,7 +37,7 @@ jobs:
         sudo update-alternatives --install /usr/bin/clang++ clang++ /usr/bin/clang++-16 0
     
     - name: '🛠️ Set up dependency of AFL++ on macOS'
-      if: ${{ contains(matrix.conifg.os, 'macos') }}
+      if: ${{ contains(matrix.config.os, 'macos') }}
       run: |
         brew install wget git make cmake llvm gdb coreutils
 
@@ -57,7 +57,7 @@ jobs:
         path: 'AFLplusplus'
 
     - name: '🛠️ macOS quirks for AFL++'
-      if: contains(matrix.conifg.os, 'macos')
+      if: contains(matrix.config.os, 'macos')
       run: |
         cd AFLplusplus && sudo afl-system-config
 
@@ -119,7 +119,7 @@ jobs:
         fi
 
     - name: '📦 Cargo Publish'
-      if: ${{ startsWith(github.ref, 'refs/tags') && contains(matrix.conifg.os, 'ubuntu') }}
+      if: ${{ startsWith(github.ref, 'refs/tags') && contains(matrix.config.os, 'ubuntu') }}
       env:
         TOKEN: ${{ secrets.CRATES_IO_KEY }}
       run: |
