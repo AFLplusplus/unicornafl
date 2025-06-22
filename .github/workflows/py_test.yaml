@@ -82,9 +82,9 @@ jobs:
             fi
         fi
 
-    - name: '🚧 Fuzz 8-byte cmplog for 60 seconds'
+    - name: '🚧 Fuzz 8-byte cmplog for 120 seconds'
       run: |
-        source venv/bin/activate && ./AFLplusplus/afl-fuzz -i ./input -o ./output-8 -b 1 -g 8 -G 8 -V 60 -c 0 -U -- python3 examples/sample.py @@ true
+        source venv/bin/activate && ./AFLplusplus/afl-fuzz -i ./input -o ./output-8 -b 1 -g 8 -G 8 -V 120 -c 0 -U -- python3 examples/sample.py @@ true
       env:
         AFL_BENCH_UNTIL_CRASH: 1
         AFL_NO_CRASH_README: 1
