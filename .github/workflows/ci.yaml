@@ -59,7 +59,7 @@ jobs:
     - name: '🛠️ macOS quirks for AFL++'
       if: contains(matrix.config.os, 'macos')
       run: |
-        cd AFLplusplus && sudo afl-system-config
+        cd AFLplusplus && sudo sh afl-system-config
 
     - name: '🚧 AFLplusplus Setup'
       run: |
