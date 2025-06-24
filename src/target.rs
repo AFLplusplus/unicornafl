@@ -1,6 +1,6 @@
 use std::path::PathBuf;
 
-use libafl_bolts::shmem::{ShMemProvider, StdShMemProvider};
+use libafl_bolts::shmem::{ShMemProvider, UnixShMemProvider};
 use libafl_targets::{__afl_map_size, EDGES_MAP_PTR, SHM_FUZZING, cmps::CMPLOG_ENABLED};
 use log::{debug, error, trace, warn};
 use unicorn_engine::{Arch, RegisterARM, Unicorn, uc_error};
@@ -58,8 +58,9 @@ pub fn child_fuzz<'a, D: 'a>(
         trace!("{:?}={:?}", env, val);
     }
 
-    let mut shmem_provider = StdShMemProvider::new()?;
+    let mut shmem_provider = UnixShMemProvider::new()?;
 
+    trace!("Mapping both input shm and coverage shm...");
     let has_afl = libafl_targets::map_input_shared_memory(&mut shmem_provider).is_ok()
         && libafl_targets::map_shared_memory(&mut shmem_provider).is_ok();
 

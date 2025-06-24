@@ -1,6 +1,6 @@
 use std::{
     io::{PipeReader, PipeWriter},
-    os::fd::{AsFd, AsRawFd},
+    os::fd::AsFd,
 };
 
 use libafl_bolts::os::{ChildHandle, ForkResult};
@@ -29,8 +29,8 @@ pub(crate) fn write_u64_to_fd(fd: impl AsFd, message: u64) -> Result<(), uc_afl_
 }
 
 fn read_from_fd(fd: impl AsFd, message: &mut [u8]) -> Result<(), uc_afl_ret> {
-    let bytes_read = nix::unistd::read(fd.as_fd().as_raw_fd(), message)
-        .map_err(|_| uc_afl_ret::UC_AFL_RET_ERROR)?;
+    let bytes_read =
+        nix::unistd::read(fd.as_fd(), message).map_err(|_| uc_afl_ret::UC_AFL_RET_ERROR)?;
     if bytes_read != message.len() {
         return Err(uc_afl_ret::UC_AFL_RET_ERROR);
     }
