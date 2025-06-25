@@ -99,6 +99,23 @@ class UcAflError(Exception):
         else:
             raise ValueError("Tried to compare UcAflError to {} ({})".format((type(other), other)))
 
+def __handle_input_string(input_file: Optional[str | bytes]) -> int:
+    if isinstance(input_file, str):
+        return \
+            ctypes.cast(
+                ctypes.create_string_buffer(input_file.encode('utf-8')),
+                ctypes.c_void_p
+            ).value
+    elif isinstance(input_file, bytes):
+        return \
+           ctypes.cast(
+               ctypes.create_string_buffer(input_file),
+               ctypes.c_void_p
+           ).value
+    elif input_file is None:
+        return 0
+    else:
+        raise TypeError("Input file should be string or bytes or None")
 
 def uc_afl_fuzz(uc: Uc,
                 input_file: Optional[str | bytes],
@@ -129,22 +146,7 @@ def uc_afl_fuzz(uc: Uc,
     cb2 = ctypes.cast(UC_AFL_VALIDATE_CRASH_CB(
         _validate_crash_cb), UC_AFL_VALIDATE_CRASH_CB)
 
-    if isinstance(input_file, str):
-        input_file = \
-            ctypes.cast(
-                ctypes.create_string_buffer(input_file.encode('utf-8')),
-                ctypes.c_void_p
-            ).value
-    elif isinstance(input_file, bytes):
-        input_file = \
-           ctypes.cast(
-               ctypes.create_string_buffer(input_file),
-               ctypes.c_void_p
-           ).value
-    elif input_file is None:
-        input_file = 0
-    else:
-        raise TypeError("Input file should be string or bytes or None")
+    input_file = __handle_input_string(input_file)
     err = uc_afl_fuzz_impl(
         uc._uch.value,
         input_file,
@@ -192,14 +194,7 @@ def uc_afl_fuzz_custom(uc: Uc,
     cb3 = ctypes.cast(UC_AFL_FUZZ_CALLBACK_CB(
         _fuzz_callback_cb), UC_AFL_FUZZ_CALLBACK_CB)
 
-    if isinstance(input_file, str):
-        input_file = ctypes.create_string_buffer(input_file.encode('utf-8'))
-    elif isinstance(input_file, bytes):
-        input_file = ctypes.create_string_buffer(input_file)
-    elif input_file is None:
-        input_file = 0
-    else:
-        raise TypeError("Input file should be string or bytes or None")
+    input_file = __handle_input_string(input_file)
     err = uc_afl_fuzz_custom_impl(
         uc._uch.value,
         input_file,
