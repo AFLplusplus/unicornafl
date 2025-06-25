@@ -199,9 +199,10 @@ fn hook_opcode_cmplog<'a, D: 'a>(
     let cur_loc = afl_hash_ip(address) & (state.map_size - 1);
     let k = cur_loc as usize & (CMPLOG_MAP_W - 1);
     let shape = match size {
-        16 => 1,
-        32 => 3,
-        64 => 7,
+        8 => 1,
+        16 => 2,
+        32 => 4,
+        64 => 8,
         _ => 0,
     };
 
