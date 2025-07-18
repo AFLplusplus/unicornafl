@@ -104,6 +104,9 @@ jobs:
         # CIBW_TEST_COMMAND: 'pytest {project}/test'
         # CIBW_TEST_REQUIRES: pytest requests
         # CIBW_TEST_SKIP: '*-macosx_arm64 *-macosx_universal2:arm64'
+        # We must skip auditwheel because libunicorn.so is loaded at import time instead of load time and thus auditwheel will always fail!
+        # This is hacky but should be okay
+        CIBW_REPAIR_WHEEL_COMMAND: 'true'
         CIBW_MANYLINUX_X86_64_IMAGE: manylinux_2_28
         CIBW_BUILD_VERBOSITY: 1
 
