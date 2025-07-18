@@ -77,3 +77,5 @@ For more details, please refer to [Fuzzing using UnicornAFL](./docs/fuzzing.md).
 ## Migration
 
 There should be nothing special migrating from unicornafl v2.x to unicornafl v3.x, execpt the way integrating with AFL++. If your harness builds and statically links against unicornafl directly, there is no longer needed for the unicorn mode with AFL++. However, if you are using Python, or using C/C++ with `libunicornafl.so` dynamically linked, unicorn mode (`-U` option) is still needed for `afl-fuzz` command line.
+
+If you are unsure whether `-U` is needed, it is harmless in all integration and you can safely always add that.
