@@ -37,7 +37,12 @@ pyo3-log = { version = "0.12.2", optional = true }
 
 [features]
 default = []
-bindings = ["pyo3", "pyo3-log", "env_logger"]
+bindings = [
+  "unicorn-engine/dynamic_linkage"
+]
+python = [
+  "pyo3", "pyo3-log", "env_logger", "bindings"
+]
 
 [lib]
 name = "unicornafl"

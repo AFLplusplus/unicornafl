@@ -4,7 +4,7 @@ To use UnicornAFL with C/C++, you should clone this repository and build it your
 
 ```shell
 git clone --depth 1 https://github.com/AFLplusplus/unicornafl && cd unicornafl
-cargo build --release
+cargo build --release --features bindings
 ```
 
 Before building this repo, make sure that you have installed dependencies to build [Unicorn](https://github.com/unicorn-engine/unicorn), and installed stable Rust compiler with at least 1.87.0.
@@ -66,34 +66,6 @@ Some of the arguments are the same as the simplified API. The only difference is
 Before using fuzzing APIs, you should create unicorn instance on your own. It should be noted that, UnicornAFL does not need to know the actual target to fuzz. Instead, you should manually setup your target in Unicorn instance (for example, map the codes in unicorn's memory space).
 
 ## Tips
-
-### Linking
-
-Note that `libunicornafl.a` or `libunicornafl.so` already bundles a Unicorn. As a result, you don't need to manually link Unicorn any more.
-
-### Use a different version of Unicorn
-
-It should be noted that the internal of UnicornAFL depends heavily on some newest Unicorn APIs. As a result, older version of Unicorn may not work. However, if you want to use your own version of Unicorn, you should modify the `Cargo.toml` in this repo.
-
-First, find the following line:
-
-```toml
-unicorn-engine = { git = "https://github.com/unicorn-engine/unicorn", branch = "dev" }
-```
-
-If you want to use a Unicorn in local filesystem, you should change this line to
-
-```toml
-unicorn-engine = { path = "/path/to/unicorn/bindings/rust" }
-```
-
-Note that the `bindings/rust` suffix is necessary.
-
-If you want to use a forked Unicorn or Unicorn in remote Git server, you should change this line to
-
-```toml
-unicorn-engine = { git = "http://my/own/unicorn/fork" }
-```
 
 ### Debugging
 

@@ -6,7 +6,10 @@ use std::{
 };
 
 use executor::{UnicornAflExecutorCustomHook, UnicornAflExecutorHook, UnicornFuzzData};
-use unicorn_engine::{Unicorn, uc_error, unicorn_const::uc_engine};
+
+pub mod unicorn_engine {
+    pub use unicorn_engine::*;
+}
 
 pub mod executor;
 mod forkserver;
@@ -36,15 +39,15 @@ impl From<libafl::Error> for uc_afl_ret {
     }
 }
 
-impl From<uc_error> for uc_afl_ret {
-    fn from(_: uc_error) -> Self {
+impl From<unicorn_engine::uc_error> for uc_afl_ret {
+    fn from(_: unicorn_engine::uc_error) -> Self {
         Self::UC_AFL_RET_UC_ERR
     }
 }
 
 #[allow(non_camel_case_types)]
 pub type uc_afl_cb_place_input_t = extern "C" fn(
-    uc: *mut uc_engine,
+    uc: *mut unicorn_engine::uc_engine,
     input: *const c_uchar,
     input_len: usize,
     persistent_round: u64,
@@ -53,8 +56,8 @@ pub type uc_afl_cb_place_input_t = extern "C" fn(
 
 #[allow(non_camel_case_types)]
 pub type uc_afl_cb_validate_crash_t = extern "C" fn(
-    uc: *mut uc_engine,
-    unicorn_result: uc_error,
+    uc: *mut unicorn_engine::uc_engine,
+    unicorn_result: unicorn_engine::uc_error,
     input: *const c_uchar,
     input_len: usize,
     persistent_round: u64,
@@ -62,7 +65,10 @@ pub type uc_afl_cb_validate_crash_t = extern "C" fn(
 ) -> bool;
 
 #[allow(non_camel_case_types)]
-pub type uc_afl_fuzz_cb_t = extern "C" fn(uc: *mut uc_engine, data: *mut c_void) -> uc_error;
+pub type uc_afl_fuzz_cb_t = extern "C" fn(
+    uc: *mut unicorn_engine::uc_engine,
+    data: *mut c_void,
+) -> unicorn_engine::uc_error;
 
 /// Customized afl fuzz routine entrypoint for Rust user.
 ///
@@ -76,7 +82,7 @@ pub type uc_afl_fuzz_cb_t = extern "C" fn(uc: *mut uc_engine, data: *mut c_void)
 /// `persistent_iters` is the number of persistent execution rounds. If it is `None`,
 /// then the loop will be infinite
 pub fn afl_fuzz_custom<'a, D: 'a>(
-    uc: Unicorn<'a, UnicornFuzzData<D>>,
+    uc: unicorn_engine::Unicorn<'a, UnicornFuzzData<D>>,
     input_file: Option<PathBuf>,
     callbacks: impl UnicornAflExecutorHook<'a, D>,
     exits: Vec<u64>,
@@ -98,9 +104,10 @@ pub fn afl_fuzz_custom<'a, D: 'a>(
 ///
 /// If you want to manually validate crash or kick fuzzing, call [`afl_fuzz_custom`].
 pub fn afl_fuzz<'a, D: 'a>(
-    uc: Unicorn<'a, UnicornFuzzData<D>>,
+    uc: unicorn_engine::Unicorn<'a, UnicornFuzzData<D>>,
     input_file: Option<PathBuf>,
-    place_input_cb: impl FnMut(&mut Unicorn<'a, UnicornFuzzData<D>>, &[u8], u64) -> bool + 'a,
+    place_input_cb: impl FnMut(&mut unicorn_engine::Unicorn<'a, UnicornFuzzData<D>>, &[u8], u64) -> bool
+    + 'a,
     exits: Vec<u64>,
     persistent_iters: Option<u64>,
 ) -> Result<(), uc_afl_ret> {
@@ -122,7 +129,7 @@ pub fn afl_fuzz<'a, D: 'a>(
 #[unsafe(no_mangle)]
 #[allow(non_camel_case_types)]
 pub extern "C" fn uc_afl_fuzz(
-    uc_handle: *mut uc_engine,
+    uc_handle: *mut unicorn_engine::uc_engine,
     input_file: *const c_char,
     place_input_callback: uc_afl_cb_place_input_t,
     exits: *const u64,
@@ -150,7 +157,7 @@ pub extern "C" fn uc_afl_fuzz(
 #[unsafe(no_mangle)]
 #[allow(non_camel_case_types)]
 pub extern "C" fn uc_afl_fuzz_custom(
-    uc_handle: *mut uc_engine,
+    uc_handle: *mut unicorn_engine::uc_engine,
     input_file: *const c_char,
     place_input_callback: uc_afl_cb_place_input_t,
     fuzz_callback: uc_afl_fuzz_cb_t,
@@ -179,7 +186,7 @@ pub extern "C" fn uc_afl_fuzz_custom(
 // to avoid checking the emptyness inside every round.
 #[expect(clippy::too_many_arguments)]
 fn uc_afl_fuzz_internal(
-    uc_handle: *mut uc_engine,
+    uc_handle: *mut unicorn_engine::uc_engine,
     input_file: *const c_char,
     place_input_callback: uc_afl_cb_place_input_t,
     exits: *const u64,
@@ -191,23 +198,24 @@ fn uc_afl_fuzz_internal(
     data: *mut c_void,
 ) -> uc_afl_ret {
     let fuzz_data = UnicornFuzzData::new(data);
-    let uc = match unsafe { Unicorn::from_handle_with_data(uc_handle, fuzz_data) } {
+    let uc = match unsafe { unicorn_engine::Unicorn::from_handle_with_data(uc_handle, fuzz_data) } {
         Ok(uc) => uc,
         Err(err) => {
             return err.into();
         }
     };
 
-    let place_input_cb = move |uc: &mut Unicorn<'_, UnicornFuzzData<*mut c_void>>,
-                               input: &[u8],
-                               persistent_round: u64| {
-        let handle = uc.get_handle();
-        let data = uc.get_data_mut().user_data;
-        (place_input_callback)(handle, input.as_ptr(), input.len(), persistent_round, data)
-    };
+    let place_input_cb =
+        move |uc: &mut unicorn_engine::Unicorn<'_, UnicornFuzzData<*mut c_void>>,
+              input: &[u8],
+              persistent_round: u64| {
+            let handle = uc.get_handle();
+            let data = uc.get_data_mut().user_data;
+            (place_input_callback)(handle, input.as_ptr(), input.len(), persistent_round, data)
+        };
     let validate_crash_cb = validate_crash_callback.map(|validate_crash_callback| {
-        move |uc: &mut Unicorn<'_, UnicornFuzzData<*mut c_void>>,
-              unicorn_result: Result<(), uc_error>,
+        move |uc: &mut unicorn_engine::Unicorn<'_, UnicornFuzzData<*mut c_void>>,
+              unicorn_result: Result<(), unicorn_engine::uc_error>,
               input: &[u8],
               persistent_round: u64| {
             let handle = uc.get_handle();
@@ -215,7 +223,7 @@ fn uc_afl_fuzz_internal(
             let unicorn_result = if let Err(err) = unicorn_result {
                 err
             } else {
-                uc_error::OK
+                unicorn_engine::uc_error::OK
             };
             (validate_crash_callback)(
                 handle,
@@ -228,11 +236,11 @@ fn uc_afl_fuzz_internal(
         }
     });
     let fuzz_cb = fuzz_callback.map(|fuzz_callback| {
-        move |uc: &mut Unicorn<'_, UnicornFuzzData<*mut c_void>>| {
+        move |uc: &mut unicorn_engine::Unicorn<'_, UnicornFuzzData<*mut c_void>>| {
             let handle = uc.get_handle();
             let data = uc.get_data_mut().user_data;
             let unicorn_result = fuzz_callback(handle, data);
-            if unicorn_result == uc_error::OK {
+            if unicorn_result == unicorn_engine::uc_error::OK {
                 Ok(())
             } else {
                 Err(unicorn_result)

@@ -46,6 +46,16 @@ For python bindings, we have:
 maturin build --release
 ```
 
+## Unicorn Linkage
+
+Please note that, unicorn is already bundled with unicornafl by default and you **shall not** pass unicorn engine pointer created by another unicorn dynamic library.
+
+For Rust, stick to `unicornafl::unicorn_engine::*` to avoid incorrect structs and pointers. Refer to [Rust usage](./docs/rust-usage.md) for more details on override dependencies.
+
+For Python, you are free to use `from unicorn import Uc` because Python only allows dynamic linkage and we will always use the copy from the Unicorn python bindings.
+
+For C/C++, similar to Python, you should provide a dynamic unicorn library which our unicornafl will pick.
+
 ## Example && Minimal Tutorial
 
 We provide a sample harness at [the examples](https://github.com/AFLplusplus/AFLplusplus/tree/stable/unicorn_mode/samples).
