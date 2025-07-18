@@ -22,6 +22,10 @@ typedef enum uc_afl_ret {
     UC_AFL_RET_NO_AFL,
     UC_AFL_RET_CALLED_TWICE,
     UC_AFL_RET_FINISHED,
+    UC_AFL_RET_INVALID_UC,
+    UC_AFL_RET_UC_ERR,
+    UC_AFL_RET_LIBAFL,
+    UC_AFL_RET_FFI,
 } uc_afl_ret;
 
 typedef bool (*uc_afl_cb_place_input_t)(uc_engine* uc, char* input,

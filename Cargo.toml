@@ -1,6 +1,52 @@
-[workspace]
+[package]
+name = "unicornafl"
+version = "3.0.0"
+edition = "2024"
+rust-version = "1.87"
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
-members = [
-    "bindings/rust",
-]
+[dependencies]
+# For macOS autotokens fix
+libafl_targets = { git = "https://github.com/AFLplusplus/LibAFL", rev = "c604d2dac47e84b7133e85cfd137acf2d6e0175b", features = [
+  "pointer_maps",
+  "forkserver",
+  "cmplog",
+  "cmplog_extended_instrumentation",
+] }
+libafl = { git = "https://github.com/AFLplusplus/LibAFL", rev = "c604d2dac47e84b7133e85cfd137acf2d6e0175b" }
+libafl_bolts = { git = "https://github.com/AFLplusplus/LibAFL", rev = "c604d2dac47e84b7133e85cfd137acf2d6e0175b" }
+# libafl_targets = { path = "../LibAFL/libafl_targets", features = [
+#   "pointer_maps",
+#   "forkserver",
+#   "cmplog",
+#   "cmplog_extended_instrumentation",
+# ] }
+# libafl = {path = "../LibAFL/libafl"}
+# libafl_bolts = {path = "../LibAFL/libafl_bolts"}
 
+serde = { version = "1.0", features = ["derive"] }
+unicorn-engine = { git = "https://github.com/unicorn-engine/unicorn", branch = "dev" }
+log = "0.4"
+nix = { version = "0.30", features = ["signal"] }
+env_logger = { version = "0.11", optional = true }
+pyo3 = { version = "0.24.0", features = [
+  "extension-module",
+  "abi3-py38",
+], optional = true }
+pyo3-log = { version = "0.12.2", optional = true }
+
+[features]
+default = []
+bindings = ["pyo3", "pyo3-log", "env_logger"]
+
+[lib]
+name = "unicornafl"
+crate-type = ["cdylib", "staticlib", "rlib"] # For python
+
+[[example]]
+name = "sample"
+
+[profile.release]
+lto = true
+codegen-units = 1
+strip = true

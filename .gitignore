@@ -9,3 +9,6 @@ bindings/python/dist/
 build_python/
 target/
 Cargo.lock
+.gdb_history
+*.so
+__pycache__

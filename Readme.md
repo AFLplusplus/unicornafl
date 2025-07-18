@@ -1,105 +1,79 @@
 # UnicornAFL
 
-The project builds a bridge between AFL++ and unicorn engine.
-You can fuzz unicorn targets using python, rust, and C.
+UnicornAFL is a bridge between AFL++ and the [unicorn engine](https://github.com/unicorn-engine/unicorn). Generally, it allows you to fuzz any machine code in a few setups, with coverage, cmpcov, and cmplog support.
 
-Check out [the examples](https://github.com/AFLplusplus/AFLplusplus/tree/stable/unicorn_mode/samples) in AFLplusplus/unicorn_mode
+Starting from v3.0.0, unicornafl is fully rewritten with `libafl_targets` in Rust though we still provide Python and C bindings.
 
-## Compile
+## Usage
 
-If you have unicorn installed globally, you may just:
+### Rust
+
+To use `unicornafl` as a library, just add this to your `Cargo.toml`
+
+```toml
+unicornafl = { git = "https://github.com/AFLplusplus/unicornafl", branch = "main" }
+```
+
+`main` is used here because `unicorn` is not released yet. We will make it ready shortly.
+
+For more details, please refer to [Rust usage](./docs/rust-usage.md).
+
+### Python
+
+At this moment, manual building is required (see below) but we will soon release wheels.
+
+For more details, please refer to [Python usage](./docs/python-usage.md).
+
+### C/C++
+
+After building this repo, you could link the generated static archive or shared library with included C/C++ header file in [include/unicornafl.h](./include/unicornafl.h).
+
+For more details, please refer to [C/C++ usage](./docs/c-usage.md).
+
+## Build
+
+Simply do:
 
 ```bash
-mkdir build
-cd build
-cmake .. -DCMAKE_BUILD_TYPE=Release
-make
+git clone https://github.com/AFLplusplus/unicornafl
+cd unicornafl
+cargo build --release
 ```
 
-Or if you prefer a latest build, don't forget to update submodule before building.
+For python bindings, we have:
 
 ```bash
-git submodule update --init --recursive
-mkdir build
-cd build
-cmake .. -DCMAKE_BUILD_TYPE=Release -DUCAFL_NO_LOG=on # disable logging for the maximum speed
-make
+maturin build --release
 ```
 
-Or if you would like python bindings.
+## Example && Minimal Tutorial
+
+We provide a sample harness at [the examples](https://github.com/AFLplusplus/AFLplusplus/tree/stable/unicorn_mode/samples).
+
+The target assembly is:
+
+```
+mov rax, rdx;
+cmp rax, 0x114514;
+je die;
+xor rax, rax;
+die:
+  mov rax, [rax];
+xor rax, rax;
+```
+
+We artifically make our harness stops at any of the `xor rax, rax` instruction. Therefore, if `rax==0x114514` is true, our harness will have an unmapped read error, which will be captured by `unicornafl` as a crash. Otherwise, it just stops without any crashes. You could start fuzzing by:
 
 ```bash
-python3 -m pip install unicornafl
+cargo build --example sample --release
+# assume AFL++ is installed
+afl-fuzz -i ./input -o ./output-8 -b 1 -g 8 -G 8 -V 60 -c 0 -- ./target/release/examples/sample @@ true
 ```
 
-Or build it by yourself.
+This shall find the crash instantly, thanks to the `cmplog` integration.
 
-```bash
-git submodule update --init --recursive
-cd bindings/python/
-python3 -m pip install -e .
-```
-
-## API
-
-The only API currently unicornafl exposes is:
-
-```C
-//
-//  Start our fuzzer.
-//
-//  If no afl-fuzz instance is found, this function is almost identical to uc_emu_start()
-//  
-//  @uc: The uc_engine return-ed from uc_open().
-//  @input_file: This usually is the input file name provided by the command argument.
-//  @place_input_callback: This callback is triggered every time a new child is generated. It returns 
-//                         true if the input is accepted, or the input would be skipped.
-//  @exits: All possible exits.
-//  @exit_count: The count of the @exits array.
-//  @validate_crash_callback: This callback is triggered every time to check if we are crashed.                     
-//  @always_validate: If this is set to False, validate_crash_callback will be only triggered if
-//                    uc_emu_start (which is called internally by uc_afl_fuzz) returns an error. Or
-//                    the validate_crash_callback will be triggered every time.
-//  @persistent_iters: Fuzz how many times before forking a new child.
-//  @data: The extra data user provides.
-//
-//  @uc_afl_ret: The error the fuzzer returns.
-UNICORNAFL_EXPORT
-uc_afl_ret uc_afl_fuzz(uc_engine* uc, char* input_file,
-                       uc_afl_cb_place_input_t place_input_callback,
-                       uint64_t* exits, size_t exit_count,
-                       uc_afl_cb_validate_crash_t validate_crash_callback,
-                       bool always_validate, uint32_t persistent_iters,
-                       void* data);
-```
+For more details, please refer to [Fuzzing using UnicornAFL](./docs/fuzzing.md).
 
 ## Migration
 
-unicornafl 2.x remains the same API compatible to unicornafl 1.x so there is no extra work to migrate.
-
-However, a change in unicornafl 2.x is that the monkey patch is no longer needed for Python, which is a bit more elegant. For instance:
-
-```python
-# works with both unicornafl 1.x and unicornafl 2.x
-import unicornafl
-
-unicornafl.monkeypatch()
-
-uc.afl_fuzz(...)
-```
-
-In unicornafl 2.x, we recommend:
-
-```python
-# unicornafl 2.x only!
-import unicornafl
-
-unicornafl.uc_afl_fuzz(uc, ...)
-```
-
-## Debugging
-
-UnicornAFL supports debugging in a similar way to AFL++.
-Setting the environment variable `AFL_DEBUG` will provide additional output relating to the forkserver and interaction between parent and child processes during execution.
-As usual with AFL++, `AFL_DEBUG_CHILD` will enable the output of the fuzzed children.
-This output can be further enriched via the `AFL_DEBUG_UNICORN` variable, which will detail information about child execution including block translations, hooks, and encountered errors. Note that this variable also requires `AFL_DEBUG_CHILD` to be set, as the output is provided from child context.
+There should be nothing special migrating from unicornafl v2.x to unicornafl v3.x, execpt the way integrating with AFL++. If your harness builds and statically links against unicornafl directly, there is no longer needed for the unicorn mode with AFL++. However, if you are using Python, or using C/C++ with `libunicornafl.so` dynamically linked, unicorn mode (`-U` option) is still needed for `afl-fuzz` command line.
