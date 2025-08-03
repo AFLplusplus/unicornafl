@@ -126,6 +126,7 @@ pub fn afl_fuzz<'a, D: 'a>(
 }
 
 /// Fuzzing entrypoint for FFI
+#[cfg(feature = "bindings")]
 #[unsafe(no_mangle)]
 #[allow(non_camel_case_types)]
 pub extern "C" fn uc_afl_fuzz(
@@ -154,6 +155,7 @@ pub extern "C" fn uc_afl_fuzz(
 }
 
 /// Custom fuzzing entrypoint for FFI
+#[cfg(feature = "bindings")]
 #[unsafe(no_mangle)]
 #[allow(non_camel_case_types)]
 pub extern "C" fn uc_afl_fuzz_custom(
@@ -323,7 +325,7 @@ fn uc_afl_fuzz_internal(
     }
 }
 
-#[cfg(feature = "bindings")]
+#[cfg(feature = "python")]
 pub mod bindings;
-#[cfg(feature = "bindings")]
+#[cfg(feature = "python")]
 pub use bindings::*;

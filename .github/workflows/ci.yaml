@@ -47,7 +47,7 @@ jobs:
 
     - name: '🚧 Build sample'
       run: |
-        cargo build --release --example sample --features env_logger
+        cargo build --release --example sample --features env_logger,bindings
 
     - name: '🚧 AFLplusplus Checkout'
       uses: actions/checkout@v4
