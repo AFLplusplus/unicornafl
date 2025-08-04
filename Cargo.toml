@@ -25,7 +25,7 @@ libafl_bolts = { git = "https://github.com/AFLplusplus/LibAFL", rev = "c604d2dac
 # libafl_bolts = {path = "../LibAFL/libafl_bolts"}
 
 serde = { version = "1.0", features = ["derive"] }
-unicorn-engine = { git = "https://github.com/unicorn-engine/unicorn", rev = "cbdd00046af48c87d752d81cb57e4f9942dbb957" }
+unicorn-engine = { git = "https://github.com/unicorn-engine/unicorn", rev = "9784c02dffa8572d1bd3b44b40bc4b24eb1a7946" }
 log = "0.4"
 nix = { version = "0.30", features = ["signal"] }
 env_logger = { version = "0.11", optional = true }
