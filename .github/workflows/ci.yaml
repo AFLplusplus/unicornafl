@@ -44,10 +44,14 @@ jobs:
     - name: '🚧 Cargo test'
       run: |
         cargo test
+    
+    - name: '🚧 Test Building bindings feature'
+      run: |
+        cargo build --features env_logger,bindings
 
     - name: '🚧 Build sample'
       run: |
-        cargo build --release --example sample --features env_logger,bindings
+        cargo build --release --example sample --features env_logger
 
     - name: '🚧 AFLplusplus Checkout'
       uses: actions/checkout@v4
