@@ -80,7 +80,7 @@ cargo build --example sample --release
 afl-fuzz -i ./input -o ./output-8 -b 1 -g 8 -G 8 -V 60 -c 0 -- ./target/release/examples/sample @@ true
 ```
 
-This shall find the crash instantly, thanks to the `cmplog` integration.
+This shall find the crash instantly, thanks to the `cmplog` integration (enabled by `-c 0`).
 
 For more details, please refer to [Fuzzing using UnicornAFL](./docs/fuzzing.md).
 
